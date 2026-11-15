@@ -12,6 +12,7 @@ import {
   buildHubs,
   burstOffset,
   hubPoint,
+  pickNearest,
   choosePlanetUnit,
   cosmosFade,
   flightOffset,
@@ -27,6 +28,7 @@ import {
   spiralPoint,
   swarmCapacity,
   type Hub,
+  type TapTarget,
   type PlanetJitter,
 } from '../widgets/cosmos/cosmosModel';
 import { GraphView } from '../widgets/cosmos/GraphView';
@@ -177,26 +179,42 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       focus.set(null);
       return;
     }
+    // 광선이 종이에 정확히 맞으면 그 종이다
     const cardHit = focus.pickHit(x, y);
     if (cardHit) {
       focus.set(cardHit.card);
       return;
     }
-    // 종이가 없으면 화면에서 가장 가까운 노드를 고른다
-    let best: CosmosNode | null = null;
-    let bestDist: number = g.tapRadius;
+    // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다
+    const rect = canvas.getBoundingClientRect();
+    const pxPerUnit = rect.height / (2 * Math.tan((stage.camera.fov * Math.PI) / 360));
+    const targets: TapTarget[] = [];
+    const picks: Array<{ card: NoteCard } | { node: CosmosNode }> = [];
+    for (const card of cards) {
+      if (!card.visible || card.mesh.material.uniforms.uFade.value < 0.3) continue;
+      const depth = -card.mesh.position.z;
+      if (depth < 0.5) continue;
+      const half = (Math.hypot(card.layout.worldWidth, card.layout.worldHeight) / 2) * card.mesh.scale.x;
+      const sp = screenOf(card.mesh.position);
+      targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.paperTapRadius, (half * pxPerUnit) / depth) });
+      picks.push({ card });
+    }
     for (const node of nodes) {
       if (node.position.z > -0.5) continue;
-      const s = screenOf(node.position);
-      const d = Math.hypot(s.x - x, s.y - y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = node;
-      }
+      const sp = screenOf(node.position);
+      targets.push({ x: sp.x, y: sp.y, radius: g.tapRadius });
+      picks.push({ node });
     }
-    if (!best) return;
-    if (best.kind === 'planet') controller.focusOn(best.anchorTime, finerLevel(controller.level));
-    else controller.focusOn(best.anchorTime, controller.level);
+    const i = pickNearest(targets, x, y);
+    if (i < 0) return;
+    const chosen = picks[i];
+    if ('card' in chosen) {
+      focus.set(chosen.card);
+      return;
+    }
+    const node = chosen.node;
+    if (node.kind === 'planet') controller.focusOn(node.anchorTime, finerLevel(controller.level));
+    else controller.focusOn(node.anchorTime, controller.level);
   });
 
   const hud = createAxisHud(controller, oldest, newest);

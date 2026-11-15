@@ -8,6 +8,7 @@ import {
   burstOffset,
   hourColorIndex,
   hubPoint,
+  pickNearest,
   parentUnit,
   choosePlanetUnit,
   cosmosFade,
@@ -275,6 +276,21 @@ describe('선 그래프', () => {
       expect(i).toBe(Math.floor((h * n) / 24));
       expect(i).toBeLessThan(n);
     }
+  });
+});
+
+describe('pickNearest', () => {
+  it('판정 반경 안의 후보 가운데 가장 가까운 후보를 고르고, 없으면 -1 이다', () => {
+    const targets = [
+      { x: 100, y: 100, radius: 30 },
+      { x: 130, y: 100, radius: 30 },
+      { x: 400, y: 400, radius: 80 },
+    ];
+    expect(pickNearest(targets, 118, 100)).toBe(1);
+    expect(pickNearest(targets, 110, 100)).toBe(0);
+    expect(pickNearest(targets, 460, 400)).toBe(2);
+    expect(pickNearest(targets, 250, 250)).toBe(-1);
+    expect(pickNearest([], 0, 0)).toBe(-1);
   });
 });
 

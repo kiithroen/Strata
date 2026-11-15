@@ -280,6 +280,30 @@ export function flightQuaternion(f: Flight, tau: number, outward: Vector3, out: 
   return out.copy(alignQuat).multiply(rollQuat).multiply(rockQuat).multiply(rockQuat2);
 }
 
+/** 화면 위 탭 후보: 화면 좌표와 판정 반경(CSS px) */
+export interface TapTarget {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+/**
+ * 탭 자리에서 판정 반경 안에 든 후보 가운데 가장 가까운 후보의 번호. 없으면 -1.
+ * 움직이는 종이와 작은 노드를 정확히 맞히지 않아도 고를 수 있게 한다
+ */
+export function pickNearest(targets: readonly TapTarget[], x: number, y: number): number {
+  let best = -1;
+  let bestDist = Infinity;
+  targets.forEach((t, i) => {
+    const d = Math.hypot(t.x - x, t.y - y);
+    if (d <= t.radius && d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
 const lookMatrix = new Matrix4();
 const up = new Vector3(0, 1, 0);
 

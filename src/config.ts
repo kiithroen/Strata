@@ -50,7 +50,7 @@ export const tuning = {
      * 종이 휨: 카드 좌표(-0.5~0.5)에서 가로·세로 물결의 빈도·높이·빠르기, 가로 말림 크기와 빠르기.
      * 높이는 카드 폭 대비다
      */
-    bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [3.1, 2.3], curl: 0.32, curlSpeed: 0.9 },
+    bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [1.9, 1.5], curl: 0.32, curlSpeed: 0.6 },
     /** 압정: 윗변에서 내려온 거리(높이 대비), 가운데에서 좌우로 벗어나는 최대 정도(폭 대비), 앞면 위로 뜬 높이(폭 대비) */
     pin: { inset: 0.06, jitter: 0.16, lift: 0.025 },
     /** 압정 자리 윗변에 붙인 테이프: 색, 폭·높이(카드 폭 대비), 최대 기울기(라디안) */
@@ -185,6 +185,8 @@ export const tuning = {
       /** 허브는 나선 반지름의 이 비율인 안쪽 줄기 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
       hubRadius: 0.42,
       tapRadius: 34,
+      /** 종이 탭 판정 반경(CSS px). 화면에 보이는 종이 반지름이 이보다 크면 그쪽을 쓴다 */
+      paperTapRadius: 38,
       burst: { inner: 0.07, spacing: 0.07, depthJitter: 0.05, spin: 0.06 },
       hourColors: ['#4a64ff', '#3fd2ff', '#7dffb6', '#ffe07a', '#ff6fae', '#b783ff'],
     },
@@ -200,15 +202,15 @@ export const tuning = {
       capacityByUnit: { year: 3, month: 3, day: 8, hour: 14, hour6: 8, min15: 14 },
       gap: 0.18,
       spread: 0.75,
-      speed: 0.5,
+      speed: 0.2,
       speedJitter: [0.6, 1.4],
       wobble: 0.1,
-      wobbleFreq: [0.6, 2.2],
-      spinRate: [0.35, 1.5],
+      wobbleFreq: [0.35, 1.1],
+      spinRate: [0.12, 0.5],
       flutterAmp: 0.6,
       flutterAmp2: 0.35,
-      flutterFreq: [1.4, 3.6],
-      gust: { freq: [0.17, 0.41], phase: [0.3, 2.1], boost: 1.6 },
+      flutterFreq: [0.6, 1.6],
+      gust: { freq: [0.11, 0.27], phase: [0.3, 2.1], boost: 0.7 },
       gustWobble: 1.4,
     },
     satelliteScale: 0.3,
@@ -219,7 +221,7 @@ export const tuning = {
     regroupRate: 5,
     planetFadeRate: 4,
     /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
-    holdRate: 12,
+    holdRate: 30,
     /** 먼지: 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 원반 전체에 흩어지는 비율 */
     dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.12, halo: 0.12, size: 2.4, opacity: 0.55 },
     stars: { count: 2600, radius: 55, size: 1.8 },
