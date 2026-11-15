@@ -15,7 +15,10 @@
 
 파일: `src/widgets/noteCard/`
 
-사진 노트 하나를 나타내는 종이다. 흰 종이(`card.paper`)에 종이결을 뿌리고, 사진과 얇은 테두리(`card.photoLine`), 날짜·번호(`card.ink`, `card.inkDim`)를 인쇄한 모양을 캔버스 하나에 그려 텍스처로 쓴다.
+노트 하나를 나타내는 종이다. 노트 타입(`photo`, `memo`, `doc`)에 따라 모양과 질감을 달리해 캔버스에 그려 텍스처로 쓴다.
+- **사진 (`photo`)**: 폴라로이드 인화지(`card.paper`, `card.paperBack`)에 사진 테두리·안쪽 음영(`card.photoLine`, `card.photoInsetShadow`)과 두툼한 아래쪽 여백(`card.labelRatio`)을 두고 날짜·번호·캡션을 인쇄한다.
+- **짧은 노트 (`memo`)**: 정사각 포스트잇(`card.memo`: 파스텔 색지 조합, 윗변 접착 띠) 위에 제목·짧은 본문·날짜를 인쇄한다.
+- **긴 문서 (`doc`)**: `1 : √2` A4 용지(`card.doc`: 여백선·가로줄) 위에 제목·날짜 헤더와 여러 줄 문단을 인쇄한다.
 
 **압정과 테이프** (`paperPin.ts`)
 - 압정은 윗변에서 `card.pin.inset`(높이 대비) 아래, 가운데에서 좌우로 `card.pin.jitter`(폭 대비) 안쪽에 노트 번호로 정한 자리에 꽂힌다. `pinPoint`가 종이의 위치·회전·배율로 월드 자리를 구한다.
@@ -26,8 +29,8 @@
 - 사진은 폭·높이와 `render(targetWidth)`를 가진다. 텍스처를 만들 때 필요한 해상도로 그려 받고, 결과는 들고 있지 않는다.
 
 **크기와 텍스처** (`cardLayout.ts`, `NoteCard.ts`)
-- 안쪽 여백은 텍스처 폭 × `card.paddingRatio`, 라벨 띠 높이는 사진 폭 × `card.labelRatio`다. 사진 칸은 사진 비율을 그대로 지키고 라벨 띠는 사진 아래에 붙는다.
-- 월드 폭은 `card.width`, 월드 높이는 텍스처 비율로 정한다. 텍스처 폭을 바꿔도 월드 크기는 같다.
+- 폴라로이드(`photo`)는 위·좌우 여백(`card.paddingRatio`)을 두고 사진 비율을 그대로 지키며, 아래쪽 여백(`card.labelRatio`)을 두툼하게 붙여 인화지 모양을 낸다.
+- 포스트잇(`memo`)은 정사각 비율에 폭 `card.width × card.memo.widthScale`, A4 문서(`doc`)는 `1 : √2` 비율에 폭 `card.width × card.doc.widthScale`이다. 텍스처 폭을 바꿔도 월드 크기는 같다.
 - 떠 있는 카드는 `card.textureWidth` 텍스처를 쓴다. 펼치기 시작하면 `card.detailTextureWidth` 텍스처를 따로 만들어 바꿔 끼우고, 다 닫히면 버린다.
 
 **움직임** (`cardMotion.ts`의 `CardMotion`)
@@ -41,7 +44,7 @@
 - 모든 카드가 `CardLook` 유니폼 객체를 함께 쓴다. 시간과 안개 범위는 데모가 한 번만 갱신한다.
 - 배치가 넘기는 불투명도(`fade`)를 받는다. 펼치는 중인 카드는 불투명도와 상관없이 보이고, 거의 투명한 카드는 그리지 않는다.
 - 펼친 카드는 테두리에 강조색 빛이 돌고 주사선과 잡음이 옅어진다. 깊이에 따라 안개 범위에서 배경색으로 녹는다.
-- 양면이다. 뒷면은 인쇄 없는 종이(`card.paperBack`)에 종이결만 보인다.
+- 양면이다. 뒷면은 인쇄 없는 각 타입·색상의 종이결만 보인다.
 - 휨(`CardLook.uBend`, 0~1): 메시를 `card.segments` 칸 격자로 나누고, 정점 셰이더가 카드 좌표의 가로·세로 물결과 가로 말림(`card.bend`)을 더한 높이만큼 앞뒤로 민다. 종이마다 노트 번호로 정한 위상만큼 어긋나게 출렁이고, 펼치는 동안에는 평평해진다.
 - 조명(`CardLook.uShade`, 0~1): 휜 면의 법선으로 밝기와 옅은 윤기를 낸다. 펼치는 동안에는 꺼진다. 우주 보기만 휨과 조명을 켠다.
 - `setBadge(text)`로 카드 오른쪽 위에 배지를 붙인다(높이 `axis.badgeHeight`). 글자 텍스처는 `widgets/common/labelCache.ts`가 구워 재사용한다.

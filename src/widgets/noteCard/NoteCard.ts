@@ -1,9 +1,9 @@
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial } from 'three';
 import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
-import { cardLayout, type CardLayout } from './cardLayout';
+import { faceLayout, type CardLayout } from './cardLayout';
 import { createCardMaterial, type CardLook } from './cardMaterial';
-import { createCardTexture, type CardFace } from './cardTexture';
+import { createCardTexture, paperColors, type CardFace } from './cardTexture';
 import { CardMotion, type FloatParams, type Pose } from './cardMotion';
 
 export interface NoteCardOptions {
@@ -43,7 +43,8 @@ export class NoteCard {
     this.face = opts.face;
     this.anisotropy = opts.anisotropy;
     this.labels = opts.labels;
-    this.layout = cardLayout(opts.face.photo.width, opts.face.photo.height);
+    const kind = opts.face.kind ?? 'photo';
+    this.layout = faceLayout(kind, opts.face.photo);
     this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy);
     let phase = 0;
     for (let i = 0; i < this.id.length; i++) phase = (phase * 31 + this.id.charCodeAt(i)) % 6283;
@@ -53,6 +54,7 @@ export class NoteCard {
       width: this.layout.worldWidth,
       height: this.layout.worldHeight,
       bendPhase: phase / 1000,
+      paperBack: paperColors(opts.face).back,
     });
     this.bendPhase = phase / 1000;
     const seg = tuning.card.segments;
@@ -140,7 +142,7 @@ export class NoteCard {
     const u = this.mesh.material.uniforms;
     const opening = this.motion.focused || this.motion.focus > HIDDEN;
     if (opening && !this.detailTexture) {
-      const detailLayout = cardLayout(this.face.photo.width, this.face.photo.height, tuning.card.detailTextureWidth);
+      const detailLayout = faceLayout(this.layout.kind, this.face.photo, tuning.card.detailTextureWidth);
       this.detailTexture = createCardTexture(this.face, detailLayout, this.anisotropy);
       u.map.value = this.detailTexture;
     } else if (!opening && this.detailTexture) {

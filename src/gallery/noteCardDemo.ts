@@ -1,8 +1,10 @@
 import { Euler, Quaternion, Vector3 } from 'three';
 import { tuning } from '../config';
+import { sampleNoteText } from '../dev/fakeNotes';
 import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
 import { listenTap } from '../input/tap';
 import { LabelCache } from '../widgets/common/labelCache';
+import type { NoteKind } from '../widgets/noteCard/cardLayout';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import type { Pose } from '../widgets/noteCard/cardMotion';
 import { generateField } from '../widgets/noteCard/field';
@@ -38,8 +40,16 @@ export function mountNoteCardDemo(stage: Stage): NoteCardDemo {
       quaternion: new Quaternion().setFromEuler(new Euler(0, slot.yaw, 0)),
       scale: 1,
     });
+    const kind: NoteKind = i % 5 === 1 || i % 5 === 3 ? 'memo' : i % 5 === 4 ? 'doc' : 'photo';
+    const sample = sampleNoteText(kind, i);
     const card = new NoteCard({
-      face: { id: String(slots.length - i).padStart(4, '0'), createdAt: new Date(stamp), photo: photos[i] },
+      face: {
+        id: String(slots.length - i).padStart(4, '0'),
+        createdAt: new Date(stamp),
+        kind,
+        photo: kind === 'photo' ? photos[i] : undefined,
+        ...sample,
+      },
       float: { phase: slot.floatPhase, period: slot.floatPeriod },
       look,
       labels,

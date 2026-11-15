@@ -177,12 +177,15 @@ export interface CardMaterialOptions {
   height: number;
   /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다 */
   bendPhase: number;
+  /** 뒷면 종이 색. 지정하지 않으면 look.uPaperBack 을 쓴다 */
+  paperBack?: string;
 }
 
 export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
   return new ShaderMaterial({
     uniforms: {
       ...o.look,
+      uPaperBack: { value: o.paperBack ? new Color(o.paperBack) : o.look.uPaperBack.value.clone() },
       map: { value: o.map },
       uAspect: { value: o.width / o.height },
       uCardSize: { value: new Vector2(o.width, o.height) },

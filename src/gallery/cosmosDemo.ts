@@ -113,7 +113,14 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const rng = createRng(tuning.dev.noteSeed + 2);
   const cards = notes.map((note, i) => {
     const card = new NoteCard({
-      face: { id: note.id, createdAt: new Date(note.time), photo: photos[i] },
+      face: {
+        id: note.id,
+        createdAt: new Date(note.time),
+        kind: note.kind,
+        photo: note.kind === 'photo' || !note.kind ? photos[i] : undefined,
+        title: note.title,
+        body: note.body,
+      },
       float: { phase: range(rng, 0, Math.PI * 2), period: range(rng, tuning.float.periodMin, tuning.float.periodMax) },
       look,
       labels,

@@ -28,22 +28,45 @@ export const tuning = {
   },
 
   card: {
-    /** 카드 전체 폭. 높이는 사진 비율과 라벨 띠로 정해진다. */
+    /** 카드 기준 폭. 타입별 비율과 크기는 아래 설정으로 정해진다. */
     width: 1.2,
     /** 떠 있는 카드의 텍스처 폭(px) */
     textureWidth: 320,
     /** 펼친 카드에 따로 만들어 쓰는 선명한 텍스처 폭(px) */
     detailTextureWidth: 1024,
-    /** 텍스처 폭 대비 안쪽 여백 */
-    paddingRatio: 0.055,
-    /** 사진 폭 대비 라벨 띠 높이 */
-    labelRatio: 0.13,
-    /** 종이 색(앞면 바탕, 뒷면), 인쇄 글자 색, 사진 테두리 선 */
-    paper: '#f3f0e8',
-    paperBack: '#e9e5dc',
+    /** 폴라로이드 사진 카드: 위·좌우 여백(폭 대비)과 두툼한 아래쪽 인화지 여백(사진 폭 대비) */
+    paddingRatio: 0.065,
+    labelRatio: 0.24,
+    /** 종이 색(폴라로이드 앞·뒷면), 인쇄 글자 색, 사진 테두리·안쪽 그림자 */
+    paper: '#f5f3ec',
+    paperBack: '#e6e2d6',
     ink: '#2c2b29',
     inkDim: '#86827a',
-    photoLine: 'rgba(0, 0, 0, 0.16)',
+    photoLine: 'rgba(0, 0, 0, 0.18)',
+    photoInsetShadow: 'rgba(0, 0, 0, 0.14)',
+    /** 짧은 노트(포스트잇): 정사각 비율, 기준 폭 대비 배율, 안쪽 여백, 윗변 접착 띠 비율, 색 조합 */
+    memo: {
+      widthScale: 0.84,
+      paddingRatio: 0.09,
+      stripRatio: 0.13,
+      palette: [
+        { front: '#f4df72', strip: '#e5cd56', back: '#e2cb5f' },
+        { front: '#f4df72', strip: '#e5cd56', back: '#e2cb5f' },
+        { front: '#bfe5f2', strip: '#a6d2e2', back: '#add5e3' },
+        { front: '#f6c7ce', strip: '#e5afb8', back: '#e5b5bd' },
+        { front: '#c9ecc2', strip: '#b2daa9', back: '#b7dcb0' },
+      ],
+    },
+    /** 긴 문서(A4): 1:√2 세로 비율, 기준 폭 대비 배율, 안쪽 여백, 헤더 높이 비율, 용지·줄 색 */
+    doc: {
+      widthScale: 1.05,
+      paddingRatio: 0.085,
+      headerRatio: 0.15,
+      paper: '#f6f7f4',
+      paperBack: '#eaebe6',
+      ruleLine: 'rgba(60, 85, 130, 0.12)',
+      marginLine: 'rgba(209, 34, 43, 0.22)',
+    },
     /** 휨 격자 칸 수(가로·세로) */
     segments: 10,
     /**
@@ -204,14 +227,14 @@ export const tuning = {
       gap: 0.11,
       spread: 1.35,
       pullCurve: 1.6,
-      speed: 0.14,
+      speed: 0.065,
       speedJitter: [0.6, 1.4],
       wobble: 0.1,
       wobbleFreq: [0.35, 1.1],
-      spinRate: [0.12, 0.5],
+      spinRate: [0.015, 0.06],
       flutterAmp: 0.6,
       flutterAmp2: 0.35,
-      flutterFreq: [0.6, 1.6],
+      flutterFreq: [0.4, 1.0],
       gust: { freq: [0.11, 0.27], phase: [0.3, 2.1], boost: 0.7 },
       gustWobble: 1.4,
     },

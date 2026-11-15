@@ -1,6 +1,7 @@
 import { tuning } from '../../config';
 import { DAY_MS, UNIT_DAYS, UNITS, addUnits, floorTo, type TimeUnit } from '../../core/calendar';
 import { damp } from '../../core/motion';
+import type { NoteKind } from '../noteCard/cardLayout';
 
 /**
  * 시간축: 시간을 화면 안쪽 깊이로 펼친다. 카메라는 원점에서 -Z 를 보고,
@@ -188,6 +189,9 @@ export interface NoteRef {
   id: string;
   time: number;
   tags?: readonly string[];
+  kind?: NoteKind;
+  title?: string;
+  body?: string;
 }
 
 export interface Cluster {
