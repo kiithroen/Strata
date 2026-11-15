@@ -11,6 +11,7 @@ import {
   RegroupBlend,
   buildHubs,
   burstOffset,
+  clusterAffinities,
   hubPoint,
   pickNearest,
   choosePlanetUnit,
@@ -282,10 +283,14 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         graph.label(labelPos, planetLabel(unit, floorTo(unit, cluster.anchorTime), n), c.planetLabelHeight, alpha * 0.85, cameraPosition);
 
         const r = planetRadius(n);
-        cluster.members.forEach((m, k) => {
-          // 종이: 행성 단위별 큰 카드 수까지만 날린다
-          paperFade[m] = damp(paperFade[m], k < capacity ? 1 : 0, c.regroupRate, dt);
-          flightOffset(flights[m], r, tau, gustNow, offset);
+        const affinities = clusterAffinities(notes, cluster.members);
+        const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => affinities[b] - affinities[a]);
+        order.forEach((idx, rank) => {
+          const m = cluster.members[idx];
+          const affinity = affinities[idx];
+          // 종이: 행성 단위별 큰 카드 수까지만 관련도 순으로 날린다
+          paperFade[m] = damp(paperFade[m], rank < capacity ? 1 : 0, c.regroupRate, dt);
+          flightOffset(flights[m], r, affinity, tau, gustNow, offset);
           target.copy(st.position).add(offset);
           const p = paperBlends[m].step(dt, cluster.key, target);
           const home = homes[m];
@@ -297,7 +302,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 수사 보드처럼 종이에 꽂힌 압정에 실로 묶이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
-          burstOffset(k, spin, offset);
+          burstOffset(rank, spin, offset, affinity);
           target.copy(st.position).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = paperFade[m] * (1 - card.motion.focus);

@@ -187,6 +187,7 @@ export function chooseClusterUnit(state: AxisState): TimeUnit | null {
 export interface NoteRef {
   id: string;
   time: number;
+  tags?: readonly string[];
 }
 
 export interface Cluster {

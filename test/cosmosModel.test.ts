@@ -6,6 +6,7 @@ import {
   RegroupBlend,
   buildHubs,
   burstOffset,
+  clusterAffinities,
   hourColorIndex,
   hubPoint,
   pickNearest,
@@ -128,21 +129,30 @@ describe('돌풍에 날리는 종이', () => {
     }
   });
 
-  it('종이는 행성 둘레 띠 안에 머물고 난기류만큼만 벗어난다', () => {
+  it('종이는 행성 둘레 띠 안에 머물고 관련도가 높을수록 가까우며 난기류만큼만 벗어난다', () => {
     const planetR = planetRadius(6);
     const out = new Vector3();
     const wobbleMax = s.wobble * (1 + s.gustWobble) * Math.sqrt(3);
-    for (const id of ids) {
+    expect(flightRadius(planetR, 1)).toBeCloseTo(planetR + s.gap, 12);
+    expect(flightRadius(planetR, 0)).toBeCloseTo(planetR + s.gap + s.spread, 12);
+    let prevR = Infinity;
+    for (const a of [0, 0.25, 0.5, 0.75, 1]) {
+      const r = flightRadius(planetR, a);
+      expect(r).toBeLessThan(prevR);
+      prevR = r;
+    }
+    ids.forEach((id, i) => {
       const f = flightParams(id);
-      const r = flightRadius(planetR, f);
+      const affinity = i / (ids.length - 1);
+      const r = flightRadius(planetR, affinity);
       expect(r).toBeGreaterThanOrEqual(planetR + s.gap - 1e-12);
       expect(r).toBeLessThanOrEqual(planetR + s.gap + s.spread + 1e-12);
       for (let t = 0; t < 30; t += 1.3) {
-        const d = flightOffset(f, planetR, gustTime(t), gust(t), out).length();
+        const d = flightOffset(f, planetR, affinity, gustTime(t), gust(t), out).length();
         expect(d).toBeLessThanOrEqual(r + wobbleMax + 1e-9);
         expect(d).toBeGreaterThanOrEqual(r - wobbleMax - 1e-9);
       }
-    }
+    });
   });
 
   it('궤도면은 한쪽으로 쏠리지 않고 아무 방향으로나 기운다', () => {
@@ -172,7 +182,7 @@ describe('돌풍에 날리는 종이', () => {
       let moved = 0;
       let prev: Quaternion | null = null;
       for (let t = 0; t < 40; t += 0.37) {
-        flightOffset(f, 0.3, gustTime(t), gust(t), outward);
+        flightOffset(f, 0.3, 0.5, gustTime(t), gust(t), outward);
         flightQuaternion(f, gustTime(t), outward, q);
         expect(q.length()).toBeCloseTo(1, 9);
         front.set(0, 0, 1).applyQuaternion(q);
@@ -250,7 +260,7 @@ describe('선 그래프', () => {
     expect(Math.atan2(out.y, out.x)).toBeCloseTo(Math.atan2(Math.sin(spiralAngle(8, 2)), Math.cos(spiralAngle(8, 2))), 9);
   });
 
-  it('노트 점은 노드 둘레 원판에 퍼지고 순서가 뒤일수록 바깥이며 서로 겹치지 않는다', () => {
+  it('노트 점은 관련도가 높을수록 가깝고, 같은 관련도에서는 순서가 뒤일수록 바깥이며 겹치지 않는다', () => {
     const b = g.burst;
     const pts: Vector3[] = [];
     let prevR = 0;
@@ -267,6 +277,31 @@ describe('선 그래프', () => {
     for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) minGap = Math.min(minGap, pts[i].distanceTo(pts[j]));
     // 해바라기 씨 배치는 이웃 점 사이가 간격의 절반보다 가까워지지 않는다
     expect(minGap).toBeGreaterThan(b.spacing * 0.5);
+
+    const near = burstOffset(2, 0.3, new Vector3(), 1);
+    const far = burstOffset(2, 0.3, new Vector3(), 0);
+    expect(Math.hypot(far.x, far.y)).toBeGreaterThan(Math.hypot(near.x, near.y) + b.pullSpread * 0.99);
+  });
+
+  it('묶음 관련도는 0~1 이고 시간 중심·주제 태그가 맞는 노트가 더 강하게 끌린다', () => {
+    expect(clusterAffinities([{ id: '1', time: NOW }], [0])).toEqual([1]);
+
+    const notes = [
+      { id: 'outlier', time: NOW + 10 * 3_600_000, tags: ['영수증', '메모', '할인'] },
+      { id: 'core-1', time: NOW + 60_000, tags: ['여행'] },
+      { id: 'core-2', time: NOW, tags: ['여행'] },
+      { id: 'core-3', time: NOW - 60_000, tags: ['여행'] },
+      { id: 'side', time: NOW - 120_000, tags: ['일상', '메모'] },
+    ];
+    const affinities = clusterAffinities(notes, [0, 1, 2, 3, 4]);
+    for (const a of affinities) {
+      expect(a).toBeGreaterThanOrEqual(0);
+      expect(a).toBeLessThanOrEqual(1);
+    }
+    // 중앙 시간 + 주된 태그('여행') 노트가 가장자리 이상치나 다른 태그 노트보다 강하다
+    expect(affinities[2]).toBeGreaterThan(affinities[4]);
+    expect(affinities[2]).toBeGreaterThan(affinities[0]);
+    expect(affinities[1]).toBeGreaterThan(affinities[0]);
   });
 
   it('점 색은 노트가 찍힌 시각을 하루를 나눈 칸으로 고른다', () => {

@@ -187,22 +187,24 @@ export const tuning = {
       tapRadius: 34,
       /** 종이 탭 판정 반경(CSS px). 화면에 보이는 종이 반지름이 이보다 크면 그쪽을 쓴다 */
       paperTapRadius: 38,
-      burst: { inner: 0.07, spacing: 0.07, depthJitter: 0.05, spin: 0.06 },
+      burst: { inner: 0.06, spacing: 0.055, pullSpread: 0.85, pullCurve: 1.5, depthJitter: 0.05, spin: 0.06 },
       hourColors: ['#4a64ff', '#3fd2ff', '#7dffb6', '#ffe07a', '#ff6fae', '#b783ff'],
     },
     /**
      * 돌풍에 날리는 종이(위성).
      * capacityByUnit: 행성 단위별 큰 카드 수(넘친 위성은 overflowScale 크기 종잇조각).
-     * gap·spread: 행성 표면에서 띠 안쪽까지 거리와 띠 두께. speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 종이마다 배율 범위.
+     * gap·spread·pullCurve: 행성 표면에서 가장 강한 인력 거리와 관련도가 낮을수록 멀어지는 폭·곡선 지수.
+     * speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 종이마다 배율 범위.
      * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. spinRate: 종이가 제 면 안에서 빙글 도는 빠르기 범위(라디안/초).
      * flutterAmp·flutterAmp2·flutterFreq: 앞면이 바깥 방향에서 두 축으로 기우는 최대 각도와 빈도 범위. 둘을 더한 각도를 넘지 않아 뒤집히지 않는다.
      * gust: 돌풍 사인 둘의 빈도·위상, boost 는 돌풍이 가장 셀 때 더해지는 시간 배율, gustWobble 은 흔들림이 커지는 배율
      */
     swarm: {
       capacityByUnit: { year: 3, month: 3, day: 8, hour: 14, hour6: 8, min15: 14 },
-      gap: 0.18,
-      spread: 0.75,
-      speed: 0.2,
+      gap: 0.11,
+      spread: 1.35,
+      pullCurve: 1.6,
+      speed: 0.14,
       speedJitter: [0.6, 1.4],
       wobble: 0.1,
       wobbleFreq: [0.35, 1.1],

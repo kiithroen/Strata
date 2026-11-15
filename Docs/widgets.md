@@ -104,8 +104,9 @@
 - 나선 위 자리는 반지름 `cosmos.armRadius`에서 묶음 키로 정한 만큼(`cosmos.radiusJitter`, `cosmos.angleJitter`) 벗어난다. 같은 묶음은 늘 같은 자리다.
 - 노드는 흰 점(`graph.nodeSize`, 노트 수에 따라 조금 커짐)과 가장 최근 노트 색의 빛 무리(`graph.glowSize`, `graph.glowAlpha`), 아래쪽 `날짜 · 노트 수` 글자(`cosmos.planetLabelHeight`)로 그린다. 묶음이 바뀌면 빠진 노드는 마지막 자리에서 옅어지고 새 노드는 나타난다(`cosmos.planetFadeRate`).
 
-**노트 점과 살** (`burstOffset`, `hourColorIndex`)
-- k 번째 노트 점은 노드 둘레의 화면을 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½)`, 앞뒤로 `burst.depthJitter`만큼 흔들리고 원판 전체가 `burst.spin`으로 돈다.
+**노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
+- `clusterAffinities`가 묶음 안 각 노트의 관련도(0~1)를 구한다. 날짜 축에서는 묶음 중앙 시각과의 근접성(이상치에 눌리지 않게 중앙값 편차와 순위를 섞음)과 묶음 주된 태그 집중도를 합쳐 계산한다.
+- k 번째(관련도 높은 순) 노트 점은 노드 둘레의 화면을 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½) + burst.pullSpread × (1 − 관련도)^burst.pullCurve`이고, 앞뒤로 `burst.depthJitter`만큼 흔들리며 원판 전체가 `burst.spin`으로 돈다. 관련도가 높을수록 노드 가까이에 모이고 낮을수록 긴 살 끝에 놓인다.
 - 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 수사 보드처럼 살이 종이에 꽂힌 압정(`noteCard/paperPin.ts`)에 실로 묶여 함께 끌려다니고, 압정 머리(`graph.pinSize`)를 그 노트 색으로 그린다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 압정 사이를 그만큼 옮겨 간다.
 - 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
@@ -117,9 +118,9 @@
 - 선은 화면 px 굵기 선분(`LineSegments2`), 점과 빛 무리는 깊이에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
 
 **날리는 종이** (`flightParams`, `flightOffset`, `flightQuaternion`, `gust`, `gustTime`)
-- 행성 단위별로 `swarm.capacityByUnit`장까지(최근 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
-- 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 띠 안 자리, 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 제 면 안에서 빙글 도는 빠르기(`swarm.spinRate`), 팔랑이는 축 방향과 빈도(`swarm.flutterFreq`)가 정해진다.
-- 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × 띠 안 자리`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)다.
+- 행성 단위별로 `swarm.capacityByUnit`장까지(관련도 높은 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
+- 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 제 면 안에서 빙글 도는 빠르기(`swarm.spinRate`), 팔랑이는 축 방향과 빈도(`swarm.flutterFreq`)가 정해진다.
+- 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × (1 − 관련도)^swarm.pullCurve`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)라 관련도가 높은 종이일수록 짧은 실로 노드 가까이에서 빠르게 돈다.
 - 은하 전체에 돌풍이 분다. 세기 `gust(t)`는 느린 사인 둘의 합(0~1, `swarm.gust.freq`, `swarm.gust.phase`)이고, 종이의 움직임은 `1 + gust.boost × gust`를 미리 적분한 돌풍 시계 `gustTime`으로 잰다. 돌풍이 셀수록 빨리 돌고 더 뒹굴며, 난기류 흔들림도 `swarm.wobble × (1 + swarm.gustWobble × gust)`로 커진다.
 - 종이 자세: 사진·테이프·압정이 있는 앞면이 노드 바깥쪽(노드에서 종이로 향하는 방향)을 향하고, 제 면 안에서 빙글 돌며 수직인 두 축으로 팔랑인다(`swarm.flutterAmp`, `swarm.flutterAmp2`). 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 카메라를 보지 않으므로 노드 뒤쪽 종이는 뒷면을 보인다. 크기는 `card.width × cosmos.satelliteScale`이다.
 - 다른 노드로 옮겨 갈 때만 `RegroupBlend`로 잇고, 그 밖에는 목표 위치를 지연 없이 따른다.

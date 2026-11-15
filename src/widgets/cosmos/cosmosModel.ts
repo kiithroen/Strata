@@ -2,7 +2,7 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
 import { floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
-import { unitSpacing, type AxisState, type Cluster } from '../timeAxis/axisModel';
+import { unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
 
 /**
  * 우주 보기: 시간 묶음은 행성, 노트는 행성 둘레를 도는 위성이다.
@@ -119,14 +119,74 @@ export function hubPoint(childDepths: readonly number[], time: number, out: Vect
   return spiralPoint(depth, time, { radiusScale: tuning.cosmos.graph.hubRadius, angleOffset: 0 }, out);
 }
 
+function clamp01(x: number): number {
+  return Math.max(0, Math.min(1, x));
+}
+
+/**
+ * 묶음 안 각 노트가 그 노드에 끌리는 관련도(0~1, 1이 가장 강함).
+ * 날짜 축에서는 묶음 중앙 시각과의 근접성과 태그 주제 집중도를 합쳐 계산한다.
+ */
+export function clusterAffinities(notes: readonly NoteRef[], members: readonly number[]): number[] {
+  const n = members.length;
+  if (n === 0) return [];
+  if (n === 1) return [1];
+
+  const medianTime = n === 2 ? notes[members[0]].time : notes[members[Math.floor(n / 2)]].time;
+  const dts = members.map((m) => Math.abs(notes[m].time - medianTime));
+  const nonZero = dts.filter((d) => d > 0).sort((a, b) => a - b);
+  const scale = nonZero.length > 0 ? nonZero[Math.floor(nonZero.length / 2)] : 1;
+
+  const tagCounts = new Map<string, number>();
+  for (const m of members) {
+    const tags = notes[m].tags;
+    if (!tags) continue;
+    for (const tag of new Set(tags)) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+  }
+
+  const metrics = new Float64Array(n);
+  let minMetric = Infinity;
+  let maxMetric = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const note = notes[members[i]];
+    const timeScore = Math.exp(-dts[i] / (scale * 1.5));
+    let metric = timeScore;
+    if (tagCounts.size > 0) {
+      const tags = note.tags;
+      let tagScore = 0;
+      if (tags && tags.length > 0) {
+        let sum = 0;
+        for (const tag of tags) sum += (tagCounts.get(tag) ?? 0) / n;
+        tagScore = (sum / tags.length) * (1 / Math.sqrt(tags.length));
+      }
+      metric = 0.6 * timeScore + 0.4 * tagScore;
+    }
+    metric += hash01(hashString(note.id), 99) * 1e-6;
+    metrics[i] = metric;
+    if (metric < minMetric) minMetric = metric;
+    if (metric > maxMetric) maxMetric = metric;
+  }
+
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => metrics[b] - metrics[a]);
+  const span = maxMetric - minMetric;
+  const result = new Array<number>(n);
+  order.forEach((idx, rank) => {
+    const normMetric = span > 1e-9 ? (metrics[idx] - minMetric) / span : 1;
+    const rankScore = 1 - rank / (n - 1);
+    result[idx] = clamp01(0.55 * normMetric + 0.45 * rankScore);
+  });
+  return result;
+}
+
 /**
  * 노드에서 k 번째 노트 점까지의 자리: 화면을 마주 보는 원판에 해바라기 씨처럼(황금각) 퍼진다.
- * 반지름은 burst.inner + burst.spacing × √(k + ½), 앞뒤로 burst.depthJitter 만큼 흔들리고 원판 전체가 spin 각도만큼 돈다.
+ * 관련도(affinity, 0~1)가 높을수록 노드 가까이에 모이고, 낮을수록 긴 살 끝에 놓인다.
  */
-export function burstOffset(k: number, spin: number, out: Vector3): Vector3 {
+export function burstOffset(k: number, spin: number, out: Vector3, affinity = 1): Vector3 {
   const b = tuning.cosmos.graph.burst;
   const angle = k * GOLDEN_ANGLE + spin;
-  const r = b.inner + b.spacing * Math.sqrt(k + 0.5);
+  const pull = Math.pow(1 - clamp01(affinity), b.pullCurve);
+  const r = b.inner + b.spacing * Math.sqrt(k + 0.5) + b.pullSpread * pull;
   return out.set(Math.cos(angle) * r, Math.sin(angle) * r, (hash01(k, 77) * 2 - 1) * b.depthJitter);
 }
 
@@ -170,8 +230,6 @@ function randomQuaternion(h: number, salt: number, out: Quaternion): Quaternion 
 export interface Flight {
   /** XZ 평면의 원을 궤도면으로 돌리는 회전. 궤도면은 아무 방향으로나 기운다 */
   orbit: Quaternion;
-  /** 행성 둘레 띠 안의 자리(0이 안쪽, 1이 바깥쪽) */
-  band: number;
   phase: number;
   /** 공전 속도 배율. 음수면 반대로 돈다 */
   speed: number;
@@ -194,7 +252,6 @@ export function flightParams(noteId: string): Flight {
   const direction = hash01(h, 1) < 0.5 ? -1 : 1;
   return {
     orbit: randomQuaternion(h, 2, new Quaternion()),
-    band: hash01(h, 5),
     phase: hash01(h, 6) * TAU,
     speed: direction * pick(h, 7, s.speedJitter),
     wobbleFreq: [pick(h, 8, s.wobbleFreq), pick(h, 9, s.wobbleFreq), pick(h, 10, s.wobbleFreq)],
@@ -228,10 +285,11 @@ export function gustTime(time: number): number {
   return time + g.boost * integral;
 }
 
-/** 행성 중심에서 종이 궤도까지 반지름. 행성 표면에서 swarm.gap 떨어진 곳부터 swarm.spread 두께의 띠다 */
-export function flightRadius(planetR: number, f: Flight): number {
+/** 행성 중심에서 종이 궤도까지 반지름. 관련도(affinity, 0~1)가 높을수록 행성에 가깝게 당겨진다 */
+export function flightRadius(planetR: number, affinity: number): number {
   const s = tuning.cosmos.swarm;
-  return planetR + s.gap + s.spread * f.band;
+  const pull = Math.pow(1 - clamp01(affinity), s.pullCurve);
+  return planetR + s.gap + s.spread * pull;
 }
 
 /** 공전 각속도. 케플러 3법칙처럼 반지름의 1.5 제곱에 반비례한다 */
@@ -243,9 +301,16 @@ export function orbitSpeed(radius: number): number {
  * 행성 중심에서 본 종이 위치: 기운 궤도를 돌면서 난기류에 흔들린다.
  * tau 는 gustTime(공전 시계), g 는 그때의 돌풍 세기다. 흔들림 크기는 swarm.wobble × (1 + swarm.gustWobble × g)다.
  */
-export function flightOffset(f: Flight, planetR: number, tau: number, g: number, out: Vector3): Vector3 {
+export function flightOffset(
+  f: Flight,
+  planetR: number,
+  affinity: number,
+  tau: number,
+  g: number,
+  out: Vector3,
+): Vector3 {
   const s = tuning.cosmos.swarm;
-  const r = flightRadius(planetR, f);
+  const r = flightRadius(planetR, affinity);
   const angle = f.phase + f.speed * orbitSpeed(r) * tau;
   out.set(Math.cos(angle) * r, 0, Math.sin(angle) * r).applyQuaternion(f.orbit);
   const w = s.wobble * (1 + s.gustWobble * g);
