@@ -1,0 +1,64 @@
+:root {
+  --bg: #07070a;
+  --text: #e9e6e1;
+  --text-dim: #8a8782;
+  --accent: #d1222b;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "D2Coding", monospace;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+}
+
+#stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 브라우저의 확대·스크롤을 막고 손가락 조작은 앱이 직접 받는다 */
+  touch-action: none;
+}
+
+.hud {
+  position: fixed;
+  left: 0;
+  right: 0;
+  padding: 0 16px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.hud-top {
+  top: calc(env(safe-area-inset-top) + 14px);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.hud-top .tag {
+  color: var(--bg);
+  background: var(--accent);
+  padding: 2px 6px;
+  font-weight: 700;
+}
+
+.hud-bottom {
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  color: var(--text-dim);
+  text-align: center;
+}
