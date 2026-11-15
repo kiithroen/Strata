@@ -16,6 +16,13 @@ npm run dev
 - **USB(권장)**: 폰을 USB 디버깅으로 연결하고 `adb reverse tcp:5173 tcp:5173`을 실행한 뒤 폰 브라우저에서 `http://localhost:5173/`을 연다. 주소가 localhost라 보안 컨텍스트가 필요한 API(저장소 영구화 등)도 쓸 수 있다. PC 크롬의 `chrome://inspect`로 폰 화면의 콘솔을 볼 수 있다.
 - **같은 와이파이**: `npm run dev:lan`으로 띄우고 출력에 나온 Network 주소를 폰에서 연다. 주소가 localhost가 아니라서 보안 컨텍스트가 필요한 API는 막힌다.
 
+## 배포
+
+`main`에 푸시하면 `.github/workflows/pages.yml`이 `npm ci`, `npm test`, `npm run build`를 돌리고 `dist`를 GitHub Pages에 올린다. 주소는 <https://kiithroen.github.io/Strata/>다. 테스트나 빌드가 실패하면 올라가지 않는다.
+
+- 빌드는 상대 경로(`vite.config.ts`의 `base: './'`)라 저장소 하위 경로에서도 열린다. 페이지 경로를 나누는 라우팅을 넣으면 이 설정을 다시 봐야 한다.
+- 배포본에는 디버그 훅(`window.__strata`)이 없다.
+
 ## 구조
 
 | 경로 | 내용 |
