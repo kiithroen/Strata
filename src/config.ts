@@ -124,6 +124,50 @@ export const tuning = {
     badgeHeight: 0.16,
   },
 
+  cosmos: {
+    /** 우주는 깊이 끝까지 보여야 해서 안개를 따로 둔다 */
+    fogNear: 14,
+    fogFar: 44,
+    nearDepth: 1.0,
+    fadeNearStart: 2.6,
+    farDepth: 52,
+    /** 행성 단위는 간격이 이 깊이 이상인 가장 작은 단위(연·월·일·시)다. 다 넘으면 시 단위다 */
+    planetMinSpacing: 0.6,
+    /** 나선팔: 깊이 1 마다 도는 각도, 초점면에서 지금 행성이 놓이는 각도(-π/2 가 화면 아래), 나선 반지름 */
+    twist: 0.21,
+    focusAngle: -1.5708,
+    armRadius: 1.3,
+    /** 행성마다 나선에서 벗어나는 정도: 반지름 비율, 각도 */
+    radiusJitter: 0.35,
+    angleJitter: 0.3,
+    /** 은하 전체가 도는 속도(라디안/초) */
+    spin: 0.015,
+    planetRadius: 0.16,
+    /** 위성 수의 제곱근에 곱해 행성 반지름에 더한다 */
+    planetGrowth: 0.05,
+    glowScale: 7,
+    planetLabelHeight: 0.13,
+    planetMaxRadius: 0.34,
+    /**
+     * 위성 고리: 첫 고리 위성 수, 고리마다 늘어나는 수, 고리 간격, 공전 속도 계수, 고리 기울기 최대.
+     * maxByUnit 은 행성 단위별 카드 고리 수다. 넘친 위성은 바깥 띠에 작게 돈다
+     */
+    ring: { base: 3, grow: 2, gap: 0.3, speed: 0.55, inclination: 0.55, maxByUnit: { year: 1, month: 1, day: 2, hour: 3, hour6: 2, min15: 3 } },
+    satelliteScale: 0.3,
+    ringOpacity: 0.35,
+    /** 고리에 다 못 들어간 위성은 바깥 띠에 작게 돈다 */
+    overflowScale: 0.07,
+    /** 묶임이 바뀔 때 위성이 새 행성으로 옮겨 가는 속도, 행성이 나타나고 사라지는 속도 */
+    regroupRate: 5,
+    planetFadeRate: 4,
+    /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
+    holdRate: 12,
+    /** 먼지: 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 원반 전체에 흩어지는 비율 */
+    dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.12, halo: 0.12, size: 2.4, opacity: 0.55 },
+    stars: { count: 2600, radius: 55, size: 1.8 },
+    coreSize: 9,
+  },
+
   dev: {
     /** 시간축 데모의 가짜 노트 */
     noteCount: 110,

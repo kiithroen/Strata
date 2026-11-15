@@ -4,7 +4,8 @@
 
 | 위젯 | 갤러리 이름 | 상태 |
 |---|---|---|
-| 시간축 | `time-axis` | 구현됨 |
+| 우주 보기 | `cosmos` | 구현됨. 앱의 주 화면이다 |
+| 시간축 | `time-axis` | 구현됨. 우주 보기가 쓰는 시간 모델을 레일로 보여 주는 확인용 화면이다 |
 | 노트 카드 | `note-card` | 구현됨 |
 | 카메라·제스처 | | 할 일 |
 | 후처리 | | 할 일 |
@@ -82,3 +83,34 @@
 - 가짜 노트 `dev.noteCount`장(`src/dev/fakeNotes.ts`: 최근일수록 촘촘하고, `dev.bursts`번은 몇 시간 안에 몰아 찍음)을 시간축에 놓는다. 처음에는 가장 최근 노트를 초점면에 두고 월 단계로 연다.
 - 제스처 위젯이 생기기 전까지는 화면 아래 단추로 조종한다: ◀(과거로)·▶(최근으로), 연·월·일·노트. 왼쪽 위에 지금 시점을 보인다.
 - 묶음을 탭하면 그 대표 시각으로 한 단계 들어가고, 낱장을 탭하면 펼친다. 펼친 상태에서 아무 데나 탭하면 닫는다.
+
+## 우주 보기
+
+파일: `src/widgets/cosmos/`. 시간 ↔ 깊이, 단계, 묶음, 조종은 시간축(`timeAxis/axisModel.ts`)을 그대로 쓴다.
+
+시간 묶음은 행성, 노트는 행성 둘레를 도는 위성(사진 카드)이다. 행성은 시간축(깊이)을 따라 화면 안쪽으로 감겨 드는 나선팔 위에 흩어져 있어 정면에서 보면 은하처럼 보인다. 나선은 카메라 공간에 고정돼 있고, 시간을 옮기면 행성과 먼지가 나선을 타고 소용돌이치며 다가오거나 멀어진다.
+
+**행성** (`cosmosModel.ts`, `PlanetView.ts`)
+- 행성 단위는 연·월·일·시 가운데 간격이 `cosmos.planetMinSpacing` 이상인 가장 작은 단위다(다 넘으면 시). 같은 단위 칸의 노트가 한 행성이고, 행성은 그 칸에서 가장 최근 노트의 시각(깊이)에 놓인다.
+- 나선 각도는 `cosmos.focusAngle + cosmos.twist × (깊이 − axis.focusDepth) + cosmos.spin × 공전 시계`다. 지금 시점의 행성이 초점면에서 `focusAngle` 쪽(화면 아래)에 놓인다.
+- 나선 위 자리는 반지름 `cosmos.armRadius`에서 묶음 키로 정한 만큼(`cosmos.radiusJitter`, `cosmos.angleJitter`) 벗어난다. 같은 묶음은 늘 같은 자리다.
+- 반지름은 `cosmos.planetRadius`에 위성 수의 제곱근 × `cosmos.planetGrowth`를 더하고 `cosmos.planetMaxRadius`를 넘지 않는다.
+- 셰이더 구체(띠 무늬, 자전, 테두리 빛), 가산 합성 빛 무리(`cosmos.glowScale`), 아래쪽 `날짜 · 위성 수` 글자(`cosmos.planetLabelHeight`)로 그린다. 묶음이 바뀌면 사라지는 행성은 그 자리에서 옅어지고(`cosmos.planetFadeRate`) 새 행성은 나타난다.
+
+**위성** (`ringLayout`, `orbitOffset`)
+- 위성은 고리에 안쪽부터 채운다. k번째 고리에는 `ring.base + ring.grow × k`개가 들어가고, 카드 고리 수는 행성 단위별로 `ring.maxByUnit`이다. 넘친 위성은 바깥 띠에서 `cosmos.overflowScale` 크기로 작게 돈다.
+- 고리 반지름은 행성 반지름 + `ring.gap × (k + 1)`이다. 고리 평면은 화면을 마주 보는 평면에서 묶음 키로 정한 만큼(`ring.inclination` 안) 기울어 있고, 같은 평면에 궤도 선(`cosmos.ringOpacity`)을 긋는다.
+- 같은 고리의 위성은 같은 간격으로 함께 돈다. 각속도는 `ring.speed / 반지름^1.5`(케플러 3법칙)다.
+- 카드는 늘 카메라를 향하고 크기는 `card.width × cosmos.satelliteScale`이다. 깊이에 따라 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
+- 묶음이 바뀌어 다른 행성으로 옮겨 갈 때만 그 순간의 어긋남을 `cosmos.regroupRate`로 줄이며 잇는다(`RegroupBlend`). 묶음이 그대로면 목표 위치를 지연 없이 따른다.
+
+**배경** (`Universe.ts`)
+- 먼지: `dust.count`개 점이 `dust.arms`개 나선팔 둘레(반지름 퍼짐 `dust.spread`, 각도 퍼짐 `dust.angleSpread`)에 모이고, `dust.halo` 비율은 은하 원반 전체에 흩어진다. 시간축이 움직인 깊이만큼 흘러가 비행하는 느낌을 준다.
+- 별(`stars.count`, 반지름 `stars.radius`)은 반짝이고, 그 바깥 구에 성운 셰이더를 그린다. 먼 가운데에 은하 중심 빛(`cosmos.coreSize`)이 있다.
+- 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다.
+
+**탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)
+- 손가락이 화면에 닿아 있는 동안 공전과 은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 위성을 누르기 쉽게 하려는 것이다.
+- 탭이 위성 카드에 맞으면 그 카드를 펼친다. 단, 보이는 행성 몸체가 카드보다 앞을 가리면 행성이다. 카드가 없으면 행성보다 넉넉한 판정 구로 행성을 고른다.
+- 행성을 탭하면 그 행성의 시각으로 한 단계 들어간다. 펼친 상태에서 아무 데나 탭하면 닫는다.
+- 데이터와 임시 단추는 시간축 데모와 같다(`src/gallery/axisHud.ts`).

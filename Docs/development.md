@@ -23,9 +23,9 @@ npm run dev
 | `src/config.ts` | 튜닝 값(`tuning`) |
 | `src/core/` | 위젯이 함께 쓰는 순수 로직: 지수 접근(`motion.ts`), 달력 단위(`calendar.ts`), 시드 난수, 날짜 표기 |
 | `src/widgets/<위젯>/` | 위젯 하나. 움직임·배치는 순수 로직, 텍스처·재질·메시는 뷰 |
-| `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시) |
+| `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
-| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 등록표 |
+| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 임시 조종 단추(`axisHud.ts`), 등록표 |
 | `src/dev/` | 개발용 가짜 데이터 |
 | `test/` | vitest 단위 테스트(노드 환경) |
 
@@ -56,6 +56,7 @@ npm run build
 - `demo`: 위젯 데모 객체
   - 노트 카드: `cards`, `focus(card | null)`, `focusedId()`
   - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
+  - 우주 보기: 시간축에 더해 `planets()`, `screenOf(월드 위치)`(탭할 화면 좌표)
 - `time()`: 지금 게임 시간(초)
 - `advance(seconds, hz = 60)`: 게임 시간을 고정 간격으로 진행하고 한 번 그린다
 

@@ -25,12 +25,23 @@ export class CardFocus {
 
   /** 화면 좌표에 보이는 가장 가까운 카드 */
   pick(clientX: number, clientY: number): NoteCard | null {
+    return this.pickHit(clientX, clientY)?.card ?? null;
+  }
+
+  /** 가장 가까운 카드와 카메라에서의 거리. 다른 물체와 누가 앞인지 견줄 때 쓴다 */
+  pickHit(clientX: number, clientY: number): { card: NoteCard; distance: number } | null {
+    this.aim(clientX, clientY);
+    const visible = this.cards.filter((c) => c.visible).map((c) => c.mesh);
+    const hit = this.raycaster.intersectObjects(visible, false)[0];
+    return hit ? { card: hit.object.userData.card as NoteCard, distance: hit.distance } : null;
+  }
+
+  /** 화면 좌표로 광선을 겨눈 레이캐스터. 카드 말고 다른 물체를 고를 때 함께 쓴다 */
+  aim(clientX: number, clientY: number): Raycaster {
     const rect = this.stage.renderer.domElement.getBoundingClientRect();
     this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(this.ndc, this.stage.camera);
-    const visible = this.cards.filter((c) => c.visible).map((c) => c.mesh);
-    const hit = this.raycaster.intersectObjects(visible, false)[0];
-    return hit ? (hit.object.userData.card as NoteCard) : null;
+    return this.raycaster;
   }
 
   /** 펼친 카드의 목표 자세. 펼친 카드가 없으면 null */
