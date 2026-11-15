@@ -3,7 +3,8 @@ import { tuning } from '../config';
 import { createRng, range } from '../core/random';
 import { createFakeNotes } from '../dev/fakeNotes';
 import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
-import { listenTap } from '../input/tap';
+import { listenGestures } from '../input/gesture';
+import { AxisNavigation } from '../widgets/camera/axisNavigation';
 import { LabelCache } from '../widgets/common/labelCache';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import { createPose } from '../widgets/noteCard/cardMotion';
@@ -27,7 +28,7 @@ import {
   placementTargets,
   stepPlacement,
 } from '../widgets/timeAxis/placement';
-import { createAxisHud } from './axisHud';
+import { createTimeReadout } from './timeReadout';
 import { CardFocus } from './cardFocus';
 import type { Stage, WidgetDemo } from './stage';
 
@@ -41,8 +42,7 @@ export interface TimeAxisDemo extends WidgetDemo {
 
 /**
  * 시간축 위젯 데모: 가짜 사진 노트를 시간축 위에 놓는다.
- * 제스처 위젯이 생기기 전까지는 화면 아래 단추로 단계를 바꾸고 시간을 옮긴다.
- * 묶음을 탭하면 그 시점으로 한 단계 들어가고, 낱장을 탭하면 펼친다.
+ * 끌기와 핀치로 시간축을 이동·확대하고, 묶음을 탭하면 들어가며, 낱장을 탭하면 펼친다.
  */
 export function mountTimeAxisDemo(stage: Stage): TimeAxisDemo {
   stage.grid.visible = false;
@@ -106,23 +106,31 @@ export function mountTimeAxisDemo(stage: Stage): TimeAxisDemo {
   targets.forEach((t, i) => Object.assign(current[i], t));
 
   const focus = new CardFocus(stage, cards);
-  const stopTap = listenTap(stage.renderer.domElement, (x, y) => {
-    if (focus.focused) {
-      focus.set(null);
-      return;
-    }
-    const card = focus.pick(x, y);
-    if (!card) return;
-    const cluster = clusters[clusterOf[cards.indexOf(card)]];
-    if (cluster.members.length > 1) controller.focusOn(cluster.anchorTime, finerLevel(controller.level));
-    else focus.set(card);
+  const canvas = stage.renderer.domElement;
+  const navigation = new AxisNavigation({
+    controller,
+    minTime: oldest,
+    maxTime: newest,
+    viewportHeight: () => canvas.clientHeight,
+    isBlocked: () => focus.focused !== null,
+    onTap: ({ x, y }) => {
+      if (focus.focused) {
+        focus.set(null);
+        return;
+      }
+      const card = focus.pick(x, y);
+      if (!card) return;
+      const cluster = clusters[clusterOf[cards.indexOf(card)]];
+      if (cluster.members.length > 1) navigation.focusOn(cluster.anchorTime, finerLevel(controller.level));
+      else focus.set(card);
+    },
   });
-
-  const hud = createAxisHud(controller, oldest, newest);
+  const stopGestures = listenGestures(canvas, navigation.handlers());
+  const readout = createTimeReadout(controller);
 
   return {
     title: 'TIME AXIS',
-    hint: '묶음 탭: 들어가기 · 낱장 탭: 펼치기',
+    hint: '끌기: 시간 이동 · 핀치: 확대·축소 · 탭: 들어가기/펼치기',
     controller,
     cards,
     clusters: () => clusters,
@@ -130,7 +138,7 @@ export function mountTimeAxisDemo(stage: Stage): TimeAxisDemo {
     focusedId: () => focus.focused?.id ?? null,
     update(dt, time) {
       look.uTime.value = time;
-      controller.step(dt);
+      navigation.step(dt);
       const state = controller.current;
       regroup();
 
@@ -146,12 +154,12 @@ export function mountTimeAxisDemo(stage: Stage): TimeAxisDemo {
       }
 
       view.update(generateTicks(state, tuning.axis.nearDepth, tuning.axis.farDepth, newest), depthOf(state, newest));
-      hud.update();
+      readout.update();
     },
     dispose() {
-      stopTap();
+      stopGestures();
       stopResize();
-      hud.dispose();
+      readout.dispose();
       stage.scene.remove(view.group);
       view.dispose();
       for (const c of cards) {

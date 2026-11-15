@@ -5,7 +5,8 @@ import { damp } from '../core/motion';
 import { createRng, range } from '../core/random';
 import { createFakeNotes } from '../dev/fakeNotes';
 import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
-import { listenTap } from '../input/tap';
+import { listenGestures } from '../input/gesture';
+import { AxisNavigation } from '../widgets/camera/axisNavigation';
 import { LabelCache } from '../widgets/common/labelCache';
 import {
   RegroupBlend,
@@ -48,7 +49,7 @@ import {
   levelLogScale,
   type Cluster,
 } from '../widgets/timeAxis/axisModel';
-import { createAxisHud } from './axisHud';
+import { createTimeReadout } from './timeReadout';
 import { CardFocus } from './cardFocus';
 import type { Stage, WidgetDemo } from './stage';
 
@@ -160,13 +161,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   // 공전 시계: 손가락이 닿아 있으면 멈추고 떼면 다시 흐른다
   let orbitClock = 0;
   let orbitPace = 1;
-  const touching = new Set<number>();
+  let touchCount = 0;
   const canvas = stage.renderer.domElement;
-  const onDown = (e: PointerEvent) => touching.add(e.pointerId);
-  const onUp = (e: PointerEvent) => touching.delete(e.pointerId);
-  canvas.addEventListener('pointerdown', onDown);
-  canvas.addEventListener('pointerup', onUp);
-  canvas.addEventListener('pointercancel', onUp);
 
   const cameraPosition = new Vector3();
   const offset = new Vector3();
@@ -182,54 +178,79 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   };
 
   const focus = new CardFocus(stage, cards);
-  const stopTap = listenTap(canvas, (x, y) => {
-    if (focus.focused) {
-      focus.set(null);
-      return;
-    }
-    // 광선이 종이에 정확히 맞으면 그 종이다
-    const cardHit = focus.pickHit(x, y);
-    if (cardHit) {
-      focus.set(cardHit.card);
-      return;
-    }
-    // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다
-    const rect = canvas.getBoundingClientRect();
-    const pxPerUnit = rect.height / (2 * Math.tan((stage.camera.fov * Math.PI) / 360));
+  const pickAnchorTime = (x: number, y: number): number | null => {
     const targets: TapTarget[] = [];
-    const picks: Array<{ card: NoteCard } | { node: CosmosNode }> = [];
-    for (const card of cards) {
-      if (!card.visible || card.mesh.material.uniforms.uFade.value < 0.3) continue;
-      const depth = -card.mesh.position.z;
-      if (depth < 0.5) continue;
-      const half = (Math.hypot(card.layout.worldWidth, card.layout.worldHeight) / 2) * card.mesh.scale.x;
-      const sp = screenOf(card.mesh.position);
-      targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.paperTapRadius, (half * pxPerUnit) / depth) });
-      picks.push({ card });
-    }
+    const times: number[] = [];
     for (const node of nodes) {
-      if (node.position.z > -0.5) continue;
+      const depth = -node.position.z;
+      if (depth < c.nearDepth || depth > c.farDepth) continue;
       const sp = screenOf(node.position);
-      targets.push({ x: sp.x, y: sp.y, radius: g.tapRadius });
-      picks.push({ node });
+      targets.push({ x: sp.x, y: sp.y, radius: tuning.gesture.pinchAnchorRadius });
+      times.push(node.anchorTime);
     }
     const i = pickNearest(targets, x, y);
-    if (i < 0) return;
-    const chosen = picks[i];
-    if ('card' in chosen) {
-      focus.set(chosen.card);
-      return;
-    }
-    const node = chosen.node;
-    if (node.kind === 'planet') controller.focusOn(node.anchorTime, finerLevel(controller.level));
-    else controller.focusOn(node.anchorTime, controller.level);
-  });
+    return i >= 0 ? times[i] : null;
+  };
 
-  const hud = createAxisHud(controller, oldest, newest);
+  const navigation = new AxisNavigation({
+    controller,
+    minTime: oldest,
+    maxTime: newest,
+    viewportHeight: () => canvas.clientHeight,
+    pickAnchorTime,
+    isBlocked: () => focus.focused !== null,
+    onTouchCountChange: (count) => {
+      touchCount = count;
+    },
+    onTap: ({ x, y }) => {
+      if (focus.focused) {
+        focus.set(null);
+        return;
+      }
+      // 광선이 종이에 정확히 맞으면 그 종이다
+      const cardHit = focus.pickHit(x, y);
+      if (cardHit) {
+        focus.set(cardHit.card);
+        return;
+      }
+      // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다
+      const rect = canvas.getBoundingClientRect();
+      const pxPerUnit = rect.height / (2 * Math.tan((stage.camera.fov * Math.PI) / 360));
+      const targets: TapTarget[] = [];
+      const picks: Array<{ card: NoteCard } | { node: CosmosNode }> = [];
+      for (const card of cards) {
+        if (!card.visible || card.mesh.material.uniforms.uFade.value < 0.3) continue;
+        const depth = -card.mesh.position.z;
+        if (depth < 0.5) continue;
+        const half = (Math.hypot(card.layout.worldWidth, card.layout.worldHeight) / 2) * card.mesh.scale.x;
+        const sp = screenOf(card.mesh.position);
+        targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.paperTapRadius, (half * pxPerUnit) / depth) });
+        picks.push({ card });
+      }
+      for (const node of nodes) {
+        if (node.position.z > -0.5) continue;
+        const sp = screenOf(node.position);
+        targets.push({ x: sp.x, y: sp.y, radius: g.tapRadius });
+        picks.push({ node });
+      }
+      const i = pickNearest(targets, x, y);
+      if (i < 0) return;
+      const chosen = picks[i];
+      if ('card' in chosen) {
+        focus.set(chosen.card);
+        return;
+      }
+      const node = chosen.node;
+      if (node.kind === 'planet') navigation.focusOn(node.anchorTime, finerLevel(controller.level));
+      else navigation.focusOn(node.anchorTime, controller.level);
+    },
+  });
+  const stopGestures = listenGestures(canvas, navigation.handlers());
+  const readout = createTimeReadout(controller);
 
   return {
     title: 'COSMOS',
-    hint: '노드 탭: 다가가기 · 종이 탭: 펼치기',
+    hint: '끌기: 시간 이동 · 핀치: 확대·축소 · 탭: 노드/종이',
     controller,
     cards,
     clusters: () => clusters,
@@ -240,9 +261,9 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     screenOf,
     update(dt, time) {
       look.uTime.value = time;
-      orbitPace = damp(orbitPace, touching.size > 0 ? 0 : 1, c.holdRate, dt);
+      orbitPace = damp(orbitPace, touchCount > 0 ? 0 : 1, c.holdRate, dt);
       orbitClock += dt * orbitPace;
-      controller.step(dt);
+      navigation.step(dt);
       const state = controller.current;
       stage.camera.getWorldPosition(cameraPosition);
 
@@ -378,15 +399,12 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       }
 
       graph.end();
-      hud.update();
+      readout.update();
     },
     dispose() {
-      stopTap();
+      stopGestures();
       stopResize();
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onUp);
-      hud.dispose();
+      readout.dispose();
       stage.scene.remove(graph.group);
       graph.dispose();
       stage.scene.remove(universe.group);

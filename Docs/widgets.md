@@ -7,7 +7,7 @@
 | 우주 보기 | `cosmos` | 구현됨. 앱의 주 화면이다 |
 | 시간축 | `time-axis` | 구현됨. 우주 보기가 쓰는 시간 모델을 레일로 보여 주는 확인용 화면이다 |
 | 노트 카드 | `note-card` | 구현됨 |
-| 카메라·제스처 | | 할 일 |
+| 카메라·제스처 | | 구현됨. 우주 보기와 시간축에 붙어 동작한다 |
 | 후처리 | | 할 일 |
 | 노트 보기 | | 할 일 |
 
@@ -92,7 +92,7 @@
 
 **갤러리 데모** (`src/gallery/timeAxisDemo.ts`)
 - 가짜 노트 `dev.noteCount`장(`src/dev/fakeNotes.ts`: 최근일수록 촘촘하고, `dev.bursts`번은 몇 시간 안에 몰아 찍음)을 시간축에 놓는다. 처음에는 가장 최근 노트를 초점면에 두고 월 단계로 연다.
-- 제스처 위젯이 생기기 전까지는 화면 아래 단추로 조종한다: ◀(과거로)·▶(최근으로), 연·월·일·노트. 왼쪽 위에 지금 시점을 보인다.
+- 끌기와 핀치(또는 마우스 휠)로 시간 이동과 축척을 조종하고, 왼쪽 위에 지금 시점과 단계를 보인다(`src/gallery/timeReadout.ts`).
 - 묶음을 탭하면 그 대표 시각으로 한 단계 들어가고, 낱장을 탭하면 펼친다. 펼친 상태에서 아무 데나 탭하면 닫는다.
 
 ## 우주 보기
@@ -134,6 +134,23 @@
 - 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·종이는 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
 
 **탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)
-- 손가락이 화면에 닿아 있는 동안 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
+- 손가락이 화면에 닿아 있는 동안(탭·끌기·핀치 모두) 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
 - 탭 광선이 종이에 정확히 맞으면 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다(`pickNearest`). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 행성 노드는 그 시각으로 한 단계 들어가고, 허브는 단계를 그대로 두고 그 시각으로 옮긴다.
-- 펼친 상태에서 아무 데나 탭하면 닫는다. 데이터와 임시 단추는 시간축 데모와 같다(`src/gallery/axisHud.ts`).
+- 펼친 상태에서 아무 데나 탭하면 닫는다. 데이터와 시점 표시는 시간축 데모와 같다(`src/gallery/timeReadout.ts`).
+
+## 카메라·제스처
+
+파일: `src/input/gesture.ts`, `src/widgets/camera/axisNavigation.ts`
+
+**제스처 해석** (`GestureRecognizer`, `listenGestures`)
+- 포인터 이벤트 열을 탭, 한 손가락 끌기, 두 손가락 핀치로 나눈다.
+- 한 손가락을 `input.tapMaxSeconds`와 `input.tapSlop` 안에서 떼면 탭이다. 두 손가락 이상이 닿았던 조작은 탭이 되지 않는다.
+- `input.tapSlop`을 넘게 움직이면 끌기다. 최근 `input.velocityWindowSeconds` 창에서 릴리스 속도를 계산하며, `input.velocityStopSeconds` 이상 멈춘 뒤 떼면 관성 속도는 0이다.
+- 두 손가락이 닿으면 끌기를 관성 없이 끝내고 핀치로 전환한다. 두 손가락 거리는 `input.pinchMinDistance` 이상으로 잡아 비율이 튀지 않게 한다.
+
+**시간축 탐색** (`AxisNavigation`)
+- 끄는 동안에는 `AxisController.current`를 바로 움직이고(`gesture.dragDepthPerScreen` 비율), 놓을 때 관성을 `gesture.inertiaDecay`로 감쇠해 `gesture.inertiaStopSpeed` 아래가 되거나 시간 범위에 닿으면 멈춘다.
+- 핀치는 `gesture.pinchScale × ln(거리 비율)`만큼 로그 축척을 바꾸되 양끝 단계에서 `gesture.scaleOvershoot` 안으로 제한한다. 핀치 시작 중심에서 `gesture.pinchAnchorRadius` 안의 가장 가까운 노드(없으면 초점면) 시각이 축척 변경 뒤에도 같은 깊이에 남도록 `focusTime`을 옮긴다.
+- 핀치를 놓으면 `nearestLevel`로 스냅 목표를 잡고, 고정된 노드 깊이를 유지한 채 목표로 부드럽게 수렴한다.
+- 마우스 휠(`gesture.wheelScalePer100`)도 같은 시점 고정 규칙으로 축척을 바꾸며, `gesture.wheelSnapDelay` 동안 멈추면 `nearestLevel`로 스냅한다.
+- 펼쳐진 카드가 있을 때(`isBlocked`)는 끌기·핀치·휠을 막고 탭 닫기만 허용한다.

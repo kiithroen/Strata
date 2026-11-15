@@ -2,7 +2,7 @@ import { Euler, Quaternion, Vector3 } from 'three';
 import { tuning } from '../config';
 import { sampleNoteText } from '../dev/fakeNotes';
 import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
-import { listenTap } from '../input/tap';
+import { listenGestures } from '../input/gesture';
 import { LabelCache } from '../widgets/common/labelCache';
 import type { NoteKind } from '../widgets/noteCard/cardLayout';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
@@ -60,10 +60,12 @@ export function mountNoteCardDemo(stage: Stage): NoteCardDemo {
   });
 
   const focus = new CardFocus(stage, cards);
-  const stopTap = listenTap(stage.renderer.domElement, (x, y) => {
-    // 펼친 카드가 있으면 어디를 탭하든 닫는다
-    if (focus.focused) focus.set(null);
-    else focus.set(focus.pick(x, y));
+  const stopTap = listenGestures(stage.renderer.domElement, {
+    onTap: ({ x, y }) => {
+      // 펼친 카드가 있으면 어디를 탭하든 닫는다
+      if (focus.focused) focus.set(null);
+      else focus.set(focus.pick(x, y));
+    },
   });
 
   return {

@@ -266,6 +266,29 @@ export const tuning = {
     tapSlop: 10,
     /** 이 시간 안에 떼면 탭으로 본다 */
     tapMaxSeconds: 0.35,
+    /** 끌기 속도를 재는 최근 입력 창(초)과 멈춤으로 보는 무입력 시간(초) */
+    velocityWindowSeconds: 0.1,
+    velocityStopSeconds: 0.08,
+    /** 핀치 거리의 최소 하한(CSS px). 두 손가락이 가까울 때 비율이 튀지 않게 한다 */
+    pinchMinDistance: 12,
+  },
+
+  gesture: {
+    /** 화면 세로 한 폭을 끌었을 때 이동하는 깊이(월드 단위) */
+    dragDepthPerScreen: 22,
+    /** 튕겨 놓은 뒤 관성 속도가 줄어드는 비율(1/초) */
+    inertiaDecay: 3.8,
+    /** 이 깊이 속도(월드 단위/초)보다 느려지면 관성을 멈춘다 */
+    inertiaStopSpeed: 0.05,
+    /** 핀치 거리 비율의 로그에 곱하는 축척 배율 */
+    pinchScale: 1.6,
+    /** 축척 허용 여유(가장 바깥 단계에서 로그 축척으로 얼마나 더 벗어날 수 있는지) */
+    scaleOvershoot: 1.0,
+    /** 핀치 중심에서 시점 고정 대상 노드를 찾는 최대 거리(CSS px) */
+    pinchAnchorRadius: 140,
+    /** 휠 한 눈금(100px)당 로그 축척 변화량과 손 놓음 스냅 대기 시간(초) */
+    wheelScalePer100: 0.45,
+    wheelSnapDelay: 0.18,
   },
 
   loop: {
