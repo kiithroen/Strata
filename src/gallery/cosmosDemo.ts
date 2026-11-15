@@ -12,6 +12,7 @@ import {
   buildHubs,
   burstOffset,
   hubPoint,
+  nearestCorner,
   choosePlanetUnit,
   cosmosFade,
   flightOffset,
@@ -159,6 +160,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const offset = new Vector3();
   const target = new Vector3();
   const labelPos = new Vector3();
+  const corner = new Vector3();
+  const spokeEnd = new Vector3();
 
   const screenOf = (position: Vector3) => {
     const rect = canvas.getBoundingClientRect();
@@ -260,14 +263,6 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
         const r = planetRadius(n);
         cluster.members.forEach((m, k) => {
-          // 노트 점: 노드에서 방사형으로 뻗은 살 끝
-          burstOffset(k, spin, offset);
-          target.copy(st.position).add(offset);
-          const dotP = dotBlends[m].step(dt, cluster.key, target);
-          const dotAlpha = alpha * cosmosFade(-dotP.z);
-          graph.spoke(st.position, dotP, noteColors[m], g.spokeAlpha * dotAlpha);
-          graph.dot(dotP, noteColors[m], g.dotSize, dotAlpha);
-
           // 종이: 행성 단위별 큰 카드 수까지만 날린다
           paperFade[m] = damp(paperFade[m], k < capacity ? 1 : 0, c.regroupRate, dt);
           flightOffset(flights[m], r, tau, gustNow, offset);
@@ -279,6 +274,26 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           home.scale = c.satelliteScale;
           const card = cards[m];
           card.update(dt, time, home, card === focus.focused ? pose : null, cosmosFade(-p.z) * st.fade * paperFade[m]);
+
+          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 종이의 가장 가까운 모서리에 묶이고,
+          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 줄을 풀고 점으로 돌아간다
+          burstOffset(k, spin, offset);
+          target.copy(st.position).add(offset);
+          const dotP = dotBlends[m].step(dt, cluster.key, target);
+          const tied = paperFade[m] * (1 - card.motion.focus);
+          nearestCorner(
+            card.mesh.position,
+            card.mesh.quaternion,
+            card.mesh.scale.x,
+            card.layout.worldWidth / 2,
+            card.layout.worldHeight / 2,
+            st.position,
+            corner,
+          );
+          spokeEnd.copy(dotP).lerp(corner, tied);
+          const endAlpha = alpha * cosmosFade(-spokeEnd.z);
+          graph.spoke(st.position, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
+          graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(-dotP.z) * (1 - tied));
         });
       });
 

@@ -101,7 +101,8 @@
 
 **노트 점과 살** (`burstOffset`, `hourColorIndex`)
 - k 번째 노트 점은 노드 둘레의 화면을 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½)`, 앞뒤로 `burst.depthJitter`만큼 흔들리고 원판 전체가 `burst.spin`으로 돈다.
-- 노드에서 점까지 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 긋는다. 점 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
+- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 살이 종이 네 모서리 가운데 노드에 가장 가까운 모서리(`nearestCorner`)에 묶여 함께 끌려다니고, 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 모서리 사이를 그만큼 옮겨 간다.
+- 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
 
 **허브와 가지** (`parentUnit`, `buildHubs`, `hubPoint`)
