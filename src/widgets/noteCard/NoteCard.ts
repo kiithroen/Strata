@@ -28,6 +28,8 @@ export class NoteCard {
   readonly layout: CardLayout;
   readonly motion: CardMotion;
   readonly mesh: Mesh<PlaneGeometry, ShaderMaterial>;
+  /** 종이마다 다르게 출렁이도록 어긋낸 휨 위상. 휜 높이를 셰이더 밖에서 구할 때(paperBend) 쓴다 */
+  readonly bendPhase: number;
 
   private readonly baseTexture: CanvasTexture;
   private detailTexture: CanvasTexture | null = null;
@@ -52,6 +54,7 @@ export class NoteCard {
       height: this.layout.worldHeight,
       bendPhase: phase / 1000,
     });
+    this.bendPhase = phase / 1000;
     const seg = tuning.card.segments;
     this.mesh = new Mesh(new PlaneGeometry(this.layout.worldWidth, this.layout.worldHeight, seg, seg), material);
     this.mesh.name = `note-card-${this.id}`;

@@ -51,8 +51,8 @@ export const tuning = {
      * 높이는 카드 폭 대비다
      */
     bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [3.1, 2.3], curl: 0.32, curlSpeed: 0.9 },
-    /** 압정: 윗변에서 내려온 거리(높이 대비), 가운데에서 좌우로 벗어나는 최대 정도(폭 대비) */
-    pin: { inset: 0.06, jitter: 0.16 },
+    /** 압정: 윗변에서 내려온 거리(높이 대비), 가운데에서 좌우로 벗어나는 최대 정도(폭 대비), 앞면 위로 뜬 높이(폭 대비) */
+    pin: { inset: 0.06, jitter: 0.16, lift: 0.025 },
     /** 압정 자리 윗변에 붙인 테이프: 색, 폭·높이(카드 폭 대비), 최대 기울기(라디안) */
     tape: { color: 'rgba(232, 168, 82, 0.82)', edge: 'rgba(170, 110, 40, 0.35)', width: 0.34, height: 0.085, tilt: 0.14 },
   },
@@ -192,8 +192,8 @@ export const tuning = {
      * 돌풍에 날리는 종이(위성).
      * capacityByUnit: 행성 단위별 큰 카드 수(넘친 위성은 overflowScale 크기 종잇조각).
      * gap·spread: 행성 표면에서 띠 안쪽까지 거리와 띠 두께. speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 종이마다 배율 범위.
-     * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. spinRate: 뒹구는 빠르기 범위(라디안/초).
-     * flutterAmp·flutterFreq: 팔랑이는 각도와 빈도 범위.
+     * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. spinRate: 종이가 제 면 안에서 빙글 도는 빠르기 범위(라디안/초).
+     * flutterAmp·flutterAmp2·flutterFreq: 앞면이 바깥 방향에서 두 축으로 기우는 최대 각도와 빈도 범위. 둘을 더한 각도를 넘지 않아 뒤집히지 않는다.
      * gust: 돌풍 사인 둘의 빈도·위상, boost 는 돌풍이 가장 셀 때 더해지는 시간 배율, gustWobble 은 흔들림이 커지는 배율
      */
     swarm: {
@@ -205,7 +205,8 @@ export const tuning = {
       wobble: 0.1,
       wobbleFreq: [0.6, 2.2],
       spinRate: [0.35, 1.5],
-      flutterAmp: 0.75,
+      flutterAmp: 0.6,
+      flutterAmp2: 0.35,
       flutterFreq: [1.4, 3.6],
       gust: { freq: [0.17, 0.41], phase: [0.3, 2.1], boost: 1.6 },
       gustWobble: 1.4,

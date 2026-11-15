@@ -161,27 +161,39 @@ describe('돌풍에 날리는 종이', () => {
     expect(sum.length() / ids.length).toBeLessThan(0.35);
   });
 
-  it('종이는 카메라를 보지 않고 뒹굴어 뒷면도 보인다', () => {
+  it('종이 앞면은 노드 바깥쪽을 향하고, 팔랑여도 두 기울기를 더한 각도 안이라 뒤집히지 않는다', () => {
     const q = new Quaternion();
     const front = new Vector3();
-    for (const id of ids.slice(0, 20)) {
+    const outward = new Vector3();
+    const bound = s.flutterAmp + s.flutterAmp2;
+    for (const id of ids.slice(0, 30)) {
       const f = flightParams(id);
-      let backs = 0;
-      let fronts = 0;
-      let prev: Quaternion | null = null;
       let moved = 0;
-      for (let t = 0; t < 60; t += 0.5) {
-        flightQuaternion(f, gustTime(t), q);
+      let prev: Quaternion | null = null;
+      for (let t = 0; t < 40; t += 0.37) {
+        flightOffset(f, 0.3, gustTime(t), gust(t), outward);
+        flightQuaternion(f, gustTime(t), outward, q);
         expect(q.length()).toBeCloseTo(1, 9);
         front.set(0, 0, 1).applyQuaternion(q);
-        if (front.z < -0.2) backs++;
-        if (front.z > 0.2) fronts++;
+        expect(front.angleTo(outward)).toBeLessThanOrEqual(bound + 1e-6);
         if (prev) moved = Math.max(moved, q.angleTo(prev));
         prev = q.clone();
       }
-      expect(backs).toBeGreaterThan(0);
-      expect(fronts).toBeGreaterThan(0);
+      // 제자리에 굳어 있지 않고 빙글 돌며 팔랑인다
       expect(moved).toBeGreaterThan(0);
+    }
+  });
+
+  it('카메라를 보지 않는다: 노드 뒤쪽으로 나간 종이는 카메라에 뒷면을 보인다', () => {
+    const q = new Quaternion();
+    const front = new Vector3();
+    const away = new Vector3(0, 0, -1);
+    const f = flightParams('0042');
+    for (let t = 0; t < 20; t += 0.5) {
+      flightQuaternion(f, gustTime(t), away, q);
+      front.set(0, 0, 1).applyQuaternion(q);
+      // 카메라(+Z 쪽)를 향한 성분이 음수면 뒷면이 보인다
+      expect(front.z).toBeLessThan(0);
     }
   });
 

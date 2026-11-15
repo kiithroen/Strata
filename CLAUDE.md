@@ -16,6 +16,7 @@
 
 - `ShaderMaterial`은 출력 색공간 변환을 자동으로 하지 않는다. 프래그먼트 끝에 `#include <colorspace_fragment>`를 둔다. 화면 잡음처럼 지각상 균일해야 하는 효과는 그 뒤에 더한다.
 - 브라우저 창이 숨어 있으면 `requestAnimationFrame`이 멈추거나 느려져 게임 시간이 흐르지 않는다. 화면 확인 스크립트는 벽시계로 기다리지 말고 `window.__strata.advance(초)`로 진행한 뒤 캡처한다.
+- 종이 휨 높이 식은 `cardMaterial.ts` 정점 셰이더와 `noteCard/paperBend.ts`(압정 위치용) 두 곳에 있다. 하나를 고치면 다른 쪽도 고친다.
 - 시간축의 달력 계산은 현지 시각이다. 테스트의 기준 시각도 `new Date(연, 월, …)`로 만든다.
 - 개발 서버(Vite)가 파일 변경을 놓쳐 옛 코드를 내보낼 때가 있다. 고친 동작이 화면에 안 보이면 `curl -s localhost:5173/src/<파일>`로 내보내는 코드를 확인하고, 다르면 그 파일을 `touch`한다.
 

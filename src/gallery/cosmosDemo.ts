@@ -34,6 +34,7 @@ import { Universe } from '../widgets/cosmos/Universe';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import { createPose } from '../widgets/noteCard/cardMotion';
 import { NoteCard } from '../widgets/noteCard/NoteCard';
+import { bendHeight } from '../widgets/noteCard/paperBend';
 import { paperPin, pinPoint } from '../widgets/noteCard/paperPin';
 import {
   AxisController,
@@ -271,7 +272,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           const p = paperBlends[m].step(dt, cluster.key, target);
           const home = homes[m];
           home.position.copy(p);
-          flightQuaternion(flights[m], tau, home.quaternion);
+          flightQuaternion(flights[m], tau, offset, home.quaternion);
           home.scale = c.satelliteScale;
           const card = cards[m];
           card.update(dt, time, home, card === focus.focused ? pose : null, cosmosFade(-p.z) * st.fade * paperFade[m]);
@@ -282,13 +283,16 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           target.copy(st.position).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = paperFade[m] * (1 - card.motion.focus);
+          const pin = pins[m];
+          const bent = bendHeight(pin.u, pin.v, time, card.bendPhase) * look.uBend.value * (1 - card.motion.focus);
           pinPoint(
             card.mesh.position,
             card.mesh.quaternion,
             card.mesh.scale.x,
             card.layout.worldWidth,
             card.layout.worldHeight,
-            pins[m],
+            pin,
+            bent + tuning.card.pin.lift,
             pinWorld,
           );
           spokeEnd.copy(dotP).lerp(pinWorld, tied);

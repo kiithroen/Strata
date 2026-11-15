@@ -33,7 +33,11 @@ export function paperPin(id: string): PaperPin {
   };
 }
 
-/** 종이(중심 position, 회전 quaternion, 배율 scale, 폭·높이) 위 압정의 월드 위치 */
+/**
+ * 종이(중심 position, 회전 quaternion, 배율 scale, 폭·높이) 위 압정의 월드 위치.
+ * lift 는 앞면 위로 뜬 높이(폭 대비)다. 종이가 휜 높이(paperBend.bendHeight)에 card.pin.lift 를 더해 넘기면
+ * 압정이 앞면 바로 위에 붙어, 뒤에서 볼 때는 종이에 가려진다
+ */
 export function pinPoint(
   position: Vector3,
   quaternion: Quaternion,
@@ -41,10 +45,11 @@ export function pinPoint(
   width: number,
   height: number,
   pin: PaperPin,
+  lift: number,
   out: Vector3,
 ): Vector3 {
   return out
-    .set(pin.u * width * scale, pin.v * height * scale, 0)
+    .set(pin.u * width * scale, pin.v * height * scale, lift * width * scale)
     .applyQuaternion(quaternion)
     .add(position);
 }

@@ -19,6 +19,7 @@
 
 **압정과 테이프** (`paperPin.ts`)
 - 압정은 윗변에서 `card.pin.inset`(높이 대비) 아래, 가운데에서 좌우로 `card.pin.jitter`(폭 대비) 안쪽에 노트 번호로 정한 자리에 꽂힌다. `pinPoint`가 종이의 위치·회전·배율로 월드 자리를 구한다.
+- 압정은 앞면 위로 뜬다. 그 자리의 종이 휨 높이(`paperBend.ts`의 `bendHeight`, 셰이더와 같은 식)에 `card.pin.lift`(폭 대비)를 더한 만큼 띄워, 앞에서는 종이 위에 보이고 뒤에서는 종이에 가려진다.
 - 같은 가로 자리 윗변에 마스킹 테이프(`card.tape`: 색, 폭·높이, 최대 기울기)를 텍스처에 그린다.
 
 **사진 원본** (`cardTexture.ts`의 `PhotoSource`)
@@ -117,10 +118,10 @@
 
 **날리는 종이** (`flightParams`, `flightOffset`, `flightQuaternion`, `gust`, `gustTime`)
 - 행성 단위별로 `swarm.capacityByUnit`장까지(최근 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
-- 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 띠 안 자리, 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 뒹구는 축과 빠르기(`swarm.spinRate`), 팔랑이는 축과 빈도(`swarm.flutterFreq`)가 정해진다.
+- 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 띠 안 자리, 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 제 면 안에서 빙글 도는 빠르기(`swarm.spinRate`), 팔랑이는 축 방향과 빈도(`swarm.flutterFreq`)가 정해진다.
 - 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × 띠 안 자리`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)다.
 - 은하 전체에 돌풍이 분다. 세기 `gust(t)`는 느린 사인 둘의 합(0~1, `swarm.gust.freq`, `swarm.gust.phase`)이고, 종이의 움직임은 `1 + gust.boost × gust`를 미리 적분한 돌풍 시계 `gustTime`으로 잰다. 돌풍이 셀수록 빨리 돌고 더 뒹굴며, 난기류 흔들림도 `swarm.wobble × (1 + swarm.gustWobble × gust)`로 커진다.
-- 종이 자세는 처음 자세에 제 축 뒹굴기와 팔랑임(`swarm.flutterAmp`)을 곱한 것이라 카메라를 보지 않고 뒷면도 보인다. 크기는 `card.width × cosmos.satelliteScale`이다.
+- 종이 자세: 사진·테이프·압정이 있는 앞면이 노드 바깥쪽(노드에서 종이로 향하는 방향)을 향하고, 제 면 안에서 빙글 돌며 수직인 두 축으로 팔랑인다(`swarm.flutterAmp`, `swarm.flutterAmp2`). 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 카메라를 보지 않으므로 노드 뒤쪽 종이는 뒷면을 보인다. 크기는 `card.width × cosmos.satelliteScale`이다.
 - 다른 노드로 옮겨 갈 때만 `RegroupBlend`로 잇고, 그 밖에는 목표 위치를 지연 없이 따른다.
 
 **배경** (`Universe.ts`)
