@@ -99,26 +99,26 @@
 
 파일: `src/widgets/cosmos/`. 시간 ↔ 깊이, 단계, 묶음, 조종은 시간축(`timeAxis/axisModel.ts`)을 그대로 쓴다.
 
-시간 묶음은 빛나는 노드(행성)이고, 노드에서 노트 점이 방사형 선으로 뻗는다. 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다. 노드들은 화면 안쪽으로 감겨 드는 나선팔 위에 흩어져 있어 정면에서 보면 은하처럼 보인다. 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
+시간 묶음은 빛나는 노드(행성)이고, 노드에서 노트 점이 방사형 선으로 뻗는다. 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다. 노드들은 지금 시점을 중심(`s = 0`)으로 전후·좌우·상하 360° 사방에 감겨 퍼지는 3차원 구면 나선 위에 흩어져 있으며, 어느 시점으로 옮기면 그 시점이 다시 중심이 되어 주변 시간대가 사방에 재배치된다. 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
 
 **행성 노드** (`cosmosModel.ts`)
-- 행성 단위는 연·월·일·시 가운데 간격이 `cosmos.planetMinSpacing` 이상인 가장 작은 단위다(다 넘으면 시). 같은 단위 칸의 노트가 한 행성이고, 행성은 그 칸에서 가장 최근 노트의 시각(깊이)에 놓인다.
-- 나선 각도는 `cosmos.focusAngle + cosmos.twist × (깊이 − axis.focusDepth) + cosmos.spin × 공전 시계`다. 지금 시점의 행성이 초점면에서 `focusAngle` 쪽(화면 아래)에 놓인다.
-- 나선 위 자리는 반지름 `cosmos.armRadius`에서 묶음 키로 정한 만큼(`cosmos.radiusJitter`, `cosmos.angleJitter`) 벗어난다. 같은 묶음은 늘 같은 자리다.
+- 행성 단위는 연·월·일·시 가운데 간격이 `cosmos.planetMinSpacing` 이상인 가장 작은 단위다(다 넘으면 시). 같은 단위 칸의 노트가 한 행성이고, 행성은 그 칸에서 가장 최근 노트의 시각(시간 오프셋 `s = 깊이 − axis.focusDepth`)에 놓인다.
+- 구면 나선 좌표는 반지름 `cosmos.innerRadius + cosmos.radialScale × |s|`, 방위각 `cosmos.twist × s + cosmos.spin × 공전 시계`, 고도각 `cosmos.elevationAmp × sin(cosmos.elevationFreq × s)`(수직 상한 클램프)다. `s = 0`인 지금 시점 노드가 카메라 정면(`yaw = 0, pitch = 0`)의 가장 가까운 껍질에 놓이고, 과거·미래로 멀어질수록 사방 360°를 둘러싸며 바깥 껍질로 뻗는다.
+- 나선 위 자리는 묶음 키로 정한 난수 편차(`cosmos.radiusJitter`, `cosmos.angleJitter`, `cosmos.elevationJitter`)만큼 벗어난다. 같은 묶음은 늘 같은 자리다.
 - 노드는 흰 점(`graph.nodeSize`, 노트 수에 따라 조금 커짐)과 가장 최근 노트 색의 빛 무리(`graph.glowSize`, `graph.glowAlpha`), 아래쪽 `날짜 · 노트 수` 글자(`cosmos.planetLabelHeight`)로 그린다. 묶음이 바뀌면 빠진 노드는 마지막 자리에서 옅어지고 새 노드는 나타난다(`cosmos.planetFadeRate`).
 
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
 - `clusterAffinities`가 묶음 안 각 노트의 관련도(0~1)를 구한다. 날짜 축에서는 묶음 중앙 시각과의 근접성(이상치에 눌리지 않게 중앙값 편차와 순위를 섞음)과 묶음 주된 태그 집중도를 합쳐 계산한다.
-- k 번째(관련도 높은 순) 노트 점은 노드 둘레의 화면을 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½) + burst.pullSpread × (1 − 관련도)^burst.pullCurve`이고, 앞뒤로 `burst.depthJitter`만큼 흔들리며 원판 전체가 `burst.spin`으로 돈다. 관련도가 높을수록 노드 가까이에 모이고 낮을수록 긴 살 끝에 놓인다.
+- k 번째(관련도 높은 순) 노트 점은 노드 둘레의 카메라를 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½) + burst.pullSpread × (1 − 관련도)^burst.pullCurve`이고, 앞뒤로 `burst.depthJitter`만큼 흔들리며 원판 전체가 `burst.spin`으로 돈다. 관련도가 높을수록 노드 가까이에 모이고 낮을수록 긴 살 끝에 놓인다.
 - 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 수사 보드처럼 살이 종이에 꽂힌 압정(`noteCard/paperPin.ts`)에 실로 묶여 함께 끌려다니고, 압정 머리(`graph.pinSize`)를 그 노트 색으로 그린다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 압정 사이를 그만큼 옮겨 간다.
 - 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
 
 **허브와 가지** (`parentUnit`, `buildHubs`, `hubPoint`)
 - 허브 단위는 행성 단위의 한 단계 위다(연이면 허브가 없다). 같은 허브 칸의 행성이 한 허브에 이어진다.
-- 허브는 자식 행성들의 평균 깊이에서 나선 반지름의 `graph.hubRadius` 비율인 안쪽 줄기 위에 놓인다. 허브에서 자식 행성으로 가지(`graph.branchWidth`, `graph.branchColor`, `graph.branchAlpha`)를 뻗고, 허브끼리는 시간 순서로 잇는다. 허브가 없으면 행성끼리 시간 순서로 잇는다.
+- 허브는 자식 행성들의 평균 시간 오프셋(`s`)과 평균 나선 반지름에 `graph.hubRadius` 비율을 곱한 안쪽 구면 껍질 위에 놓인다. 허브에서 자식 행성으로 가지(`graph.branchWidth`, `graph.branchColor`, `graph.branchAlpha`)를 뻗고, 허브끼리는 시간 순서로 잇는다. 허브가 없으면 행성끼리 시간 순서로 잇는다.
 - 허브는 큰 흰 점(`graph.hubSize`)과 빛 무리(`graph.hubGlowSize`), 위쪽 글자(`graph.hubLabelHeight`)로 그린다.
-- 선은 화면 px 굵기 선분(`LineSegments2`), 점과 빛 무리는 깊이에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
+- 선은 화면 px 굵기 선분(`LineSegments2`), 점과 빛 무리는 거리에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
 
 **날리는 종이** (`flightParams`, `flightOffset`, `flightQuaternion`, `gust`, `gustTime`)
 - 행성 단위별로 `swarm.capacityByUnit`장까지(관련도 높은 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
@@ -129,18 +129,19 @@
 - 다른 노드로 옮겨 갈 때만 `RegroupBlend`로 잇고, 그 밖에는 목표 위치를 지연 없이 따른다.
 
 **배경** (`Universe.ts`)
-- 먼지: `dust.count`개 점이 `dust.arms`개 나선팔 둘레(반지름 퍼짐 `dust.spread`, 각도 퍼짐 `dust.angleSpread`)에 모이고, `dust.halo` 비율은 은하 원반 전체에 흩어진다. 시간축이 움직인 깊이만큼 흘러가 비행하는 느낌을 준다.
-- 별(`stars.count`, 반지름 `stars.radius`)은 반짝이고, 그 바깥 구에 성운 셰이더를 그린다. 먼 가운데에 은하 중심 빛(`cosmos.coreSize`)이 있다.
-- 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·종이는 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
+- 먼지: `dust.count`개 점이 과거(`-s`)와 미래(`+s`) 두 갈래 3D 구면 나선팔(반지름 퍼짐 `dust.spread`, 각도 퍼짐 `dust.angleSpread`)을 따라 모이고, `dust.halo` 비율은 구 전체에 흩어진다. 시간축이 움직인 거리만큼 흘러가 비행하는 느낌을 준다.
+- 별(`stars.count`, 반지름 `stars.radius`)은 반짝이고, 그 바깥 구에 전방위 성운 셰이더를 그린다.
+- 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·종이는 카메라에서 잰 반경 거리 기준으로 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
 
 **탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)
 - 손가락이 화면에 닿아 있는 동안(탭·끌기·핀치 모두) 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
-- 탭 광선이 종이에 정확히 맞으면 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다(`pickNearest`). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 행성 노드는 그 시각으로 한 단계 들어가고, 허브는 단계를 그대로 두고 그 시각으로 옮긴다.
+- 한 손가락 끌기로 360° 시선을 돌려(`CameraRig`) 주변을 둘러보고, 오른쪽 시간 띠(`src/gallery/timeScrubber.ts`)를 끌거나 눌러 시간축을 이동한다.
+- 탭 광선이 종이에 정확히 맞으면 지금 카메라 정면으로 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다(`pickNearest`, 카메라 시선 앞쪽 기준). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 행성 노드는 그 시각으로 한 단계 들어가고, 허브는 단계를 그대로 두고 그 시각으로 옮기며, 어느 노드를 택하든 시선도 정면으로 부드럽게 돌린다.
 - 펼친 상태에서 아무 데나 탭하면 닫는다. 데이터와 시점 표시는 시간축 데모와 같다(`src/gallery/timeReadout.ts`).
 
 ## 카메라·제스처
 
-파일: `src/input/gesture.ts`, `src/widgets/camera/axisNavigation.ts`
+파일: `src/input/gesture.ts`, `src/widgets/camera/axisNavigation.ts`, `src/widgets/camera/cameraRig.ts`, `src/gallery/timeScrubber.ts`
 
 **제스처 해석** (`GestureRecognizer`, `listenGestures`)
 - 포인터 이벤트 열을 탭, 한 손가락 끌기, 두 손가락 핀치로 나눈다.
@@ -148,9 +149,14 @@
 - `input.tapSlop`을 넘게 움직이면 끌기다. 최근 `input.velocityWindowSeconds` 창에서 릴리스 속도를 계산하며, `input.velocityStopSeconds` 이상 멈춘 뒤 떼면 관성 속도는 0이다.
 - 두 손가락이 닿으면 끌기를 관성 없이 끝내고 핀치로 전환한다. 두 손가락 거리는 `input.pinchMinDistance` 이상으로 잡아 비율이 튀지 않게 한다.
 
-**시간축 탐색** (`AxisNavigation`)
-- 끄는 동안에는 `AxisController.current`를 바로 움직이고(`gesture.dragDepthPerScreen` 비율), 놓을 때 관성을 `gesture.inertiaDecay`로 감쇠해 `gesture.inertiaStopSpeed` 아래가 되거나 시간 범위에 닿으면 멈춘다.
-- 핀치는 `gesture.pinchScale × ln(거리 비율)`만큼 로그 축척을 바꾸되 양끝 단계에서 `gesture.scaleOvershoot` 안으로 제한한다. 핀치 시작 중심에서 `gesture.pinchAnchorRadius` 안의 가장 가까운 노드(없으면 초점면) 시각이 축척 변경 뒤에도 같은 깊이에 남도록 `focusTime`을 옮긴다.
-- 핀치를 놓으면 `nearestLevel`로 스냅 목표를 잡고, 고정된 노드 깊이를 유지한 채 목표로 부드럽게 수렴한다.
+**360° 시선 제어** (`CameraRig`)
+- 화면 높이 대비 세로 시야각(`fovDeg`) 비율로 px 이동량을 `yaw`·`pitch` 각도로 바꾸고, `pitch`는 `gesture.maxPitch` 안에서 제한한다.
+- 한 손가락 릴리스 속도가 `gesture.lookStopSpeed` 이상이면 `gesture.lookInertiaDecay`로 감쇠하는 관성 회전이 이어진다.
+- 노드를 탭해 시점을 옮길 때는 `faceDirection`으로 최단 각도를 따라 정면 `(0, 0)` 방향으로 부드럽게 수렴한다(`gesture.lookTurnRate`).
+
+**시간축 탐색 · 시간 띠** (`AxisNavigation`, `timeScrubber.ts`)
+- `dragTime`이 꺼진 상태(우주 보기)에서는 한 손가락 끌기를 시간 이동으로 쓰지 않고 오른쪽 시간 띠의 `scrubTo`로 시간축을 연속 탐색한다. `dragTime`이 켜진 상태(시간축 데모)에서는 세로 끌기(`gesture.dragDepthPerScreen`)와 관성(`gesture.inertiaDecay`, `gesture.inertiaStopSpeed`)으로 이동한다.
+- 핀치는 `gesture.pinchScale × ln(거리 비율)`만큼 로그 축척을 바꾸되 양끝 단계에서 `gesture.scaleOvershoot` 안으로 제한한다. 핀치 시작 중심에서 `gesture.pinchAnchorRadius` 안의 가장 가까운 노드(없으면 초점면) 시각이 축척 변경 뒤에도 같은 거리에 남도록 `focusTime`을 옮긴다.
+- 핀치를 놓으면 `nearestLevel`로 스냅 목표를 잡고, 고정된 노드 거리를 유지한 채 목표로 부드럽게 수렴한다.
 - 마우스 휠(`gesture.wheelScalePer100`)도 같은 시점 고정 규칙으로 축척을 바꾸며, `gesture.wheelSnapDelay` 동안 멈추면 `nearestLevel`로 스냅한다.
-- 펼쳐진 카드가 있을 때(`isBlocked`)는 끌기·핀치·휠을 막고 탭 닫기만 허용한다.
+- 펼쳐진 카드가 있을 때(`isBlocked`)는 끌기·핀치·휠과 시간 띠 조작을 막고 탭 닫기만 허용한다.

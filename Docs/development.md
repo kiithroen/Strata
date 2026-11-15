@@ -32,7 +32,7 @@ npm run dev
 | `src/widgets/<위젯>/` | 위젯 하나. 움직임·배치는 순수 로직, 텍스처·재질·메시는 뷰 |
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
-| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 등록표 |
+| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 등록표 |
 | `src/dev/` | 개발용 가짜 데이터 |
 | `test/` | vitest 단위 테스트(노드 환경) |
 

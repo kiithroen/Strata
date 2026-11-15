@@ -25,7 +25,9 @@ import {
   planetLabel,
   planetRadius,
   spiralAngle,
+  spiralElevation,
   spiralPoint,
+  spiralRadius,
 } from '../src/widgets/cosmos/cosmosModel';
 import { floorTo } from '../src/core/calendar';
 import { createFakeNotes } from '../src/dev/fakeNotes';
@@ -57,31 +59,53 @@ describe('choosePlanetUnit', () => {
   });
 });
 
-describe('나선팔', () => {
-  it('초점면에서는 focusAngle 이고 깊이마다 twist 만큼, 시간마다 spin 만큼 돈다', () => {
-    const f = tuning.axis.focusDepth;
-    expect(spiralAngle(f, 0)).toBeCloseTo(c.focusAngle, 12);
-    expect(spiralAngle(f + 2, 0) - spiralAngle(f, 0)).toBeCloseTo(2 * c.twist, 12);
-    expect(spiralAngle(f, 3) - spiralAngle(f, 0)).toBeCloseTo(3 * c.spin, 12);
+describe('구면 나선', () => {
+  it('현재 시점(s=0)은 정면(-Z)에 놓이고, 시간 거리마다 방위각·고도각이 돌며 반지름이 커진다', () => {
+    const p0 = spiralPoint(0, 0, { radiusScale: 1, angleOffset: 0, elevationOffset: 0 }, new Vector3());
+    expect(p0.x).toBeCloseTo(0, 12);
+    expect(p0.y).toBeCloseTo(0, 12);
+    expect(p0.z).toBeCloseTo(-c.innerRadius, 12);
+
+    expect(spiralAngle(2, 0) - spiralAngle(0, 0)).toBeCloseTo(2 * c.twist, 12);
+    expect(spiralAngle(0, 3) - spiralAngle(0, 0)).toBeCloseTo(3 * c.spin, 12);
+    expect(spiralElevation(0)).toBeCloseTo(0, 12);
+    expect(spiralRadius(-5)).toBeCloseTo(spiralRadius(5), 12);
   });
 
-  it('나선 위 점은 깊이에 놓이고 반지름은 armRadius × 벗어남 비율이다', () => {
+  it('구면 나선 점은 s=0 을 지날 때 연속이고 사방 360°와 위아래로 뻗으며 거리는 반지름 × 벗어남 비율이다', () => {
     const out = new Vector3();
     for (const key of ['month:1', 'day:2', 'hour:3']) {
       const j = planetJitter(key);
       expect(planetJitter(key)).toEqual(j);
       expect(Math.abs(j.radiusScale - 1)).toBeLessThanOrEqual(c.radiusJitter);
       expect(Math.abs(j.angleOffset)).toBeLessThanOrEqual(c.angleJitter);
-      for (const depth of [2, 6, 20]) {
-        spiralPoint(depth, 1.5, j, out);
-        expect(out.z).toBeCloseTo(-depth, 12);
-        expect(Math.hypot(out.x, out.y)).toBeCloseTo(c.armRadius * j.radiusScale, 12);
-        expect(Math.atan2(out.y, out.x)).toBeCloseTo(
-          Math.atan2(Math.sin(spiralAngle(depth, 1.5) + j.angleOffset), Math.cos(spiralAngle(depth, 1.5) + j.angleOffset)),
-          9,
-        );
+      expect(Math.abs(j.elevationOffset)).toBeLessThanOrEqual(c.elevationJitter);
+      for (const s of [-12, -4, 0, 4, 12, 24]) {
+        spiralPoint(s, 1.5, j, out);
+        expect(out.length()).toBeCloseTo(spiralRadius(s) * j.radiusScale, 12);
       }
     }
+
+    // s=0 부근 연속성과 사방 퍼짐
+    const zeroJ = { radiusScale: 1, angleOffset: 0, elevationOffset: 0 };
+    const a = spiralPoint(-1e-4, 0, zeroJ, new Vector3()).clone();
+    const b = spiralPoint(1e-4, 0, zeroJ, new Vector3()).clone();
+    expect(a.distanceTo(b)).toBeLessThan(1e-2);
+
+    let hasLeft = false;
+    let hasRight = false;
+    let hasBack = false;
+    let hasUp = false;
+    let hasDown = false;
+    for (let s = -45; s <= 45; s += 1.5) {
+      spiralPoint(s, 0, zeroJ, out);
+      if (out.x < -2) hasLeft = true;
+      if (out.x > 2) hasRight = true;
+      if (out.z > 2) hasBack = true;
+      if (out.y > 2) hasUp = true;
+      if (out.y < -2) hasDown = true;
+    }
+    expect(hasLeft && hasRight && hasBack && hasUp && hasDown).toBe(true);
   });
 });
 
@@ -252,12 +276,14 @@ describe('선 그래프', () => {
     }
   });
 
-  it('허브는 자식들의 평균 깊이에서 안쪽 줄기 위에 놓인다', () => {
+  it('허브는 자식들의 평균 시간 거리에서 안쪽 구면 껍질 위에 놓인다', () => {
     const out = new Vector3();
     hubPoint([4, 8, 12], 2, out);
-    expect(out.z).toBeCloseTo(-8, 12);
-    expect(Math.hypot(out.x, out.y)).toBeCloseTo(c.armRadius * g.hubRadius, 12);
-    expect(Math.atan2(out.y, out.x)).toBeCloseTo(Math.atan2(Math.sin(spiralAngle(8, 2)), Math.cos(spiralAngle(8, 2))), 9);
+    const expectedR = ((spiralRadius(4) + spiralRadius(8) + spiralRadius(12)) / 3) * g.hubRadius;
+    expect(out.length()).toBeCloseTo(expectedR, 12);
+    const sAvg = 8;
+    const expectedAlpha = spiralAngle(sAvg, 2);
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(Math.atan2(Math.sin(expectedAlpha), Math.cos(expectedAlpha)), 9);
   });
 
   it('노트 점은 관련도가 높을수록 가깝고, 같은 관련도에서는 순서가 뒤일수록 바깥이며 겹치지 않는다', () => {

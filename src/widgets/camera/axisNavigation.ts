@@ -15,6 +15,8 @@ export interface AxisNavigationOptions {
   minTime: number;
   maxTime: number;
   viewportHeight: () => number;
+  /** 한 손가락 끌기로 시간축을 옮길지 여부(기본 true). 360° 카메라 회전에 끌기를 쓸 때는 false 로 둔다 */
+  dragTime?: boolean;
   /** 핀치·휠 중심 좌표에서 가장 가까운 노드의 시각(ms). 없으면 초점면을 고정한다 */
   pickAnchorTime?: (x: number, y: number) => number | null;
   /** 펼친 카드가 있는 등 축 조작을 막아야 할 때 true */
@@ -87,13 +89,21 @@ export class AxisNavigation {
     this.controller.focusOn(clampFocusTime(time, this.minTime, this.maxTime), level);
   }
 
+  /** 시간 스크러버 등에서 즉시 시점을 옮긴다 */
+  scrubTo(time: number): void {
+    this.cancelMotion();
+    const next = clampFocusTime(time, this.minTime, this.maxTime);
+    this.controller.current.focusTime = next;
+    this.controller.target.focusTime = next;
+  }
+
   onTouchCountChange(count: number): void {
     if (count > 0) this.velocityTime = 0;
     this.options.onTouchCountChange?.(count);
   }
 
   onDragStart(): void {
-    if (this.options.isBlocked?.()) return;
+    if (this.options.dragTime === false || this.options.isBlocked?.()) return;
     this.cancelMotion();
     this.isDragging = true;
   }

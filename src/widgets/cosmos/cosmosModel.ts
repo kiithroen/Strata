@@ -1,13 +1,13 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
-import { floorTo, type TimeUnit } from '../../core/calendar';
+import { DAY_MS, floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
-import { unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
+import { depthPerDay, unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
 
 /**
  * 우주 보기: 시간 묶음은 행성, 노트는 행성 둘레를 도는 위성이다.
- * 행성은 시간축(깊이)을 따라 화면 안쪽으로 감겨 들어가는 나선팔 위에 흩어져 있어 정면에서 보면 은하처럼 보인다.
- * 나선은 카메라 공간에 고정돼 있고, 시간을 옮기면 행성이 나선을 타고 소용돌이치며 다가오거나 멀어진다.
+ * 행성은 현재 시점을 중심으로 사방 360°를 감싸며 바깥으로 퍼지는 구면 나선 위에 놓인다.
+ * 시점을 옮기면 그 시점이 새 중심이 되어 주변 기억들이 다시 사방에 펼쳐진다.
  */
 
 /** 행성이 될 수 있는 단위. 큰 것부터 */
@@ -46,12 +46,13 @@ export function hash01(a: number, b = 0): number {
   return (h >>> 0) / 4294967296;
 }
 
-// ── 나선팔 ────────────────────────────────────────────
+// ── 3D 구면 나선 ──────────────────────────────────────
 
-/** 행성이 나선에서 벗어나는 정도. 묶음 키로 정해져 같은 묶음은 늘 같은 자리다 */
+/** 행성이 구면 나선에서 벗어나는 정도. 묶음 키로 정해져 같은 묶음은 늘 같은 자리다 */
 export interface PlanetJitter {
   radiusScale: number;
   angleOffset: number;
+  elevationOffset: number;
 }
 
 export function planetJitter(key: string): PlanetJitter {
@@ -60,20 +61,42 @@ export function planetJitter(key: string): PlanetJitter {
   return {
     radiusScale: 1 + (hash01(h, 1) * 2 - 1) * c.radiusJitter,
     angleOffset: (hash01(h, 2) * 2 - 1) * c.angleJitter,
+    elevationOffset: (hash01(h, 3) * 2 - 1) * c.elevationJitter,
   };
 }
 
-/** 나선 각도: 초점면에서 cosmos.focusAngle, 깊이마다 cosmos.twist 만큼 돌고, 은하 전체가 cosmos.spin 으로 돈다 */
-export function spiralAngle(depth: number, time: number): number {
-  const c = tuning.cosmos;
-  return c.focusAngle + c.twist * (depth - tuning.axis.focusDepth) + c.spin * time;
+/** 현재 시점(focusTime)에서 시각 time 까지의 부호 있는 거리(월드 깊이 단위. 양수는 과거, 음수는 미래) */
+export function timeOffsetDepth(state: AxisState, time: number): number {
+  return ((state.focusTime - time) / DAY_MS) * depthPerDay(state);
 }
 
-/** 깊이 depth 의 나선팔 위 점. 화면 정면에서 보면 깊어질수록 가운데로 감겨 든다 */
-export function spiralPoint(depth: number, time: number, jitter: PlanetJitter, out: Vector3): Vector3 {
-  const theta = spiralAngle(depth, time) + jitter.angleOffset;
-  const r = tuning.cosmos.armRadius * jitter.radiusScale;
-  return out.set(r * Math.cos(theta), r * Math.sin(theta), -depth);
+/** 구면 나선 반지름: s=0 에서 innerRadius, 과거·미래로 멀어질수록 radialScale 비율로 커진다 */
+export function spiralRadius(s: number): number {
+  const c = tuning.cosmos;
+  return c.innerRadius + c.radialScale * Math.abs(s);
+}
+
+/** 구면 나선 방위각(0 이 정면 -Z, + 가 오른쪽 +X) */
+export function spiralAngle(s: number, time: number): number {
+  const c = tuning.cosmos;
+  return c.twist * s + c.spin * time;
+}
+
+/** 구면 나선 고도각(라디안. s=0 에서 0 이고 위아래로 감아 돈다) */
+export function spiralElevation(s: number): number {
+  const c = tuning.cosmos;
+  return c.elevationAmp * Math.sin(c.elevationFreq * s);
+}
+
+const MAX_ELEVATION = 1.45;
+
+/** 현재 시점을 중심으로 사방 360° 구면 나선 위의 3D 좌표 */
+export function spiralPoint(s: number, time: number, jitter: PlanetJitter, out: Vector3): Vector3 {
+  const r = spiralRadius(s) * jitter.radiusScale;
+  const alpha = spiralAngle(s, time) + jitter.angleOffset;
+  const phi = Math.max(-MAX_ELEVATION, Math.min(MAX_ELEVATION, spiralElevation(s) + jitter.elevationOffset));
+  const cosPhi = Math.cos(phi);
+  return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }
 
 // ── 선 그래프 ─────────────────────────────────────────
@@ -111,12 +134,21 @@ export function buildHubs(clusters: readonly Cluster[], parent: TimeUnit | null)
   return hubs;
 }
 
-/** 허브 자리: 자식 행성들의 평균 깊이에서, 나선 반지름의 graph.hubRadius 비율인 안쪽 줄기 위 */
-export function hubPoint(childDepths: readonly number[], time: number, out: Vector3): Vector3 {
-  let sum = 0;
-  for (const d of childDepths) sum += d;
-  const depth = sum / Math.max(1, childDepths.length);
-  return spiralPoint(depth, time, { radiusScale: tuning.cosmos.graph.hubRadius, angleOffset: 0 }, out);
+/** 허브 자리: 자식 행성들의 평균 시간 거리에서, 평균 반지름의 graph.hubRadius 비율인 안쪽 구면 껍질 위 */
+export function hubPoint(childOffsets: readonly number[], time: number, out: Vector3): Vector3 {
+  let sumS = 0;
+  let sumR = 0;
+  for (const s of childOffsets) {
+    sumS += s;
+    sumR += spiralRadius(s);
+  }
+  const count = Math.max(1, childOffsets.length);
+  const sAvg = sumS / count;
+  const r = (sumR / count) * tuning.cosmos.graph.hubRadius;
+  const alpha = spiralAngle(sAvg, time);
+  const phi = Math.max(-MAX_ELEVATION, Math.min(MAX_ELEVATION, spiralElevation(sAvg)));
+  const cosPhi = Math.cos(phi);
+  return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }
 
 function clamp01(x: number): number {

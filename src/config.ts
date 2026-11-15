@@ -171,13 +171,19 @@ export const tuning = {
     farDepth: 52,
     /** 행성 단위는 간격이 이 깊이 이상인 가장 작은 단위(연·월·일·시)다. 다 넘으면 시 단위다 */
     planetMinSpacing: 0.6,
-    /** 나선팔: 깊이 1 마다 도는 각도, 초점면에서 지금 행성이 놓이는 각도(-π/2 가 화면 아래), 나선 반지름 */
-    twist: 0.21,
-    focusAngle: -1.5708,
-    armRadius: 1.3,
-    /** 행성마다 나선에서 벗어나는 정도: 반지름 비율, 각도 */
-    radiusJitter: 0.35,
-    angleJitter: 0.3,
+    /**
+     * 구면 나선: 지금 시점(s=0)이 놓이는 최소 반지름, 시간 거리당 반지름 비율(radialScale),
+     * s 1마다 도는 방위각(twist), 위아래 고도 진폭(elevationAmp)·진동수(elevationFreq)
+     */
+    innerRadius: 5.2,
+    radialScale: 0.42,
+    twist: 0.14,
+    elevationAmp: 1.0,
+    elevationFreq: 0.095,
+    /** 행성마다 구면 나선에서 벗어나는 정도: 반지름 비율, 방위각, 고도각 */
+    radiusJitter: 0.16,
+    angleJitter: 0.22,
+    elevationJitter: 0.16,
     /** 은하 전체가 도는 속도(라디안/초) */
     spin: 0.015,
     /** 행성(시간 묶음 노드)의 반지름: 종이가 나는 띠의 안쪽 기준. 위성 수의 제곱근 × planetGrowth 를 더하고 planetMaxRadius 를 넘지 않는다 */
@@ -205,8 +211,8 @@ export const tuning = {
       hubLabelHeight: 0.15,
       /** 종이에 꽂힌 압정 머리 크기 */
       pinSize: 0.05,
-      /** 허브는 나선 반지름의 이 비율인 안쪽 줄기 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
-      hubRadius: 0.42,
+      /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
+      hubRadius: 0.72,
       tapRadius: 34,
       /** 종이 탭 판정 반경(CSS px). 화면에 보이는 종이 반지름이 이보다 크면 그쪽을 쓴다 */
       paperTapRadius: 38,
@@ -247,8 +253,8 @@ export const tuning = {
     planetFadeRate: 4,
     /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
     holdRate: 30,
-    /** 먼지: 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 원반 전체에 흩어지는 비율 */
-    dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.12, halo: 0.12, size: 2.4, opacity: 0.55 },
+    /** 먼지: 구면 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 구 전체에 흩어지는 비율 */
+    dust: { count: 9000, arms: 2, spread: 0.14, angleSpread: 0.14, halo: 0.12, size: 3.4, opacity: 0.72 },
     stars: { count: 2600, radius: 55, size: 1.8 },
     coreSize: 9,
   },
@@ -289,6 +295,12 @@ export const tuning = {
     /** 휠 한 눈금(100px)당 로그 축척 변화량과 손 놓음 스냅 대기 시간(초) */
     wheelScalePer100: 0.45,
     wheelSnapDelay: 0.18,
+    /** 360° 시선 회전: 화면 각도 대비 회전 배율, 관성 감쇠(1/초), 멈춤 속도(라디안/초), 노드 이동 회전 속도, 최대 상하 각도 */
+    lookDragScale: 1.0,
+    lookInertiaDecay: 4.2,
+    lookStopSpeed: 0.015,
+    lookTurnRate: 6.5,
+    maxPitch: 1.42,
   },
 
   loop: {

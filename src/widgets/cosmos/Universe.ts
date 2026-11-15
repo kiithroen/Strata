@@ -9,50 +9,33 @@ import {
   Points,
   ShaderMaterial,
   SphereGeometry,
-  Sprite,
-  SpriteMaterial,
 } from 'three';
 import { tuning } from '../../config';
 import { createRng } from '../../core/random';
-import { glowTexture } from '../common/glowTexture';
 
 /**
- * 우주 배경: 먼 별, 성운, 나선팔을 따라 흐르는 먼지, 은하 중심의 빛.
- * 먼지는 나선팔과 같은 식으로 놓이고, 시간을 옮긴 만큼(깊이로 환산) 흘러가 비행하는 느낌을 준다.
+ * 우주 배경: 사방 360°를 감싸는 별, 성운, 구면 나선팔을 따라 흐르는 먼지.
+ * 먼지는 행성과 같은 3D 구면 나선 위에 놓이고, 시간을 옮긴 만큼 흘러가 비행하는 느낌을 준다.
  */
 export class Universe {
   readonly group = new Group();
   private readonly dust: Points<BufferGeometry, ShaderMaterial>;
   private readonly stars: Points<BufferGeometry, ShaderMaterial>;
   private readonly nebula: Mesh<SphereGeometry, ShaderMaterial>;
-  private readonly core: Sprite;
   private dustOffset = 0;
 
   constructor(pixelRatio: number) {
     this.nebula = createNebula();
     this.stars = createStars(pixelRatio);
     this.dust = createDust(pixelRatio);
-    this.core = new Sprite(
-      new SpriteMaterial({
-        map: glowTexture(),
-        color: new Color('#ffcf9a'),
-        blending: AdditiveBlending,
-        transparent: true,
-        depthWrite: false,
-        fog: false,
-        opacity: 0.55,
-      }),
-    );
-    const c = tuning.cosmos;
-    this.core.position.set(0, 0, -c.fogFar);
-    this.core.scale.setScalar(c.coreSize);
-    this.group.add(this.nebula, this.stars, this.core, this.dust);
+    this.group.add(this.nebula, this.stars, this.dust);
   }
 
-  /** scrollDepth 는 이번 프레임에 시간축이 움직인 깊이(최근 쪽으로 가면 양수) */
+  /** scrollDepth 는 이번 프레임에 시점이 옮겨간 시간 거리(과거로 가면 음수, 최근으로 가면 양수) */
   update(time: number, scrollDepth: number): void {
     this.dustOffset += scrollDepth;
-    const range = tuning.cosmos.farDepth - tuning.cosmos.nearDepth;
+    const c = tuning.cosmos;
+    const range = (c.farDepth - c.innerRadius) / c.radialScale;
     this.dustOffset = ((this.dustOffset % range) + range) % range;
     this.dust.material.uniforms.uOffset.value = this.dustOffset;
     this.dust.material.uniforms.uTime.value = time;
@@ -70,7 +53,6 @@ export class Universe {
       o.geometry.dispose();
       o.material.dispose();
     }
-    this.core.material.dispose();
   }
 }
 
@@ -83,16 +65,18 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
   const arm = new Float32Array(n);
   const rad = new Float32Array(n);
   const ang = new Float32Array(n);
+  const elev = new Float32Array(n);
   const size = new Float32Array(n);
   const tint = new Float32Array(n);
   const gauss = () => (rng() + rng() + rng() - 1.5) / 1.5;
   for (let i = 0; i < n; i++) {
     base[i] = rng();
-    arm[i] = Math.floor(rng() * d.arms);
+    arm[i] = i % 2 === 0 ? 1 : -1;
     const halo = rng() < d.halo;
-    // 나선팔 먼지는 팔 둘레에 모이고, 일부는 은하 원반 전체에 흩어진다
-    rad[i] = halo ? 0.15 + rng() * 2.2 : Math.max(0.05, 1 + gauss() * d.spread);
-    ang[i] = halo ? rng() * Math.PI * 2 : gauss() * d.angleSpread;
+    // 구면 나선팔 먼지는 팔 둘레에 모이고, 일부는 구 전체에 흩어진다
+    rad[i] = halo ? 0.35 + rng() * 0.85 : Math.max(0.35, 1 + gauss() * d.spread);
+    ang[i] = halo ? (rng() * 2 - 1) * Math.PI : gauss() * d.angleSpread;
+    elev[i] = halo ? (rng() * 2 - 1) * 1.4 : gauss() * d.angleSpread;
     size[i] = 0.4 + Math.pow(rng(), 3) * 1.6;
     tint[i] = rng();
   }
@@ -103,6 +87,7 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
   geometry.setAttribute('aArm', new BufferAttribute(arm, 1));
   geometry.setAttribute('aRad', new BufferAttribute(rad, 1));
   geometry.setAttribute('aAng', new BufferAttribute(ang, 1));
+  geometry.setAttribute('aElev', new BufferAttribute(elev, 1));
   geometry.setAttribute('aSize', new BufferAttribute(size, 1));
   geometry.setAttribute('aTint', new BufferAttribute(tint, 1));
 
@@ -111,14 +96,13 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       uOffset: { value: 0 },
       uTime: { value: 0 },
       uNear: { value: c.nearDepth },
+      uInnerRadius: { value: c.innerRadius },
+      uRadialScale: { value: c.radialScale },
       uFar: { value: c.farDepth },
-      uFocusDepth: { value: tuning.axis.focusDepth },
-      uFocusAngle: { value: c.focusAngle },
       uTwist: { value: c.twist },
+      uElevAmp: { value: c.elevationAmp },
+      uElevFreq: { value: c.elevationFreq },
       uSpin: { value: c.spin },
-      uArmRadius: { value: c.armRadius },
-      uArms: { value: d.arms },
-      uFogNear: { value: c.fogNear },
       uPixelRatio: { value: pixelRatio },
       uSize: { value: d.size },
       uOpacity: { value: d.opacity },
@@ -130,32 +114,37 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       attribute float aArm;
       attribute float aRad;
       attribute float aAng;
+      attribute float aElev;
       attribute float aSize;
       attribute float aTint;
       uniform float uOffset;
       uniform float uTime;
       uniform float uNear;
+      uniform float uInnerRadius;
+      uniform float uRadialScale;
       uniform float uFar;
-      uniform float uFocusDepth;
-      uniform float uFocusAngle;
       uniform float uTwist;
+      uniform float uElevAmp;
+      uniform float uElevFreq;
       uniform float uSpin;
-      uniform float uArmRadius;
-      uniform float uArms;
-      uniform float uFogNear;
       uniform float uPixelRatio;
       uniform float uSize;
       varying float vFade;
       varying float vTint;
       void main() {
-        float range = uFar - uNear;
-        float depth = uNear + mod(aBase * range + uOffset, range);
-        float theta = uFocusAngle + uTwist * (depth - uFocusDepth) + uSpin * uTime + aArm * 6.2831853 / uArms + aAng;
-        float r = uArmRadius * aRad;
-        vec4 mv = modelViewMatrix * vec4(r * cos(theta), r * sin(theta), -depth, 1.0);
+        float range = (uFar - uInnerRadius) / uRadialScale;
+        float t = fract(aBase + (aArm * uOffset) / range);
+        float s = aArm * t * range;
+        float r = max(uNear + 0.4, (uInnerRadius + uRadialScale * abs(s)) * aRad);
+        float alpha = uTwist * s + uSpin * uTime + aAng;
+        float phi = clamp(uElevAmp * sin(uElevFreq * s) + aElev, -1.45, 1.45);
+        float cosPhi = cos(phi);
+        vec3 pos = vec3(r * cosPhi * sin(alpha), r * sin(phi), -r * cosPhi * cos(alpha));
+        vec4 mv = modelViewMatrix * vec4(pos, 1.0);
         gl_Position = projectionMatrix * mv;
-        gl_PointSize = min(aSize * uSize * uPixelRatio * (6.0 / depth), 7.0 * uPixelRatio);
-        vFade = smoothstep(uNear, uNear + 2.5, depth) * (1.0 - smoothstep(uFar - 6.0, uFar, depth));
+        float dist = max(-mv.z, 0.25);
+        gl_PointSize = min(aSize * uSize * uPixelRatio * (6.0 / dist), 8.0 * uPixelRatio);
+        vFade = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.78, 1.0, t));
         vTint = aTint;
       }
     `,
@@ -302,9 +291,7 @@ function createNebula(): Mesh<SphereGeometry, ShaderMaterial> {
         float b = smoothstep(0.5, 0.9, fbm(p * 1.7 + 11.0));
         float c = smoothstep(0.55, 0.95, fbm(p * 1.3 + 23.0));
         vec3 col = uColorA * a + uColorB * b * 0.8 + uColorC * c * 0.7;
-        // 정면 안쪽(은하 중심 쪽)을 조금 더 밝힌다
-        col *= 0.55 + 0.45 * smoothstep(0.2, 1.0, -vDir.z);
-        gl_FragColor = vec4(col * 0.55, 1.0);
+        gl_FragColor = vec4(col * 0.45, 1.0);
         #include <colorspace_fragment>
       }
     `,
