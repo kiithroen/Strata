@@ -1,6 +1,7 @@
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
+import { createRng } from '../../core/random';
 import type { CardLayout } from './cardLayout';
 
 /** 사진 원본. 필요한 해상도로 그때그때 그려 받는다. 텍스처를 만든 뒤에는 결과를 들고 있지 않는다. */
@@ -18,7 +19,7 @@ export interface CardFace {
 
 const MONO = 'ui-monospace, "Cascadia Mono", Consolas, "D2Coding", monospace';
 
-/** 사진, 테두리, 모서리 괄호, 날짜·번호 라벨을 캔버스 하나에 그려 텍스처로 만든다. */
+/** 흰 종이에 사진과 날짜·번호를 인쇄한 모양을 캔버스 하나에 그려 텍스처로 만든다. */
 export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy: number): CanvasTexture {
   const look = tuning.look;
   const canvas = document.createElement('canvas');
@@ -27,24 +28,21 @@ export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D 캔버스를 만들 수 없다');
 
-  ctx.fillStyle = look.panel;
+  const card = tuning.card;
+  ctx.fillStyle = card.paper;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  drawGrain(ctx, canvas.width, canvas.height, face.id);
 
-  const { photo, label, padding, bracket } = layout;
+  const { photo, label } = layout;
   const image = face.photo.render(photo.width);
   const iw = (image as { width: number }).width;
   const ih = (image as { height: number }).height;
   drawCover(ctx, image, iw, ih, photo.x, photo.y, photo.width, photo.height);
 
-  ctx.strokeStyle = look.frameLine;
+  ctx.strokeStyle = card.photoLine;
   const px = canvas.width / 512;
   ctx.lineWidth = 1.5 * px;
   ctx.strokeRect(photo.x + 0.75 * px, photo.y + 0.75 * px, photo.width - 1.5 * px, photo.height - 1.5 * px);
-
-  ctx.strokeStyle = look.accent;
-  ctx.lineWidth = 3 * px;
-  const inset = padding * 0.45;
-  drawBrackets(ctx, inset, inset, canvas.width - inset * 2, canvas.height - inset * 2, bracket);
 
   const fontSize = Math.round(label.height * 0.34);
   const midY = label.y + label.height * 0.52;
@@ -55,11 +53,11 @@ export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy
   ctx.fillStyle = look.accent;
   ctx.fillRect(label.x, midY - marker / 2, marker, marker);
 
-  ctx.fillStyle = look.text;
+  ctx.fillStyle = card.ink;
   ctx.textAlign = 'left';
   ctx.fillText(formatStamp(face.createdAt), label.x + marker * 1.8, midY);
 
-  ctx.fillStyle = look.textDim;
+  ctx.fillStyle = card.inkDim;
   ctx.textAlign = 'right';
   ctx.fillText(`#${face.id}`, label.x + label.width, midY);
 
@@ -86,19 +84,15 @@ function drawCover(
   ctx.drawImage(image, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
 }
 
-function drawBrackets(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, len: number): void {
-  ctx.beginPath();
-  ctx.moveTo(x, y + len);
-  ctx.lineTo(x, y);
-  ctx.lineTo(x + len, y);
-  ctx.moveTo(x + w - len, y);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w, y + len);
-  ctx.moveTo(x + w, y + h - len);
-  ctx.lineTo(x + w, y + h);
-  ctx.lineTo(x + w - len, y + h);
-  ctx.moveTo(x + len, y + h);
-  ctx.lineTo(x, y + h);
-  ctx.lineTo(x, y + h - len);
-  ctx.stroke();
+/** 종이결: 노트 번호로 정한 옅은 점을 흩뿌린다 */
+function drawGrain(ctx: CanvasRenderingContext2D, w: number, h: number, id: string): void {
+  let seed = 0;
+  for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) >>> 0;
+  const rng = createRng(seed);
+  const count = Math.round((w * h) / 90);
+  for (let i = 0; i < count; i++) {
+    const dark = rng() < 0.5;
+    ctx.fillStyle = dark ? `rgba(0,0,0,${0.02 + rng() * 0.04})` : `rgba(255,255,255,${0.2 + rng() * 0.3})`;
+    ctx.fillRect(rng() * w, rng() * h, 1, 1);
+  }
 }

@@ -20,7 +20,7 @@ export const tuning = {
     fogFar: 22,
     scanlineDensity: 180,
     scanlineSpeed: 1.2,
-    scanlineStrength: 0.1,
+    scanlineStrength: 0.04,
     noiseStrength: 0.035,
     noiseFps: 24,
     focusEdgeWidth: 0.012,
@@ -35,11 +35,22 @@ export const tuning = {
     /** 펼친 카드에 따로 만들어 쓰는 선명한 텍스처 폭(px) */
     detailTextureWidth: 1024,
     /** 텍스처 폭 대비 안쪽 여백 */
-    paddingRatio: 0.035,
+    paddingRatio: 0.055,
     /** 사진 폭 대비 라벨 띠 높이 */
     labelRatio: 0.13,
-    /** 텍스처 폭 대비 모서리 괄호 길이 */
-    bracketRatio: 0.07,
+    /** 종이 색(앞면 바탕, 뒷면), 인쇄 글자 색, 사진 테두리 선 */
+    paper: '#f3f0e8',
+    paperBack: '#e9e5dc',
+    ink: '#2c2b29',
+    inkDim: '#86827a',
+    photoLine: 'rgba(0, 0, 0, 0.16)',
+    /** 휨 격자 칸 수(가로·세로) */
+    segments: 10,
+    /**
+     * 종이 휨: 카드 좌표(-0.5~0.5)에서 가로·세로 물결의 빈도·높이·빠르기, 가로 말림 크기와 빠르기.
+     * 높이는 카드 폭 대비다
+     */
+    bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [3.1, 2.3], curl: 0.32, curlSpeed: 0.9 },
   },
 
   float: {
@@ -142,21 +153,61 @@ export const tuning = {
     angleJitter: 0.3,
     /** 은하 전체가 도는 속도(라디안/초) */
     spin: 0.015,
+    /** 행성(시간 묶음 노드)의 반지름: 종이가 나는 띠의 안쪽 기준. 위성 수의 제곱근 × planetGrowth 를 더하고 planetMaxRadius 를 넘지 않는다 */
     planetRadius: 0.16,
-    /** 위성 수의 제곱근에 곱해 행성 반지름에 더한다 */
     planetGrowth: 0.05,
-    glowScale: 7,
-    planetLabelHeight: 0.13,
     planetMaxRadius: 0.34,
+    planetLabelHeight: 0.11,
     /**
-     * 위성 고리: 첫 고리 위성 수, 고리마다 늘어나는 수, 고리 간격, 공전 속도 계수, 고리 기울기 최대.
-     * maxByUnit 은 행성 단위별 카드 고리 수다. 넘친 위성은 바깥 띠에 작게 돈다
+     * 선 그래프. 선 굵기는 CSS px, 점·빛 크기는 월드 단위 지름이다.
+     * burst: 노드에서 노트 점이 방사형으로 퍼지는 원판(안쪽 반지름, 간격, 앞뒤 흔들림, 회전 속도).
+     * hourColors: 노트가 찍힌 시각(4시간 단위)별 점 색
      */
-    ring: { base: 3, grow: 2, gap: 0.3, speed: 0.55, inclination: 0.55, maxByUnit: { year: 1, month: 1, day: 2, hour: 3, hour6: 2, min15: 3 } },
+    graph: {
+      branchWidth: 1.8,
+      spokeWidth: 1.0,
+      branchColor: '#d4d6ff',
+      branchAlpha: 0.5,
+      spokeAlpha: 0.55,
+      nodeSize: 0.09,
+      hubSize: 0.13,
+      dotSize: 0.055,
+      glowSize: 1.3,
+      hubGlowSize: 2.4,
+      glowAlpha: 0.16,
+      hubLabelHeight: 0.15,
+      /** 허브는 나선 반지름의 이 비율인 안쪽 줄기 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
+      hubRadius: 0.42,
+      tapRadius: 34,
+      burst: { inner: 0.07, spacing: 0.07, depthJitter: 0.05, spin: 0.06 },
+      hourColors: ['#4a64ff', '#3fd2ff', '#7dffb6', '#ffe07a', '#ff6fae', '#b783ff'],
+    },
+    /**
+     * 돌풍에 날리는 종이(위성).
+     * capacityByUnit: 행성 단위별 큰 카드 수(넘친 위성은 overflowScale 크기 종잇조각).
+     * gap·spread: 행성 표면에서 띠 안쪽까지 거리와 띠 두께. speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 종이마다 배율 범위.
+     * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. spinRate: 뒹구는 빠르기 범위(라디안/초).
+     * flutterAmp·flutterFreq: 팔랑이는 각도와 빈도 범위.
+     * gust: 돌풍 사인 둘의 빈도·위상, boost 는 돌풍이 가장 셀 때 더해지는 시간 배율, gustWobble 은 흔들림이 커지는 배율
+     */
+    swarm: {
+      capacityByUnit: { year: 3, month: 3, day: 8, hour: 14, hour6: 8, min15: 14 },
+      gap: 0.18,
+      spread: 0.75,
+      speed: 0.5,
+      speedJitter: [0.6, 1.4],
+      wobble: 0.1,
+      wobbleFreq: [0.6, 2.2],
+      spinRate: [0.35, 1.5],
+      flutterAmp: 0.75,
+      flutterFreq: [1.4, 3.6],
+      gust: { freq: [0.17, 0.41], phase: [0.3, 2.1], boost: 1.6 },
+      gustWobble: 1.4,
+    },
     satelliteScale: 0.3,
-    ringOpacity: 0.35,
-    /** 고리에 다 못 들어간 위성은 바깥 띠에 작게 돈다 */
-    overflowScale: 0.07,
+    overflowScale: 0.09,
+    /** 종이가 돌면서 빛을 받는 정도(0이면 끈다) */
+    paperShade: 1,
     /** 묶임이 바뀔 때 위성이 새 행성으로 옮겨 가는 속도, 행성이 나타나고 사라지는 속도 */
     regroupRate: 5,
     planetFadeRate: 4,

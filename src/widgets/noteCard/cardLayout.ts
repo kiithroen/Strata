@@ -7,7 +7,6 @@ export interface CardLayout {
   padding: number;
   photo: { x: number; y: number; width: number; height: number };
   label: { x: number; y: number; width: number; height: number };
-  bracket: number;
   worldWidth: number;
   worldHeight: number;
 }
@@ -26,7 +25,6 @@ export function cardLayout(imageWidth: number, imageHeight: number, textureWidth
     padding,
     photo: { x: padding, y: padding, width: photoWidth, height: photoHeight },
     label: { x: padding, y: padding + photoHeight, width: photoWidth, height: labelHeight },
-    bracket: Math.round(textureWidth * c.bracketRatio),
     worldWidth: c.width,
     worldHeight: (c.width * textureHeight) / textureWidth,
   };

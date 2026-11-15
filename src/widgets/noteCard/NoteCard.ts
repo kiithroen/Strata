@@ -43,8 +43,17 @@ export class NoteCard {
     this.labels = opts.labels;
     this.layout = cardLayout(opts.face.photo.width, opts.face.photo.height);
     this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy);
-    const material = createCardMaterial(this.baseTexture, opts.look, this.layout.worldWidth / this.layout.worldHeight);
-    this.mesh = new Mesh(new PlaneGeometry(this.layout.worldWidth, this.layout.worldHeight), material);
+    let phase = 0;
+    for (let i = 0; i < this.id.length; i++) phase = (phase * 31 + this.id.charCodeAt(i)) % 6283;
+    const material = createCardMaterial({
+      map: this.baseTexture,
+      look: opts.look,
+      width: this.layout.worldWidth,
+      height: this.layout.worldHeight,
+      bendPhase: phase / 1000,
+    });
+    const seg = tuning.card.segments;
+    this.mesh = new Mesh(new PlaneGeometry(this.layout.worldWidth, this.layout.worldHeight, seg, seg), material);
     this.mesh.name = `note-card-${this.id}`;
     this.mesh.userData.card = this;
     this.motion = new CardMotion(opts.float);

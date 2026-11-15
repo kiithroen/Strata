@@ -1,8 +1,8 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
-import type { TimeUnit } from '../../core/calendar';
+import { floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
-import { unitSpacing, type AxisState } from '../timeAxis/axisModel';
+import { unitSpacing, type AxisState, type Cluster } from '../timeAxis/axisModel';
 
 /**
  * 우주 보기: 시간 묶음은 행성, 노트는 행성 둘레를 도는 위성이다.
@@ -22,6 +22,8 @@ export function choosePlanetUnit(state: AxisState): TimeUnit {
   }
   return chosen;
 }
+
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 // ── 해시 ──────────────────────────────────────────────
 
@@ -74,6 +76,66 @@ export function spiralPoint(depth: number, time: number, jitter: PlanetJitter, o
   return out.set(r * Math.cos(theta), r * Math.sin(theta), -depth);
 }
 
+// ── 선 그래프 ─────────────────────────────────────────
+
+/** 행성 단위의 한 단계 위 단위. 행성들은 이 단위의 허브에 가지로 이어진다. 연이면 위가 없다 */
+export function parentUnit(unit: TimeUnit): TimeUnit | null {
+  const i = PLANET_UNITS.indexOf(unit);
+  return i > 0 ? PLANET_UNITS[i - 1] : null;
+}
+
+export interface Hub {
+  key: string;
+  /** 허브 칸에서 가장 최근 노트의 시각 */
+  anchorTime: number;
+  bucket: number;
+  /** clusters 안의 번호. 최근 것부터 */
+  children: number[];
+  notes: number;
+}
+
+/** 최근 것부터 정렬된 행성 묶음을 한 단계 위 단위로 다시 묶는다. 위 단위가 없으면 빈 배열이다 */
+export function buildHubs(clusters: readonly Cluster[], parent: TimeUnit | null): Hub[] {
+  if (parent === null) return [];
+  const hubs: Hub[] = [];
+  clusters.forEach((c, i) => {
+    const bucket = floorTo(parent, c.anchorTime);
+    const last = hubs[hubs.length - 1];
+    if (last && last.bucket === bucket) {
+      last.children.push(i);
+      last.notes += c.members.length;
+      return;
+    }
+    hubs.push({ key: `${parent}:${bucket}`, anchorTime: c.anchorTime, bucket, children: [i], notes: c.members.length });
+  });
+  return hubs;
+}
+
+/** 허브 자리: 자식 행성들의 평균 깊이에서, 나선 반지름의 graph.hubRadius 비율인 안쪽 줄기 위 */
+export function hubPoint(childDepths: readonly number[], time: number, out: Vector3): Vector3 {
+  let sum = 0;
+  for (const d of childDepths) sum += d;
+  const depth = sum / Math.max(1, childDepths.length);
+  return spiralPoint(depth, time, { radiusScale: tuning.cosmos.graph.hubRadius, angleOffset: 0 }, out);
+}
+
+/**
+ * 노드에서 k 번째 노트 점까지의 자리: 화면을 마주 보는 원판에 해바라기 씨처럼(황금각) 퍼진다.
+ * 반지름은 burst.inner + burst.spacing × √(k + ½), 앞뒤로 burst.depthJitter 만큼 흔들리고 원판 전체가 spin 각도만큼 돈다.
+ */
+export function burstOffset(k: number, spin: number, out: Vector3): Vector3 {
+  const b = tuning.cosmos.graph.burst;
+  const angle = k * GOLDEN_ANGLE + spin;
+  const r = b.inner + b.spacing * Math.sqrt(k + 0.5);
+  return out.set(Math.cos(angle) * r, Math.sin(angle) * r, (hash01(k, 77) * 2 - 1) * b.depthJitter);
+}
+
+/** 노트가 찍힌 시각(4시간 단위)에 맞춘 점 색 번호 */
+export function hourColorIndex(time: number): number {
+  const colors = tuning.cosmos.graph.hourColors.length;
+  return Math.min(colors - 1, Math.floor((new Date(time).getHours() * colors) / 24));
+}
+
 // ── 행성과 위성 ───────────────────────────────────────
 
 export function planetRadius(satellites: number): number {
@@ -81,77 +143,131 @@ export function planetRadius(satellites: number): number {
   return Math.min(c.planetMaxRadius, c.planetRadius + c.planetGrowth * Math.sqrt(Math.max(0, satellites - 1)));
 }
 
-/** 행성 단위별 카드 고리 수. 축척이 클수록(행성이 촘촘할수록) 적다 */
-export function maxRings(unit: TimeUnit): number {
-  return tuning.cosmos.ring.maxByUnit[unit];
+/** 행성 단위별 큰 카드 수. 축척이 클수록(행성이 촘촘할수록) 적고, 넘친 위성은 작은 종잇조각으로 날린다 */
+export function swarmCapacity(unit: TimeUnit): number {
+  return tuning.cosmos.swarm.capacityByUnit[unit];
 }
 
-export interface RingSlot {
-  /** 고리 번호. 카드 고리 수와 같으면 바깥 띠(작게 도는 위성)다 */
-  ring: number;
-  slot: number;
-  slots: number;
+// ── 돌풍에 날리는 종이 ────────────────────────────────
+
+const TAU = Math.PI * 2;
+
+function pick(h: number, salt: number, [lo, hi]: readonly [number, number]): number {
+  return lo + (hi - lo) * hash01(h, salt);
 }
 
-/** k 번째 고리에 들어가는 위성 수 */
-export function ringCapacity(k: number): number {
-  const r = tuning.cosmos.ring;
-  return r.base + r.grow * k;
+/** 해시로 고른 단위 벡터(구면 위 고르게) */
+function randomUnit(h: number, salt: number, out: Vector3): Vector3 {
+  const u = hash01(h, salt) * 2 - 1;
+  const t = hash01(h, salt + 1) * TAU;
+  const k = Math.sqrt(1 - u * u);
+  return out.set(k * Math.cos(t), k * Math.sin(t), u);
 }
 
-/** 위성 count 개를 안쪽 고리부터 max 개 고리까지 채운다. 다 못 들어간 위성은 바깥 띠(고리 번호 max)에 고르게 놓는다 */
-export function ringLayout(count: number, max: number): RingSlot[] {
-  const out: RingSlot[] = [];
-  let left = count;
-  for (let k = 0; k < max && left > 0; k++) {
-    const slots = Math.min(ringCapacity(k), left);
-    for (let s = 0; s < slots; s++) out.push({ ring: k, slot: s, slots });
-    left -= slots;
-  }
-  for (let s = 0; s < left; s++) out.push({ ring: max, slot: s, slots: left });
-  return out;
+/** 해시로 고른 회전(구면 위 고르게, Shoemake) */
+function randomQuaternion(h: number, salt: number, out: Quaternion): Quaternion {
+  const u1 = hash01(h, salt);
+  const u2 = hash01(h, salt + 1) * TAU;
+  const u3 = hash01(h, salt + 2) * TAU;
+  const a = Math.sqrt(1 - u1);
+  const b = Math.sqrt(u1);
+  return out.set(a * Math.sin(u2), a * Math.cos(u2), b * Math.sin(u3), b * Math.cos(u3));
 }
 
-export function ringRadius(planetR: number, ring: number): number {
-  return planetR + tuning.cosmos.ring.gap * (ring + 1);
+/** 위성(종이) 하나의 비행 성질. 노트 번호로 정해져 같은 노트는 늘 같은 식으로 난다 */
+export interface Flight {
+  /** XZ 평면의 원을 궤도면으로 돌리는 회전. 궤도면은 아무 방향으로나 기운다 */
+  orbit: Quaternion;
+  /** 행성 둘레 띠 안의 자리(0이 안쪽, 1이 바깥쪽) */
+  band: number;
+  phase: number;
+  /** 공전 속도 배율. 음수면 반대로 돈다 */
+  speed: number;
+  wobbleFreq: [number, number, number];
+  wobblePhase: [number, number, number];
+  /** 처음 자세와 뒹구는 축·빠르기, 팔랑이는 축·빈도·위상 */
+  base: Quaternion;
+  spinAxis: Vector3;
+  spinRate: number;
+  flutterAxis: Vector3;
+  flutterFreq: number;
+  flutterPhase: number;
+}
+
+export function flightParams(noteId: string): Flight {
+  const s = tuning.cosmos.swarm;
+  const h = hashString(noteId);
+  const direction = hash01(h, 1) < 0.5 ? -1 : 1;
+  return {
+    orbit: randomQuaternion(h, 2, new Quaternion()),
+    band: hash01(h, 5),
+    phase: hash01(h, 6) * TAU,
+    speed: direction * pick(h, 7, s.speedJitter),
+    wobbleFreq: [pick(h, 8, s.wobbleFreq), pick(h, 9, s.wobbleFreq), pick(h, 10, s.wobbleFreq)],
+    wobblePhase: [hash01(h, 11) * TAU, hash01(h, 12) * TAU, hash01(h, 13) * TAU],
+    base: randomQuaternion(h, 14, new Quaternion()),
+    spinAxis: randomUnit(h, 17, new Vector3()),
+    spinRate: (hash01(h, 19) < 0.5 ? -1 : 1) * pick(h, 20, s.spinRate),
+    flutterAxis: randomUnit(h, 21, new Vector3()),
+    flutterFreq: pick(h, 23, s.flutterFreq),
+    flutterPhase: hash01(h, 24) * TAU,
+  };
+}
+
+/**
+ * 은하 전체에 부는 돌풍의 세기(0~1). 느린 사인 둘의 합이라 미리 적분할 수 있다.
+ * 종이의 움직임은 gustTime 으로 잰다. 돌풍이 셀수록 시간이 빨리 흐르는 셈이라 빨라지고 더 뒹군다.
+ */
+export function gust(time: number): number {
+  const g = tuning.cosmos.swarm.gust;
+  return 0.5 + 0.25 * Math.sin(g.freq[0] * time + g.phase[0]) + 0.25 * Math.sin(g.freq[1] * time + g.phase[1]);
+}
+
+/** 1 + gust.boost × gust(t) 를 0부터 적분한 값. 프레임 간격과 상관없이 게임 시간만으로 정해진다 */
+export function gustTime(time: number): number {
+  const g = tuning.cosmos.swarm.gust;
+  const integral =
+    0.5 * time -
+    (0.25 * (Math.cos(g.freq[0] * time + g.phase[0]) - Math.cos(g.phase[0]))) / g.freq[0] -
+    (0.25 * (Math.cos(g.freq[1] * time + g.phase[1]) - Math.cos(g.phase[1]))) / g.freq[1];
+  return time + g.boost * integral;
+}
+
+/** 행성 중심에서 종이 궤도까지 반지름. 행성 표면에서 swarm.gap 떨어진 곳부터 swarm.spread 두께의 띠다 */
+export function flightRadius(planetR: number, f: Flight): number {
+  const s = tuning.cosmos.swarm;
+  return planetR + s.gap + s.spread * f.band;
 }
 
 /** 공전 각속도. 케플러 3법칙처럼 반지름의 1.5 제곱에 반비례한다 */
 export function orbitSpeed(radius: number): number {
-  return tuning.cosmos.ring.speed / Math.pow(radius, 1.5);
+  return tuning.cosmos.swarm.speed / Math.pow(radius, 1.5);
 }
-
-const axisX = new Vector3(1, 0, 0);
-const axisY = new Vector3(0, 1, 0);
-const tilt = new Quaternion();
-const node = new Quaternion();
-const ringQuat = new Quaternion();
 
 /**
- * 고리 평면의 회전. XZ 평면의 원을 화면을 마주 보는 평면(XY) 쪽으로 세운 뒤
- * 묶음 키로 정한 만큼(cosmos.ring.inclination 안에서) 기울인다.
+ * 행성 중심에서 본 종이 위치: 기운 궤도를 돌면서 난기류에 흔들린다.
+ * tau 는 gustTime(공전 시계), g 는 그때의 돌풍 세기다. 흔들림 크기는 swarm.wobble × (1 + swarm.gustWobble × g)다.
  */
-export function ringQuaternion(planetKey: string, ring: number, out: Quaternion): Quaternion {
-  const inc = tuning.cosmos.ring.inclination;
-  const h = hashString(planetKey);
-  tilt.setFromAxisAngle(axisX, Math.PI / 2 - (hash01(h, 20 + ring) * 2 - 1) * inc);
-  node.setFromAxisAngle(axisY, (hash01(h, 30 + ring) * 2 - 1) * inc);
-  return out.copy(node).multiply(tilt);
+export function flightOffset(f: Flight, planetR: number, tau: number, g: number, out: Vector3): Vector3 {
+  const s = tuning.cosmos.swarm;
+  const r = flightRadius(planetR, f);
+  const angle = f.phase + f.speed * orbitSpeed(r) * tau;
+  out.set(Math.cos(angle) * r, 0, Math.sin(angle) * r).applyQuaternion(f.orbit);
+  const w = s.wobble * (1 + s.gustWobble * g);
+  out.x += w * Math.sin(f.wobbleFreq[0] * tau + f.wobblePhase[0]);
+  out.y += w * Math.sin(f.wobbleFreq[1] * tau + f.wobblePhase[1]);
+  out.z += w * Math.sin(f.wobbleFreq[2] * tau + f.wobblePhase[2]);
+  return out;
 }
 
-/** 행성 중심에서 본 위성 위치. 같은 고리의 위성은 같은 간격을 두고 함께 돈다 */
-export function orbitOffset(planetKey: string, planetR: number, slot: RingSlot, time: number, out: Vector3): Vector3 {
-  const h = hashString(planetKey);
-  const radius = ringRadius(planetR, slot.ring);
-  const phase0 = hash01(h, 10 + slot.ring) * Math.PI * 2;
-  const angle = phase0 + (Math.PI * 2 * slot.slot) / slot.slots + orbitSpeed(radius) * time;
-  out.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-  return out.applyQuaternion(ringQuaternion(planetKey, slot.ring, ringQuat));
-}
+const spinQuat = new Quaternion();
+const flutterQuat = new Quaternion();
 
-/** 고리 배치가 쓰는 고리 수(바깥 띠 포함) */
-export function ringCount(layout: readonly RingSlot[]): number {
-  return layout.length === 0 ? 0 : layout[layout.length - 1].ring + 1;
+/** 종이 자세: 제 축으로 뒹굴면서 팔랑인다(swarm.flutterAmp). 카메라를 보지 않아 뒷면도 보인다 */
+export function flightQuaternion(f: Flight, tau: number, out: Quaternion): Quaternion {
+  spinQuat.setFromAxisAngle(f.spinAxis, f.spinRate * tau);
+  flutterQuat.setFromAxisAngle(f.flutterAxis, tuning.cosmos.swarm.flutterAmp * Math.sin(f.flutterFreq * tau + f.flutterPhase));
+  return out.copy(f.base).multiply(spinQuat).multiply(flutterQuat);
 }
 
 const lookMatrix = new Matrix4();

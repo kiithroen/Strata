@@ -4,23 +4,30 @@ import { tuning } from '../src/config';
 import {
   PLANET_UNITS,
   RegroupBlend,
+  buildHubs,
+  burstOffset,
+  hourColorIndex,
+  hubPoint,
+  parentUnit,
   choosePlanetUnit,
   cosmosFade,
   facingQuaternion,
-  orbitOffset,
+  flightOffset,
+  flightParams,
+  flightQuaternion,
+  flightRadius,
+  gust,
+  gustTime,
   orbitSpeed,
   planetJitter,
   planetLabel,
   planetRadius,
-  ringCapacity,
-  ringCount,
-  ringLayout,
-  ringQuaternion,
-  ringRadius,
   spiralAngle,
   spiralPoint,
 } from '../src/widgets/cosmos/cosmosModel';
-import { LEVELS, levelLogScale, unitSpacing, type AxisState } from '../src/widgets/timeAxis/axisModel';
+import { floorTo } from '../src/core/calendar';
+import { createFakeNotes } from '../src/dev/fakeNotes';
+import { LEVELS, clusterNotes, levelLogScale, unitSpacing, type AxisState } from '../src/widgets/timeAxis/axisModel';
 
 const c = tuning.cosmos;
 const NOW = new Date(2026, 10, 15, 21, 30).getTime();
@@ -76,7 +83,7 @@ describe('나선팔', () => {
   });
 });
 
-describe('행성과 고리', () => {
+describe('행성', () => {
   it('행성 반지름은 위성이 많을수록 커지되 상한을 넘지 않는다', () => {
     expect(planetRadius(1)).toBeCloseTo(Math.min(c.planetRadius, c.planetMaxRadius), 12);
     let prev = 0;
@@ -87,68 +94,175 @@ describe('행성과 고리', () => {
       prev = r;
     }
   });
+});
 
-  it('위성을 안쪽 고리부터 채우고 넘치면 바깥 띠에 놓는다', () => {
-    for (const max of [1, 2, 3]) {
-      for (let n = 0; n < 40; n++) {
-        const layout = ringLayout(n, max);
-        expect(layout).toHaveLength(n);
-        const perRing = new Map<number, number[]>();
-        for (const s of layout) {
-          expect(s.ring).toBeLessThanOrEqual(max);
-          if (!perRing.has(s.ring)) perRing.set(s.ring, []);
-          perRing.get(s.ring)?.push(s.slot);
-        }
-        for (const [ring, slots] of perRing) {
-          expect(new Set(slots).size).toBe(slots.length);
-          for (const s of layout.filter((l) => l.ring === ring)) expect(s.slots).toBe(slots.length);
-          if (ring < max) expect(slots.length).toBeLessThanOrEqual(ringCapacity(ring));
-        }
-        // 바깥 고리가 차 있으면 안쪽 고리는 다 찼다
-        for (let k = 1; k <= max; k++) {
-          if (perRing.has(k)) expect(perRing.get(k - 1)?.length).toBe(ringCapacity(k - 1));
-        }
-        expect(ringCount(layout)).toBe(n === 0 ? 0 : Math.max(...layout.map((l) => l.ring)) + 1);
+describe('돌풍에 날리는 종이', () => {
+  const s = c.swarm;
+  const ids = Array.from({ length: 120 }, (_, i) => String(i + 1).padStart(4, '0'));
+
+  it('노트 번호가 같으면 같은 비행 성질이다', () => {
+    expect(flightParams('0042')).toEqual(flightParams('0042'));
+    expect(flightParams('0042')).not.toEqual(flightParams('0043'));
+  });
+
+  it('돌풍 세기는 0~1 이고, 돌풍 시계는 미리 적분한 값과 수치 적분이 맞는다', () => {
+    let numeric = 0;
+    const h = 1 / 240;
+    for (let i = 0; i < 240 * 40; i++) {
+      const t = i * h;
+      const g0 = gust(t);
+      expect(g0).toBeGreaterThanOrEqual(0);
+      expect(g0).toBeLessThanOrEqual(1);
+      numeric += ((2 + s.gust.boost * (g0 + gust(t + h))) / 2) * h;
+    }
+    expect(gustTime(0)).toBeCloseTo(0, 12);
+    expect(gustTime(40)).toBeCloseTo(numeric, 4);
+  });
+
+  it('돌풍 시계는 늘 앞으로 가고 빠르기는 1 ~ 1 + boost 다', () => {
+    for (let t = 0; t < 60; t += 0.37) {
+      const rate = (gustTime(t + 1e-4) - gustTime(t)) / 1e-4;
+      expect(rate).toBeGreaterThanOrEqual(1 - 1e-6);
+      expect(rate).toBeLessThanOrEqual(1 + s.gust.boost + 1e-6);
+    }
+  });
+
+  it('종이는 행성 둘레 띠 안에 머물고 난기류만큼만 벗어난다', () => {
+    const planetR = planetRadius(6);
+    const out = new Vector3();
+    const wobbleMax = s.wobble * (1 + s.gustWobble) * Math.sqrt(3);
+    for (const id of ids) {
+      const f = flightParams(id);
+      const r = flightRadius(planetR, f);
+      expect(r).toBeGreaterThanOrEqual(planetR + s.gap - 1e-12);
+      expect(r).toBeLessThanOrEqual(planetR + s.gap + s.spread + 1e-12);
+      for (let t = 0; t < 30; t += 1.3) {
+        const d = flightOffset(f, planetR, gustTime(t), gust(t), out).length();
+        expect(d).toBeLessThanOrEqual(r + wobbleMax + 1e-9);
+        expect(d).toBeGreaterThanOrEqual(r - wobbleMax - 1e-9);
       }
     }
   });
 
-  it('위성은 고리 반지름의 원 위, 고리 평면 안에서 같은 간격으로 돈다', () => {
-    const planetR = planetRadius(9);
-    const layout = ringLayout(9, 2);
+  it('궤도면은 한쪽으로 쏠리지 않고 아무 방향으로나 기운다', () => {
     const normal = new Vector3();
-    const q = new Quaternion();
-    for (const time of [0, 1.7, 12]) {
-      const byRing = new Map<number, Vector3[]>();
-      for (const slot of layout) {
-        const off = orbitOffset('day:42', planetR, slot, time, new Vector3());
-        expect(off.length()).toBeCloseTo(ringRadius(planetR, slot.ring), 9);
-        normal.set(0, 1, 0).applyQuaternion(ringQuaternion('day:42', slot.ring, q));
-        expect(off.dot(normal)).toBeCloseTo(0, 9);
-        if (!byRing.has(slot.ring)) byRing.set(slot.ring, []);
-        byRing.get(slot.ring)?.push(off);
-      }
-      for (const points of byRing.values()) {
-        if (points.length < 3) continue;
-        const gaps = points.map((p, i) => p.distanceTo(points[(i + 1) % points.length]));
-        for (const g of gaps) expect(g).toBeCloseTo(gaps[0], 9);
-      }
+    const sum = new Vector3();
+    let facing = 0;
+    let edgeOn = 0;
+    for (const id of ids) {
+      normal.set(0, 1, 0).applyQuaternion(flightParams(id).orbit);
+      sum.add(normal);
+      if (Math.abs(normal.z) > 0.8) facing++;
+      if (Math.abs(normal.z) < 0.3) edgeOn++;
     }
+    // 화면을 마주 보는 궤도와 옆으로 선 궤도가 섞여 있어야 무질서해 보인다
+    expect(facing).toBeGreaterThan(0);
+    expect(edgeOn).toBeGreaterThan(0);
+    expect(sum.length() / ids.length).toBeLessThan(0.35);
   });
 
-  it('고리는 대체로 화면을 마주 본다(기울기는 inclination 안)', () => {
+  it('종이는 카메라를 보지 않고 뒹굴어 뒷면도 보인다', () => {
     const q = new Quaternion();
-    const normal = new Vector3();
-    const minFacing = Math.cos(c.ring.inclination) ** 2;
-    for (let i = 0; i < 200; i++) {
-      normal.set(0, 1, 0).applyQuaternion(ringQuaternion(`month:${i}`, i % 4, q));
-      expect(normal.z).toBeGreaterThanOrEqual(minFacing - 1e-9);
+    const front = new Vector3();
+    for (const id of ids.slice(0, 20)) {
+      const f = flightParams(id);
+      let backs = 0;
+      let fronts = 0;
+      let prev: Quaternion | null = null;
+      let moved = 0;
+      for (let t = 0; t < 60; t += 0.5) {
+        flightQuaternion(f, gustTime(t), q);
+        expect(q.length()).toBeCloseTo(1, 9);
+        front.set(0, 0, 1).applyQuaternion(q);
+        if (front.z < -0.2) backs++;
+        if (front.z > 0.2) fronts++;
+        if (prev) moved = Math.max(moved, q.angleTo(prev));
+        prev = q.clone();
+      }
+      expect(backs).toBeGreaterThan(0);
+      expect(fronts).toBeGreaterThan(0);
+      expect(moved).toBeGreaterThan(0);
     }
   });
 
   it('공전 각속도는 반지름의 1.5 제곱에 반비례한다', () => {
     expect(orbitSpeed(2) / orbitSpeed(1)).toBeCloseTo(Math.pow(1 / 2, 1.5), 12);
     expect(orbitSpeed(0.5) / orbitSpeed(1.5)).toBeCloseTo(Math.pow(3, 1.5), 12);
+  });
+});
+
+describe('선 그래프', () => {
+  const g = c.graph;
+
+  it('허브 단위는 행성 단위의 한 단계 위이고, 연에는 위가 없다', () => {
+    expect(parentUnit('year')).toBeNull();
+    for (let i = 1; i < PLANET_UNITS.length; i++) expect(parentUnit(PLANET_UNITS[i])).toBe(PLANET_UNITS[i - 1]);
+  });
+
+  it('허브는 행성을 위 단위 칸으로 빠짐없이 묶고 노트 수를 더한다', () => {
+    const notes = createFakeNotes(NOW);
+    for (const unit of PLANET_UNITS) {
+      const clusters = clusterNotes(notes, unit);
+      const parent = parentUnit(unit);
+      const hubs = buildHubs(clusters, parent);
+      if (parent === null) {
+        expect(hubs).toHaveLength(0);
+        continue;
+      }
+      const seen = new Set<number>();
+      let total = 0;
+      for (const hub of hubs) {
+        expect(hub.anchorTime).toBe(clusters[hub.children[0]].anchorTime);
+        let count = 0;
+        for (const ci of hub.children) {
+          expect(seen.has(ci)).toBe(false);
+          seen.add(ci);
+          expect(floorTo(parent, clusters[ci].anchorTime)).toBe(hub.bucket);
+          count += clusters[ci].members.length;
+        }
+        expect(hub.notes).toBe(count);
+        total += count;
+      }
+      expect(seen.size).toBe(clusters.length);
+      expect(total).toBe(notes.length);
+      expect(new Set(hubs.map((h) => h.key)).size).toBe(hubs.length);
+    }
+  });
+
+  it('허브는 자식들의 평균 깊이에서 안쪽 줄기 위에 놓인다', () => {
+    const out = new Vector3();
+    hubPoint([4, 8, 12], 2, out);
+    expect(out.z).toBeCloseTo(-8, 12);
+    expect(Math.hypot(out.x, out.y)).toBeCloseTo(c.armRadius * g.hubRadius, 12);
+    expect(Math.atan2(out.y, out.x)).toBeCloseTo(Math.atan2(Math.sin(spiralAngle(8, 2)), Math.cos(spiralAngle(8, 2))), 9);
+  });
+
+  it('노트 점은 노드 둘레 원판에 퍼지고 순서가 뒤일수록 바깥이며 서로 겹치지 않는다', () => {
+    const b = g.burst;
+    const pts: Vector3[] = [];
+    let prevR = 0;
+    for (let k = 0; k < 40; k++) {
+      const o = burstOffset(k, 0.3, new Vector3());
+      const r = Math.hypot(o.x, o.y);
+      expect(r).toBeCloseTo(b.inner + b.spacing * Math.sqrt(k + 0.5), 12);
+      expect(r).toBeGreaterThan(prevR);
+      expect(Math.abs(o.z)).toBeLessThanOrEqual(b.depthJitter);
+      prevR = r;
+      pts.push(o);
+    }
+    let minGap = Infinity;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) minGap = Math.min(minGap, pts[i].distanceTo(pts[j]));
+    // 해바라기 씨 배치는 이웃 점 사이가 간격의 절반보다 가까워지지 않는다
+    expect(minGap).toBeGreaterThan(b.spacing * 0.5);
+  });
+
+  it('점 색은 노트가 찍힌 시각을 하루를 나눈 칸으로 고른다', () => {
+    const n = g.hourColors.length;
+    for (let h = 0; h < 24; h++) {
+      const i = hourColorIndex(new Date(2026, 10, 15, h, 30).getTime());
+      expect(i).toBe(Math.floor((h * n) / 24));
+      expect(i).toBeLessThan(n);
+    }
   });
 });
 
