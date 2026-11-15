@@ -3,12 +3,17 @@ import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import type { CardLayout } from './cardLayout';
 
+/** 사진 원본. 필요한 해상도로 그때그때 그려 받는다. 텍스처를 만든 뒤에는 결과를 들고 있지 않는다. */
+export interface PhotoSource {
+  width: number;
+  height: number;
+  render(targetWidth: number): CanvasImageSource;
+}
+
 export interface CardFace {
   id: string;
   createdAt: Date;
-  image: CanvasImageSource;
-  imageWidth: number;
-  imageHeight: number;
+  photo: PhotoSource;
 }
 
 const MONO = 'ui-monospace, "Cascadia Mono", Consolas, "D2Coding", monospace';
@@ -26,14 +31,18 @@ export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const { photo, label, padding, bracket } = layout;
-  drawCover(ctx, face.image, face.imageWidth, face.imageHeight, photo.x, photo.y, photo.width, photo.height);
+  const image = face.photo.render(photo.width);
+  const iw = (image as { width: number }).width;
+  const ih = (image as { height: number }).height;
+  drawCover(ctx, image, iw, ih, photo.x, photo.y, photo.width, photo.height);
 
   ctx.strokeStyle = look.frameLine;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(photo.x + 0.75, photo.y + 0.75, photo.width - 1.5, photo.height - 1.5);
+  const px = canvas.width / 512;
+  ctx.lineWidth = 1.5 * px;
+  ctx.strokeRect(photo.x + 0.75 * px, photo.y + 0.75 * px, photo.width - 1.5 * px, photo.height - 1.5 * px);
 
   ctx.strokeStyle = look.accent;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3 * px;
   const inset = padding * 0.45;
   drawBrackets(ctx, inset, inset, canvas.width - inset * 2, canvas.height - inset * 2, bracket);
 

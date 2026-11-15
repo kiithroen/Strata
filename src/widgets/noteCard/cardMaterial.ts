@@ -63,6 +63,7 @@ uniform float uFogFar;
 uniform float uAspect;
 uniform float uDim;
 uniform float uFocus;
+uniform float uFade;
 varying vec2 vUv;
 varying float vDepth;
 
@@ -90,7 +91,7 @@ void main() {
 
   float fog = smoothstep(uFogNear, uFogFar, vDepth);
   color.rgb = mix(color.rgb, uFogColor, fog);
-  color.a *= 1.0 - fog * 0.6;
+  color.a *= (1.0 - fog * 0.6) * uFade;
 
   gl_FragColor = color;
   #include <colorspace_fragment>
@@ -109,6 +110,7 @@ export function createCardMaterial(map: Texture, look: CardLook, aspect: number)
       uAspect: { value: aspect },
       uDim: { value: 0 },
       uFocus: { value: 0 },
+      uFade: { value: 1 },
     },
     vertexShader,
     fragmentShader,

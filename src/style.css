@@ -62,3 +62,71 @@ body {
   color: var(--text-dim);
   text-align: center;
 }
+
+#widget-tabs {
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+#widget-tabs a {
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+#widget-tabs a.active {
+  color: var(--text);
+}
+
+#widget-tabs a.active::before {
+  content: "// ";
+  color: var(--accent);
+}
+
+.axis-controls {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 40px);
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+}
+
+.axis-controls button {
+  min-width: 44px;
+  height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dim);
+  background: rgba(10, 10, 14, 0.72);
+  border: 1px solid rgba(233, 230, 225, 0.22);
+  touch-action: manipulation;
+}
+
+.axis-controls button.active {
+  color: var(--text);
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.axis-readout {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 40px);
+  left: 16px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.axis-readout::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--accent);
+}

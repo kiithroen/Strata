@@ -6,6 +6,8 @@ export class Stage {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
   readonly camera: PerspectiveCamera;
+  /** 바닥 격자. 자기 바닥을 그리는 위젯 데모는 숨긴다 */
+  readonly grid: GridHelper;
   private readonly observer: ResizeObserver;
   private readonly resizeListeners = new Set<() => void>();
 
@@ -21,6 +23,7 @@ export class Stage {
     this.scene.fog = new Fog(l.background, l.fogNear, l.fogFar);
 
     const grid = new GridHelper(80, 80, l.accent, l.textDim);
+    this.grid = grid;
     grid.position.y = -3.2;
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
     for (const m of gridMaterials) {

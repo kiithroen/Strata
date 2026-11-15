@@ -12,9 +12,9 @@ export interface CardLayout {
   worldHeight: number;
 }
 
-export function cardLayout(imageWidth: number, imageHeight: number): CardLayout {
+/** textureWidth 를 바꿔도 월드 크기와 비율은 같다. 텍스처 해상도만 달라진다. */
+export function cardLayout(imageWidth: number, imageHeight: number, textureWidth: number = tuning.card.textureWidth): CardLayout {
   const c = tuning.card;
-  const textureWidth = c.textureWidth;
   const padding = Math.round(textureWidth * c.paddingRatio);
   const photoWidth = textureWidth - padding * 2;
   const photoHeight = Math.round((photoWidth * imageHeight) / imageWidth);

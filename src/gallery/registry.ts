@@ -1,8 +1,10 @@
 import { mountNoteCardDemo } from './noteCardDemo';
 import type { WidgetDemoFactory } from './stage';
+import { mountTimeAxisDemo } from './timeAxisDemo';
 
 /** 갤러리 주소의 ?w= 값과 위젯 데모를 잇는다. 첫 항목이 기본값이다. */
 export const widgetDemos: Record<string, WidgetDemoFactory> = {
+  'time-axis': mountTimeAxisDemo,
   'note-card': mountNoteCardDemo,
 };
 

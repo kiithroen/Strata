@@ -7,7 +7,7 @@ npm install
 npm run dev
 ```
 
-<http://localhost:5173/>에서 위젯 갤러리가 열린다. `?w=<이름>`으로 위젯을 고른다(목록은 `src/gallery/registry.ts`). 이름이 없거나 틀리면 첫 위젯이 열린다.
+<http://localhost:5173/>에서 위젯 갤러리가 열린다. `?w=<이름>`으로 위젯을 고르거나 왼쪽 위 탭으로 오간다(목록은 `src/gallery/registry.ts`). 이름이 없거나 틀리면 등록표의 첫 위젯이 열린다.
 
 ## 폰에서 열기
 
@@ -21,10 +21,11 @@ npm run dev
 | 경로 | 내용 |
 |---|---|
 | `src/config.ts` | 튜닝 값(`tuning`) |
-| `src/core/` | 위젯이 함께 쓰는 순수 로직: 지수 접근(`motion.ts`), 시드 난수, 날짜 표기 |
+| `src/core/` | 위젯이 함께 쓰는 순수 로직: 지수 접근(`motion.ts`), 달력 단위(`calendar.ts`), 시드 난수, 날짜 표기 |
 | `src/widgets/<위젯>/` | 위젯 하나. 움직임·배치는 순수 로직, 텍스처·재질·메시는 뷰 |
+| `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시) |
 | `src/input/` | 손가락 입력 해석 |
-| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 등록표 |
+| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 등록표 |
 | `src/dev/` | 개발용 가짜 데이터 |
 | `test/` | vitest 단위 테스트(노드 환경) |
 
@@ -52,7 +53,10 @@ npm run build
 개발 서버에서만 `window.__strata`가 열린다.
 
 - `id`: 지금 위젯 이름
-- `demo`: 위젯 데모 객체. 노트 카드 데모는 `cards`, `focus(card | null)`, `focusedId()`를 가진다
+- `demo`: 위젯 데모 객체
+  - 노트 카드: `cards`, `focus(card | null)`, `focusedId()`
+  - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
 - `time()`: 지금 게임 시간(초)
+- `advance(seconds, hz = 60)`: 게임 시간을 고정 간격으로 진행하고 한 번 그린다
 
-브라우저 창이 숨어 있으면 프레임이 느려져 게임 시간이 덜 흐른다. 전환이 끝났는지는 기다린 시간이 아니라 이 훅으로 상태를 읽어 판단한다.
+브라우저 창이 숨어 있으면 프레임이 멈추거나 느려져 게임 시간이 흐르지 않는다. 화면 확인 스크립트는 기다리지 말고 `advance`로 시간을 진행한 뒤 캡처한다.

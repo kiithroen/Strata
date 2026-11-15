@@ -1,6 +1,6 @@
 import { PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
-import { approachFactor, damp } from '../../core/motion';
+import { damp } from '../../core/motion';
 
 export interface Pose {
   position: Vector3;
@@ -56,14 +56,24 @@ export function createPose(): Pose {
   return { position: new Vector3(), quaternion: new Quaternion(), scale: 1 };
 }
 
-const idleQuat = new Quaternion();
+export function copyPose(from: Pose, to: Pose): Pose {
+  to.position.copy(from.position);
+  to.quaternion.copy(from.quaternion);
+  to.scale = from.scale;
+  return to;
+}
+
 const tiltQuat = new Quaternion();
+const rollQuat = new Quaternion();
 const axisX = new Vector3(1, 0, 0);
 const axisZ = new Vector3(0, 0, 1);
 
 /**
  * 카드 하나의 움직임. 렌더링과 분리해 두어 노드 환경에서도 시험할 수 있다.
- * 모든 접근은 경과 시간(dt) 기반 지수 접근이라 같은 게임 시간이면 주사율과 무관하게 같은 자세에 닿는다.
+ *
+ * 떠 있는 자세는 배치(필드·시간축)가 매 프레임 넘기는 기본 자세에 흔들림을 더한 것이고, 지연 없이 그대로 따라간다.
+ * 펼치기는 떠 있는 자세와 펼친 자세를 focus(0~1)로 섞는다. focus 는 게임 시간 기반 지수 접근이라
+ * 같은 게임 시간이면 주사율과 무관하게 같은 자세가 나온다.
  */
 export class CardMotion {
   readonly position = new Vector3();
@@ -78,42 +88,35 @@ export class CardMotion {
   dimTarget = 0;
 
   private readonly sample: FloatSample = { y: 0, pitch: 0, roll: 0 };
-  private readonly idlePosition = new Vector3();
+  private readonly idle = createPose();
+  /** 닫히는 동안에도 섞을 수 있게 마지막 펼친 자세를 기억한다 */
+  private readonly lastFocus = createPose();
 
-  constructor(
-    readonly homePosition: Vector3,
-    readonly homeQuaternion: Quaternion,
-    readonly float: FloatParams,
-    time = 0,
-  ) {
-    this.idleTarget(time, this.position, this.quaternion);
-  }
+  constructor(readonly float: FloatParams) {}
 
-  /** 떠 있을 때의 목표 자세 */
-  idleTarget(time: number, outPosition: Vector3, outQuaternion: Quaternion): void {
+  /** 기본 자세에 흔들림을 더한 떠 있는 자세 */
+  idlePose(time: number, home: Pose, out: Pose): Pose {
     const s = floatOffset(time, this.float, this.sample);
-    outPosition.copy(this.homePosition);
-    outPosition.y += s.y;
+    out.position.copy(home.position);
+    out.position.y += s.y * home.scale;
     tiltQuat.setFromAxisAngle(axisX, s.pitch);
-    idleQuat.setFromAxisAngle(axisZ, s.roll).premultiply(tiltQuat);
-    outQuaternion.copy(this.homeQuaternion).multiply(idleQuat);
+    rollQuat.setFromAxisAngle(axisZ, s.roll).premultiply(tiltQuat);
+    out.quaternion.copy(home.quaternion).multiply(rollQuat);
+    out.scale = home.scale;
+    return out;
   }
 
-  step(dt: number, time: number, focusPose: Pose | null): void {
+  step(dt: number, time: number, home: Pose, focusPose: Pose | null): void {
     const f = tuning.focus;
     const toFocus = this.focused && focusPose !== null;
-    let targetScale = 1;
-    if (toFocus) {
-      this.position.lerp(focusPose.position, approachFactor(f.positionRate, dt));
-      this.quaternion.slerp(focusPose.quaternion, approachFactor(f.rotationRate, dt));
-      targetScale = focusPose.scale;
-    } else {
-      this.idleTarget(time, this.idlePosition, idleQuat);
-      this.position.lerp(this.idlePosition, approachFactor(f.positionRate, dt));
-      this.quaternion.slerp(idleQuat, approachFactor(f.rotationRate, dt));
-    }
-    this.scale = damp(this.scale, targetScale, f.scaleRate, dt);
-    this.focus = damp(this.focus, toFocus ? 1 : 0, f.scaleRate, dt);
+    if (toFocus) copyPose(focusPose, this.lastFocus);
+    this.focus = damp(this.focus, toFocus ? 1 : 0, f.rate, dt);
     this.dim = damp(this.dim, this.dimTarget, f.dimRate, dt);
+
+    const idle = this.idlePose(time, home, this.idle);
+    const w = this.focus;
+    this.position.copy(idle.position).lerp(this.lastFocus.position, w);
+    this.quaternion.copy(idle.quaternion).slerp(this.lastFocus.quaternion, w);
+    this.scale = idle.scale + (this.lastFocus.scale - idle.scale) * w;
   }
 }

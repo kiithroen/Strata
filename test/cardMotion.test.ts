@@ -18,6 +18,7 @@ const IMAGE_SIZES: [number, number][] = [
   [640, 360],
 ];
 const ASPECTS = [0.42, 0.75, 1, 1.6, 2.2];
+const FLOAT = { phase: 0.7, period: (tuning.float.periodMin + tuning.float.periodMax) / 2 };
 
 function makeCamera(aspect: number): PerspectiveCamera {
   const c = tuning.camera;
@@ -28,11 +29,8 @@ function makeCamera(aspect: number): PerspectiveCamera {
   return camera;
 }
 
-function makeMotion(): CardMotion {
-  return new CardMotion(new Vector3(1.2, -0.5, -7), new Quaternion().setFromEuler(new Euler(0, 0.3, 0)), {
-    phase: 0.7,
-    period: (tuning.float.periodMin + tuning.float.periodMax) / 2,
-  });
+function makeHome(): Pose {
+  return { position: new Vector3(1.2, -0.5, -7), quaternion: new Quaternion().setFromEuler(new Euler(0, 0.3, 0)), scale: 1 };
 }
 
 function focusPoseFor(aspect: number): Pose {
@@ -42,14 +40,15 @@ function focusPoseFor(aspect: number): Pose {
 
 /** hz 주사율로 seconds 동안 펼친 채 진행한다 */
 function runFocused(hz: number, seconds: number, pose: Pose): CardMotion {
-  const m = makeMotion();
+  const m = new CardMotion(FLOAT);
+  const home = makeHome();
   m.focused = true;
   const dt = 1 / hz;
   const steps = Math.round(seconds * hz);
   let time = 0;
   for (let i = 0; i < steps; i++) {
     time += dt;
-    m.step(dt, time, pose);
+    m.step(dt, time, home, pose);
   }
   return m;
 }
@@ -59,7 +58,7 @@ describe('CardMotion 펼치기', () => {
     const pose = focusPoseFor(0.75);
     // 모든 주사율에서 정수 프레임이 되는 시간. 전환이 끝나기 전 시점을 본다
     const seconds = 1 / 6;
-    expect(Math.exp(-tuning.focus.positionRate * seconds)).toBeGreaterThan(0.01);
+    expect(Math.exp(-tuning.focus.rate * seconds)).toBeGreaterThan(0.01);
     const ref = runFocused(60, seconds, pose);
     for (const hz of [30, 90, 120, 144]) {
       const m = runFocused(hz, seconds, pose);
@@ -72,42 +71,50 @@ describe('CardMotion 펼치기', () => {
 
   it('충분히 지나면 펼친 자세에 닿는다', () => {
     const pose = focusPoseFor(0.75);
-    const f = tuning.focus;
-    const slowest = Math.min(f.positionRate, f.rotationRate, f.scaleRate);
-    const m = runFocused(120, 12 / slowest, pose);
+    const m = runFocused(120, 12 / tuning.focus.rate, pose);
     expect(m.position.distanceTo(pose.position)).toBeLessThan(1e-4);
     expect(m.quaternion.angleTo(pose.quaternion)).toBeLessThan(1e-4);
     expect(m.scale).toBeCloseTo(pose.scale, 4);
     expect(m.focus).toBeCloseTo(1, 4);
   });
 
-  it('닫으면 떠 있던 자리로 돌아가 흔들림을 따라간다', () => {
+  it('닫으면 그 사이 움직인 기본 자리로 돌아간다', () => {
     const pose = focusPoseFor(0.75);
-    const f = tuning.focus;
-    const fl = tuning.float;
     const hz = 120;
     const dt = 1 / hz;
     const m = runFocused(hz, 1, pose);
     m.focused = false;
+    const home = makeHome();
+    home.position.set(-2, 0.4, -11);
     let time = 1;
-    const settle = 12 / Math.min(f.positionRate, f.rotationRate, f.scaleRate);
-    for (let i = 0; i < Math.round(settle * hz); i++) {
+    for (let i = 0; i < Math.round((12 / tuning.focus.rate) * hz); i++) {
       time += dt;
-      m.step(dt, time, null);
+      m.step(dt, time, home, null);
     }
-    // 1차 지연 필터가 사인 흔들림을 따라갈 때 생기는 최대 오차: A·ω/k
-    const omega = (2 * Math.PI) / fl.periodMin;
-    const lag = (fl.amplitude * omega) / f.positionRate;
-    const target = new Vector3();
-    const targetQ = new Quaternion();
-    m.idleTarget(time, target, targetQ);
-    expect(m.position.distanceTo(target)).toBeLessThan(lag * 1.5);
+    const idle = m.idlePose(time, home, createPose());
+    expect(m.position.distanceTo(idle.position)).toBeLessThan(1e-3);
     expect(m.scale).toBeCloseTo(1, 4);
     expect(m.focus).toBeCloseTo(0, 4);
   });
 });
 
-describe('floatOffset', () => {
+describe('CardMotion 떠 있기', () => {
+  it('펼치지 않은 카드는 움직이는 기본 자세를 지연 없이 따라간다', () => {
+    const m = new CardMotion(FLOAT);
+    const home = makeHome();
+    const idle = createPose();
+    let time = 0;
+    for (const dt of [1 / 30, 1 / 144, 1 / 60, 0.1]) {
+      time += dt;
+      home.position.x += 3;
+      home.position.z -= 5;
+      m.step(dt, time, home, null);
+      m.idlePose(time, home, idle);
+      expect(m.position.distanceTo(idle.position)).toBeLessThan(1e-12);
+      expect(m.quaternion.angleTo(idle.quaternion)).toBeLessThan(1e-6);
+    }
+  });
+
   it('흔들림이 설정한 진폭을 넘지 않는다', () => {
     const fl = tuning.float;
     for (let i = 0; i < 2000; i++) {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { approachFactor, damp } from '../src/core/motion';
 
-const RATES = [tuning.focus.positionRate, tuning.focus.rotationRate, tuning.focus.scaleRate, tuning.focus.dimRate];
+const RATES = [tuning.focus.rate, tuning.focus.dimRate, tuning.axis.timeRate, tuning.axis.scaleRate, tuning.axis.layoutRate];
 const REFRESH = [30, 60, 90, 120, 144];
 
 describe('approachFactor', () => {

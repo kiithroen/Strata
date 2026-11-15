@@ -1,12 +1,10 @@
 import { createRng, range } from '../core/random';
+import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 
-/** 개발용 가짜 사진. 풍경, 종이 메모, 화이트보드 세 종류를 시드로 만든다. */
-export interface PlaceholderPhoto {
-  canvas: HTMLCanvasElement;
-  width: number;
-  height: number;
-}
-
+/**
+ * 개발용 가짜 사진. 풍경, 종이 메모, 화이트보드 세 종류를 시드로 만든다.
+ * 사진마다 시드를 들고 있다가 요청한 해상도로 같은 그림을 다시 그린다. 그린 캔버스는 들고 있지 않는다.
+ */
 const SIZES: [number, number][] = [
   [640, 480],
   [480, 640],
@@ -14,24 +12,32 @@ const SIZES: [number, number][] = [
   [640, 360],
 ];
 
-export function createPlaceholderPhotos(count: number, seed: number): PlaceholderPhoto[] {
+export function createPlaceholderPhotos(count: number, seed: number): PhotoSource[] {
   const rng = createRng(seed);
-  const photos: PlaceholderPhoto[] = [];
+  const photos: PhotoSource[] = [];
   for (let i = 0; i < count; i++) {
     const [width, height] = SIZES[Math.floor(rng() * SIZES.length)];
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('2D 캔버스를 만들 수 없다');
-    const kind = rng();
-    if (kind < 0.4) drawLandscape(ctx, width, height, rng);
-    else if (kind < 0.75) drawPaper(ctx, width, height, rng);
-    else drawWhiteboard(ctx, width, height, rng);
-    addGrain(ctx, width, height, rng);
-    photos.push({ canvas, width, height });
+    const photoSeed = Math.floor(rng() * 2 ** 31);
+    photos.push({ width, height, render: (targetWidth) => drawPhoto(photoSeed, width, height, targetWidth) });
   }
   return photos;
+}
+
+function drawPhoto(seed: number, width: number, height: number, targetWidth: number): HTMLCanvasElement {
+  const scale = targetWidth / width;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D 캔버스를 만들 수 없다');
+  ctx.scale(scale, scale);
+  const rng = createRng(seed);
+  const kind = rng();
+  if (kind < 0.4) drawLandscape(ctx, width, height, rng);
+  else if (kind < 0.75) drawPaper(ctx, width, height, rng);
+  else drawWhiteboard(ctx, width, height, rng);
+  addGrain(ctx, width, height, rng);
+  return canvas;
 }
 
 function drawLandscape(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number): void {
