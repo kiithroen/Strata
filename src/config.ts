@@ -51,6 +51,10 @@ export const tuning = {
      * 높이는 카드 폭 대비다
      */
     bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [3.1, 2.3], curl: 0.32, curlSpeed: 0.9 },
+    /** 압정: 윗변에서 내려온 거리(높이 대비), 가운데에서 좌우로 벗어나는 최대 정도(폭 대비) */
+    pin: { inset: 0.06, jitter: 0.16 },
+    /** 압정 자리 윗변에 붙인 테이프: 색, 폭·높이(카드 폭 대비), 최대 기울기(라디안) */
+    tape: { color: 'rgba(232, 168, 82, 0.82)', edge: 'rgba(170, 110, 40, 0.35)', width: 0.34, height: 0.085, tilt: 0.14 },
   },
 
   float: {
@@ -176,6 +180,8 @@ export const tuning = {
       hubGlowSize: 2.4,
       glowAlpha: 0.16,
       hubLabelHeight: 0.15,
+      /** 종이에 꽂힌 압정 머리 크기 */
+      pinSize: 0.05,
       /** 허브는 나선 반지름의 이 비율인 안쪽 줄기 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
       hubRadius: 0.42,
       tapRadius: 34,

@@ -8,7 +8,6 @@ import {
   burstOffset,
   hourColorIndex,
   hubPoint,
-  nearestCorner,
   parentUnit,
   choosePlanetUnit,
   cosmosFade,
@@ -255,27 +254,6 @@ describe('선 그래프', () => {
     for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) minGap = Math.min(minGap, pts[i].distanceTo(pts[j]));
     // 해바라기 씨 배치는 이웃 점 사이가 간격의 절반보다 가까워지지 않는다
     expect(minGap).toBeGreaterThan(b.spacing * 0.5);
-  });
-
-  it('살은 종이 네 모서리 가운데 노드에 가장 가까운 모서리에 묶인다', () => {
-    const q = new Quaternion();
-    const pos = new Vector3(0.4, -0.2, -6);
-    const hw = 0.3;
-    const hh = 0.4;
-    const scale = 0.5;
-    const out = new Vector3();
-    for (const id of ['0001', '0002', '0003', '0004']) {
-      q.copy(flightParams(id).base);
-      const corners = [-1, 1].flatMap((sx) =>
-        [-1, 1].map((sy) => new Vector3(sx * hw * scale, sy * hh * scale, 0).applyQuaternion(q).add(pos)),
-      );
-      for (const node of [new Vector3(0, 0, -6), new Vector3(2, 1, -8), new Vector3(-1, -2, -4)]) {
-        nearestCorner(pos, q, scale, hw, hh, node, out);
-        expect(out.distanceTo(pos)).toBeCloseTo(Math.hypot(hw, hh) * scale, 9);
-        const nearest = Math.min(...corners.map((c) => c.distanceTo(node)));
-        expect(out.distanceTo(node)).toBeCloseTo(nearest, 9);
-      }
-    }
   });
 
   it('점 색은 노트가 찍힌 시각을 하루를 나눈 칸으로 고른다', () => {

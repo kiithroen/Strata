@@ -17,6 +17,10 @@
 
 사진 노트 하나를 나타내는 종이다. 흰 종이(`card.paper`)에 종이결을 뿌리고, 사진과 얇은 테두리(`card.photoLine`), 날짜·번호(`card.ink`, `card.inkDim`)를 인쇄한 모양을 캔버스 하나에 그려 텍스처로 쓴다.
 
+**압정과 테이프** (`paperPin.ts`)
+- 압정은 윗변에서 `card.pin.inset`(높이 대비) 아래, 가운데에서 좌우로 `card.pin.jitter`(폭 대비) 안쪽에 노트 번호로 정한 자리에 꽂힌다. `pinPoint`가 종이의 위치·회전·배율로 월드 자리를 구한다.
+- 같은 가로 자리 윗변에 마스킹 테이프(`card.tape`: 색, 폭·높이, 최대 기울기)를 텍스처에 그린다.
+
 **사진 원본** (`cardTexture.ts`의 `PhotoSource`)
 - 사진은 폭·높이와 `render(targetWidth)`를 가진다. 텍스처를 만들 때 필요한 해상도로 그려 받고, 결과는 들고 있지 않는다.
 
@@ -101,7 +105,7 @@
 
 **노트 점과 살** (`burstOffset`, `hourColorIndex`)
 - k 번째 노트 점은 노드 둘레의 화면을 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½)`, 앞뒤로 `burst.depthJitter`만큼 흔들리고 원판 전체가 `burst.spin`으로 돈다.
-- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 살이 종이 네 모서리 가운데 노드에 가장 가까운 모서리(`nearestCorner`)에 묶여 함께 끌려다니고, 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 모서리 사이를 그만큼 옮겨 간다.
+- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 수사 보드처럼 살이 종이에 꽂힌 압정(`noteCard/paperPin.ts`)에 실로 묶여 함께 끌려다니고, 압정 머리(`graph.pinSize`)를 그 노트 색으로 그린다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 압정 사이를 그만큼 옮겨 간다.
 - 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
 

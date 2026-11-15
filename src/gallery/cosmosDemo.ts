@@ -12,7 +12,6 @@ import {
   buildHubs,
   burstOffset,
   hubPoint,
-  nearestCorner,
   choosePlanetUnit,
   cosmosFade,
   flightOffset,
@@ -35,6 +34,7 @@ import { Universe } from '../widgets/cosmos/Universe';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import { createPose } from '../widgets/noteCard/cardMotion';
 import { NoteCard } from '../widgets/noteCard/NoteCard';
+import { paperPin, pinPoint } from '../widgets/noteCard/paperPin';
 import {
   AxisController,
   clusterNotes,
@@ -139,6 +139,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const dotBlends = notes.map(() => new RegroupBlend());
   const paperFade = new Float64Array(notes.length);
   const flights = notes.map((n) => flightParams(n.id));
+  const pins = notes.map((n) => paperPin(n.id));
   const homes = notes.map(createPose);
   let clusters: Cluster[] = [];
   let hubs: Hub[] = [];
@@ -160,7 +161,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const offset = new Vector3();
   const target = new Vector3();
   const labelPos = new Vector3();
-  const corner = new Vector3();
+  const pinWorld = new Vector3();
   const spokeEnd = new Vector3();
 
   const screenOf = (position: Vector3) => {
@@ -275,25 +276,26 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           const card = cards[m];
           card.update(dt, time, home, card === focus.focused ? pose : null, cosmosFade(-p.z) * st.fade * paperFade[m]);
 
-          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 종이의 가장 가까운 모서리에 묶이고,
-          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 줄을 풀고 점으로 돌아간다
+          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 수사 보드처럼 종이에 꽂힌 압정에 실로 묶이고,
+          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
           burstOffset(k, spin, offset);
           target.copy(st.position).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = paperFade[m] * (1 - card.motion.focus);
-          nearestCorner(
+          pinPoint(
             card.mesh.position,
             card.mesh.quaternion,
             card.mesh.scale.x,
-            card.layout.worldWidth / 2,
-            card.layout.worldHeight / 2,
-            st.position,
-            corner,
+            card.layout.worldWidth,
+            card.layout.worldHeight,
+            pins[m],
+            pinWorld,
           );
-          spokeEnd.copy(dotP).lerp(corner, tied);
+          spokeEnd.copy(dotP).lerp(pinWorld, tied);
           const endAlpha = alpha * cosmosFade(-spokeEnd.z);
           graph.spoke(st.position, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
           graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(-dotP.z) * (1 - tied));
+          graph.dot(pinWorld, noteColors[m], g.pinSize * card.mesh.scale.x / c.satelliteScale, cosmosFade(-pinWorld.z) * st.fade * tied);
         });
       });
 

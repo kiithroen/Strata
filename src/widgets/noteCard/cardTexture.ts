@@ -3,6 +3,7 @@ import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import { createRng } from '../../core/random';
 import type { CardLayout } from './cardLayout';
+import { paperPin, type PaperPin } from './paperPin';
 
 /** 사진 원본. 필요한 해상도로 그때그때 그려 받는다. 텍스처를 만든 뒤에는 결과를 들고 있지 않는다. */
 export interface PhotoSource {
@@ -44,6 +45,8 @@ export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy
   ctx.lineWidth = 1.5 * px;
   ctx.strokeRect(photo.x + 0.75 * px, photo.y + 0.75 * px, photo.width - 1.5 * px, photo.height - 1.5 * px);
 
+  drawTape(ctx, canvas.width, canvas.height, paperPin(face.id));
+
   const fontSize = Math.round(label.height * 0.34);
   const midY = label.y + label.height * 0.52;
   ctx.font = `${fontSize}px ${MONO}`;
@@ -82,6 +85,24 @@ function drawCover(
   const sw = w / scale;
   const sh = h / scale;
   ctx.drawImage(image, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
+}
+
+/** 압정 자리 윗변에 걸친 마스킹 테이프. 압정(paperPin)과 같은 가로 자리에 붙는다 */
+function drawTape(ctx: CanvasRenderingContext2D, w: number, h: number, pin: PaperPin): void {
+  const t = tuning.card.tape;
+  const tw = w * t.width;
+  const th = w * t.height;
+  const cx = w * (0.5 + pin.u);
+  const cy = h * (0.5 - pin.v);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(pin.tilt);
+  ctx.fillStyle = t.color;
+  ctx.fillRect(-tw / 2, -th / 2, tw, th);
+  ctx.strokeStyle = t.edge;
+  ctx.lineWidth = Math.max(1, w / 400);
+  ctx.strokeRect(-tw / 2, -th / 2, tw, th);
+  ctx.restore();
 }
 
 /** 종이결: 노트 번호로 정한 옅은 점을 흩뿌린다 */

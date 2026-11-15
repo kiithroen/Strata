@@ -270,35 +270,6 @@ export function flightQuaternion(f: Flight, tau: number, out: Quaternion): Quate
   return out.copy(f.base).multiply(spinQuat).multiply(flutterQuat);
 }
 
-const cornerTmp = new Vector3();
-
-/**
- * 종이(중심 position, 회전 quaternion, 배율 scale, 반폭·반높이)의 네 모서리 가운데 target 에 가장 가까운 모서리.
- * 노드에서 뻗은 살을 종이에 묶을 자리다
- */
-export function nearestCorner(
-  position: Vector3,
-  quaternion: Quaternion,
-  scale: number,
-  halfWidth: number,
-  halfHeight: number,
-  target: Vector3,
-  out: Vector3,
-): Vector3 {
-  let best = Infinity;
-  for (const sx of [-1, 1]) {
-    for (const sy of [-1, 1]) {
-      cornerTmp.set(sx * halfWidth * scale, sy * halfHeight * scale, 0).applyQuaternion(quaternion).add(position);
-      const d = cornerTmp.distanceToSquared(target);
-      if (d < best) {
-        best = d;
-        out.copy(cornerTmp);
-      }
-    }
-  }
-  return out;
-}
-
 const lookMatrix = new Matrix4();
 const up = new Vector3(0, 1, 0);
 
