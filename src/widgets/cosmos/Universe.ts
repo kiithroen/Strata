@@ -9,6 +9,7 @@ import {
   Points,
   ShaderMaterial,
   SphereGeometry,
+  type Vector3,
 } from 'three';
 import { tuning } from '../../config';
 import { createRng } from '../../core/random';
@@ -32,15 +33,19 @@ export class Universe {
   }
 
   /** scrollDepth 는 이번 프레임에 시점이 옮겨간 시간 거리(과거로 가면 음수, 최근으로 가면 양수) */
-  update(time: number, scrollDepth: number): void {
-    this.dustOffset += scrollDepth;
+  update(time: number, scrollDepth: number, cameraPosition?: Vector3): void {
     const c = tuning.cosmos;
-    const range = (c.farDepth - c.innerRadius) / c.radialScale;
+    const range = c.dust.maxArc;
+    this.dustOffset += scrollDepth * c.spiralKnee;
     this.dustOffset = ((this.dustOffset % range) + range) % range;
     this.dust.material.uniforms.uOffset.value = this.dustOffset;
     this.dust.material.uniforms.uTime.value = time;
     this.stars.material.uniforms.uTime.value = time;
     this.nebula.material.uniforms.uTime.value = time;
+    if (cameraPosition) {
+      this.stars.position.copy(cameraPosition);
+      this.nebula.position.copy(cameraPosition);
+    }
   }
 
   setPixelRatio(pixelRatio: number): void {
@@ -95,10 +100,8 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
     uniforms: {
       uOffset: { value: 0 },
       uTime: { value: 0 },
-      uNear: { value: c.nearDepth },
-      uInnerRadius: { value: c.innerRadius },
       uRadialScale: { value: c.radialScale },
-      uFar: { value: c.farDepth },
+      uMaxArc: { value: d.maxArc },
       uTwist: { value: c.twist },
       uElevAmp: { value: c.elevationAmp },
       uElevFreq: { value: c.elevationFreq },
@@ -119,10 +122,8 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       attribute float aTint;
       uniform float uOffset;
       uniform float uTime;
-      uniform float uNear;
-      uniform float uInnerRadius;
       uniform float uRadialScale;
-      uniform float uFar;
+      uniform float uMaxArc;
       uniform float uTwist;
       uniform float uElevAmp;
       uniform float uElevFreq;
@@ -132,12 +133,11 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       varying float vFade;
       varying float vTint;
       void main() {
-        float range = (uFar - uInnerRadius) / uRadialScale;
-        float t = fract(aBase + (aArm * uOffset) / range);
-        float s = aArm * t * range;
-        float r = max(uNear + 0.4, (uInnerRadius + uRadialScale * abs(s)) * aRad);
-        float alpha = uTwist * s + uSpin * uTime + aAng;
-        float phi = clamp(uElevAmp * sin(uElevFreq * s) + aElev, -1.45, 1.45);
+        float t = fract(aBase + (aArm * uOffset) / uMaxArc);
+        float arc = aArm * t * uMaxArc;
+        float r = max(0.3, uRadialScale * abs(arc) * aRad);
+        float alpha = uTwist * arc + uSpin * uTime + aAng;
+        float phi = clamp(uElevAmp * sin(uElevFreq * arc) + aElev, -1.45, 1.45);
         float cosPhi = cos(phi);
         vec3 pos = vec3(r * cosPhi * sin(alpha), r * sin(phi), -r * cosPhi * cos(alpha));
         vec4 mv = modelViewMatrix * vec4(pos, 1.0);

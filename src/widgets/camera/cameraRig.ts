@@ -7,6 +7,7 @@ export interface CameraRigOptions {
   viewportHeight: () => number;
   initialYaw?: number;
   initialPitch?: number;
+  initialDistance?: number;
 }
 
 export function wrapAngle(a: number): number {
@@ -25,12 +26,13 @@ export function clampPitch(pitch: number): number {
 }
 
 /**
- * 360° 전방위 카메라 시선(yaw·pitch) 제어기.
- * 한 손가락 끌기로 상하좌우를 둘러보고 관성으로 흐르며, 노드 이동 시 정면 방향으로 부드럽게 돌아온다.
+ * 원점(0,0,0) 중심 궤도 카메라(yaw·pitch·distance) 제어기.
+ * 한 손가락 끌기로 중심 성단 둘레를 회전·기울이고 관성으로 흐른다.
  */
 export class CameraRig {
   yaw: number;
   pitch: number;
+  distance: number;
   private targetYaw: number;
   private targetPitch: number;
   private turning = false;
@@ -41,6 +43,7 @@ export class CameraRig {
   constructor(private readonly options: CameraRigOptions) {
     this.yaw = wrapAngle(options.initialYaw ?? 0);
     this.pitch = clampPitch(options.initialPitch ?? 0);
+    this.distance = Math.max(1, options.initialDistance ?? 10);
     this.targetYaw = this.yaw;
     this.targetPitch = this.pitch;
   }
@@ -71,7 +74,7 @@ export class CameraRig {
   onDragMove(dx: number, dy: number): void {
     if (!this.isDragging) return;
     const k = this.radPerPx();
-    this.yaw = wrapAngle(this.yaw + dx * k);
+    this.yaw = wrapAngle(this.yaw - dx * k);
     this.pitch = clampPitch(this.pitch + dy * k);
   }
 
@@ -79,7 +82,7 @@ export class CameraRig {
     if (!this.isDragging) return;
     this.isDragging = false;
     const k = this.radPerPx();
-    const vyaw = vx * k;
+    const vyaw = -vx * k;
     const vpitch = vy * k;
     if (Math.hypot(vyaw, vpitch) >= tuning.gesture.lookStopSpeed) {
       this.yawVel = vyaw;
@@ -122,8 +125,13 @@ export class CameraRig {
   }
 
   applyTo(camera: PerspectiveCamera): void {
-    camera.rotation.order = 'YXZ';
-    camera.rotation.set(this.pitch, this.yaw, 0);
+    const cosP = Math.cos(this.pitch);
+    camera.position.set(
+      this.distance * cosP * Math.sin(this.yaw),
+      this.distance * Math.sin(this.pitch),
+      this.distance * cosP * Math.cos(this.yaw),
+    );
+    camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
   }
 

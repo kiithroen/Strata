@@ -172,14 +172,17 @@ export const tuning = {
     /** 행성 단위는 간격이 이 깊이 이상인 가장 작은 단위(연·월·일·시)다. 다 넘으면 시 단위다 */
     planetMinSpacing: 0.6,
     /**
-     * 구면 나선: 지금 시점(s=0)이 놓이는 최소 반지름, 시간 거리당 반지름 비율(radialScale),
-     * s 1마다 도는 방위각(twist), 위아래 고도 진폭(elevationAmp)·진동수(elevationFreq)
+     * 구면 나선: 중심 시점(s=0)이 원점(0,0,0)에 놓이고, 과거·미래로 멀어질수록 로그 곡선으로
+     * 3차원 사방으로 감겨 퍼진다(radialScale, spiralKnee). twist 는 방위각 감김, elevationAmp·Freq 는 상하 물결.
      */
-    innerRadius: 5.2,
-    radialScale: 0.42,
-    twist: 0.14,
-    elevationAmp: 1.0,
-    elevationFreq: 0.095,
+    radialScale: 3.4,
+    spiralKnee: 0.45,
+    twist: 1.65,
+    elevationAmp: 0.72,
+    elevationFreq: 1.15,
+    /** 단계별 궤도 카메라 거리와 초기 시선 각도(라디안) */
+    orbitDistance: { year: 16.5, month: 11.0, day: 6.8, note: 4.0 },
+    initialOrbit: { yaw: 0.35, pitch: 0.28 },
     /** 행성마다 구면 나선에서 벗어나는 정도: 반지름 비율, 방위각, 고도각 */
     radiusJitter: 0.16,
     angleJitter: 0.22,
@@ -254,7 +257,7 @@ export const tuning = {
     /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
     holdRate: 30,
     /** 먼지: 구면 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 구 전체에 흩어지는 비율 */
-    dust: { count: 9000, arms: 2, spread: 0.14, angleSpread: 0.14, halo: 0.12, size: 3.4, opacity: 0.72 },
+    dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 3.6, size: 3.2, opacity: 0.68 },
     stars: { count: 2600, radius: 55, size: 1.8 },
     coreSize: 9,
   },
@@ -287,20 +290,20 @@ export const tuning = {
     /** 이 깊이 속도(월드 단위/초)보다 느려지면 관성을 멈춘다 */
     inertiaStopSpeed: 0.05,
     /** 핀치 거리 비율의 로그에 곱하는 축척 배율 */
-    pinchScale: 1.6,
+    pinchScale: 2.8,
     /** 축척 허용 여유(가장 바깥 단계에서 로그 축척으로 얼마나 더 벗어날 수 있는지) */
     scaleOvershoot: 1.0,
     /** 핀치 중심에서 시점 고정 대상 노드를 찾는 최대 거리(CSS px) */
     pinchAnchorRadius: 140,
     /** 휠 한 눈금(100px)당 로그 축척 변화량과 손 놓음 스냅 대기 시간(초) */
-    wheelScalePer100: 0.45,
-    wheelSnapDelay: 0.18,
-    /** 360° 시선 회전: 화면 각도 대비 회전 배율, 관성 감쇠(1/초), 멈춤 속도(라디안/초), 노드 이동 회전 속도, 최대 상하 각도 */
-    lookDragScale: 1.0,
+    wheelScalePer100: 1.15,
+    wheelSnapDelay: 0.26,
+    /** 궤도 카메라 회전: 화면 각도 대비 회전 배율, 관성 감쇠(1/초), 멈춤 속도(라디안/초), 시선 복귀 속도, 최대 상하 각도 */
+    lookDragScale: 2.2,
     lookInertiaDecay: 4.2,
     lookStopSpeed: 0.015,
     lookTurnRate: 6.5,
-    maxPitch: 1.42,
+    maxPitch: 1.35,
   },
 
   loop: {

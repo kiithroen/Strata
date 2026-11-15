@@ -331,7 +331,8 @@ export function listenGestures(
   const wheel = (e: WheelEvent) => {
     if (!handlers.onWheel) return;
     e.preventDefault();
-    const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+    // 트랙패드 핀치(ctrlKey)는 작은 deltaY 를 보내므로 감도를 높인다
+    const scale = (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1) * (e.ctrlKey ? 4 : 1);
     handlers.onWheel({ x: e.clientX, y: e.clientY, deltaY: e.deltaY * scale });
   };
 

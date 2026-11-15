@@ -25,6 +25,7 @@ import {
   gust,
   gustTime,
   hourColorIndex,
+  orbitDistanceForScale,
   parentUnit,
   planetJitter,
   planetLabel,
@@ -188,22 +189,13 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   };
 
   const focus = new CardFocus(stage, cards);
-  const pickAnchorTime = (x: number, y: number): number | null => {
-    const targets: TapTarget[] = [];
-    const times: number[] = [];
-    for (const node of nodes) {
-      if (cameraDepth(node.position) < c.nearDepth || node.position.length() > c.farDepth) continue;
-      const sp = screenOf(node.position);
-      targets.push({ x: sp.x, y: sp.y, radius: tuning.gesture.pinchAnchorRadius });
-      times.push(node.anchorTime);
-    }
-    const i = pickNearest(targets, x, y);
-    return i >= 0 ? times[i] : null;
-  };
 
   const cameraRig = new CameraRig({
     fovDeg: () => stage.camera.fov,
     viewportHeight: () => canvas.clientHeight,
+    initialYaw: c.initialOrbit.yaw,
+    initialPitch: c.initialOrbit.pitch,
+    initialDistance: orbitDistanceForScale(controller.current.logScale),
   });
 
   const navigation = new AxisNavigation({
@@ -212,7 +204,6 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     maxTime: newest,
     viewportHeight: () => canvas.clientHeight,
     dragTime: false,
-    pickAnchorTime,
     isBlocked: () => focus.focused !== null,
   });
 
@@ -265,7 +256,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         picks.push({ card });
       }
       for (const node of nodes) {
-        if (cameraDepth(node.position) < 0.5) continue;
+        if (cameraDepth(node.position) < c.nearDepth) continue;
+        if (cosmosFade(node.position.distanceTo(cameraPosition)) <= 0.05) continue;
         const sp = screenOf(node.position);
         targets.push({ x: sp.x, y: sp.y, radius: g.tapRadius });
         picks.push({ node });
@@ -278,8 +270,12 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         return;
       }
       const node = chosen.node;
-      navigation.focusOn(node.anchorTime, node.kind === 'planet' ? finerLevel(controller.level) : controller.level);
-      cameraRig.faceDirection(0, 0);
+      if (node.kind === 'planet') {
+        navigation.focusOn(node.anchorTime, finerLevel(controller.level));
+      } else {
+        const offCenter = Math.abs(timeOffsetDepth(controller.current, node.anchorTime)) > 0.6;
+        navigation.focusOn(node.anchorTime, offCenter ? controller.level : finerLevel(controller.level));
+      }
     },
   });
 
@@ -297,7 +293,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
   return {
     title: 'COSMOS',
-    hint: '끌기: 360° 둘러보기 · 핀치: 축척 · 오른쪽 띠: 시간 이동 · 탭: 노드/종이',
+    hint: '끌기: 3D 둘러보기 · 핀치/휠: 줌 · 오른쪽 띠: 시간 이동 · 탭: 노드 이동/종이',
     controller,
     cameraRig,
     cards,
@@ -312,15 +308,16 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       orbitPace = damp(orbitPace, touchCount > 0 || scrubbing ? 0 : 1, c.holdRate, dt);
       orbitClock += dt * orbitPace;
       navigation.step(dt);
+      const state = controller.current;
+      cameraRig.distance = orbitDistanceForScale(state.logScale);
       cameraRig.step(dt);
       cameraRig.applyTo(stage.camera);
-      const state = controller.current;
       stage.camera.getWorldPosition(cameraPosition);
 
       // 시간축이 움직인 만큼 먼지를 흘려 보낸다
       const scroll = ((state.focusTime - lastFocusTime) / DAY_MS) * depthPerDay(state);
       lastFocusTime = state.focusTime;
-      universe.update(orbitClock, scroll);
+      universe.update(orbitClock, scroll, cameraPosition);
 
       const unit = choosePlanetUnit(state);
       clusters = clusterNotes(notes, unit);
@@ -349,7 +346,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         const n = cluster.members.length;
         const offsetS = timeOffsetDepth(state, cluster.anchorTime);
         spiralPoint(offsetS, orbitClock, st.jitter, st.position);
-        const dist = st.position.length();
+        const dist = st.position.distanceTo(cameraPosition);
         st.color.copy(noteColors[cluster.members[0]]);
         st.size = g.nodeSize * (1 + 0.15 * Math.sqrt(n));
         planetPositions.push(st.position);
@@ -380,7 +377,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           flightQuaternion(flights[m], tau, offset, home.quaternion);
           home.scale = c.satelliteScale;
           const card = cards[m];
-          card.update(dt, time, home, card === focus.focused ? pose : null, cosmosFade(p.length()) * st.fade * paperFade[m]);
+          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * st.fade * paperFade[m];
+          card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, baseFade));
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 수사 보드처럼 종이에 꽂힌 압정에 실로 묶이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
@@ -401,10 +399,15 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
             pinWorld,
           );
           spokeEnd.copy(dotP).lerp(pinWorld, tied);
-          const endAlpha = alpha * cosmosFade(spokeEnd.length());
+          const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition));
           graph.spoke(st.position, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
-          graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(dotP.length()) * (1 - tied));
-          graph.dot(pinWorld, noteColors[m], (g.pinSize * card.mesh.scale.x) / c.satelliteScale, cosmosFade(pinWorld.length()) * st.fade * tied);
+          graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(dotP.distanceTo(cameraPosition)) * (1 - tied));
+          graph.dot(
+            pinWorld,
+            noteColors[m],
+            (g.pinSize * card.mesh.scale.x) / c.satelliteScale,
+            cosmosFade(pinWorld.distanceTo(cameraPosition)) * st.fade * tied,
+          );
         });
       });
 
@@ -416,12 +419,14 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           orbitClock,
           new Vector3(),
         );
-        const hubAlpha = cosmosFade(hp.length());
+        const hubAlpha = cosmosFade(hp.distanceTo(cameraPosition));
         for (const ci of hub.children) {
-          const childAlpha = Math.min(hubAlpha, cosmosFade(planetPositions[ci].length()));
+          const childAlpha = Math.min(hubAlpha, cosmosFade(planetPositions[ci].distanceTo(cameraPosition)));
           graph.branch(hp, planetPositions[ci], branchColor, g.branchAlpha * childAlpha);
         }
-        if (prevHub) graph.branch(prevHub, hp, branchColor, g.branchAlpha * Math.min(hubAlpha, cosmosFade(prevHub.length())));
+        if (prevHub) {
+          graph.branch(prevHub, hp, branchColor, g.branchAlpha * Math.min(hubAlpha, cosmosFade(prevHub.distanceTo(cameraPosition))));
+        }
         graph.dot(hp, hubColor, g.hubSize, hubAlpha);
         graph.glow(hp, branchColor, g.hubGlowSize, g.glowAlpha * hubAlpha);
         labelPos.copy(hp);
@@ -435,7 +440,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         for (let i = 1; i < planetPositions.length; i++) {
           const a = planetPositions[i - 1];
           const b = planetPositions[i];
-          graph.branch(a, b, branchColor, g.branchAlpha * Math.min(cosmosFade(a.length()), cosmosFade(b.length())));
+          const linkAlpha = Math.min(cosmosFade(a.distanceTo(cameraPosition)), cosmosFade(b.distanceTo(cameraPosition)));
+          graph.branch(a, b, branchColor, g.branchAlpha * linkAlpha);
         }
       }
 
@@ -447,7 +453,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           nodeStates.delete(key);
           continue;
         }
-        const alpha = st.fade * cosmosFade(st.position.length());
+        const alpha = st.fade * cosmosFade(st.position.distanceTo(cameraPosition));
         graph.dot(st.position, hubColor, st.size, alpha);
         graph.glow(st.position, st.color, g.glowSize * 0.6, g.glowAlpha * alpha);
       }
@@ -461,6 +467,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       stopResize();
       scrubber.dispose();
       readout.dispose();
+      stage.camera.position.set(0, 0, 0);
       stage.camera.rotation.set(0, 0, 0);
       stage.camera.quaternion.identity();
       stage.camera.updateMatrixWorld();

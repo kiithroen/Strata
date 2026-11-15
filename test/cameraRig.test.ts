@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { CameraRig, shortestAngleDiff } from '../src/widgets/camera/cameraRig';
 
-function makeRig(opts?: { yaw?: number; pitch?: number }) {
+function makeRig(opts?: { yaw?: number; pitch?: number; distance?: number }) {
   return new CameraRig({
     fovDeg: () => tuning.camera.fovDeg,
     viewportHeight: () => 800,
     initialYaw: opts?.yaw,
     initialPitch: opts?.pitch,
+    initialDistance: opts?.distance ?? 10,
   });
 }
 
@@ -61,10 +62,13 @@ describe('CameraRig', () => {
     }
   });
 
-  it('applyTo 는 카메라 전방 벡터를 yaw·pitch 방향으로 돌린다', () => {
+  it('applyTo 는 distance 구면 위에 카메라를 놓고 원점(0,0,0)을 바라본다', () => {
     const cam = new PerspectiveCamera(tuning.camera.fovDeg, 1, 0.1, 60);
-    const rig = makeRig({ yaw: Math.PI / 2, pitch: 0 });
+    const rig = makeRig({ yaw: Math.PI / 2, pitch: 0, distance: 12 });
     rig.applyTo(cam);
+    expect(cam.position.x).toBeCloseTo(12, 6);
+    expect(cam.position.y).toBeCloseTo(0, 6);
+    expect(cam.position.z).toBeCloseTo(0, 6);
     const forward = new Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     expect(forward.x).toBeCloseTo(-1, 6);
     expect(forward.z).toBeCloseTo(0, 6);

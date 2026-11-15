@@ -9,6 +9,7 @@ import {
   clusterAffinities,
   hourColorIndex,
   hubPoint,
+  orbitDistanceForScale,
   pickNearest,
   parentUnit,
   choosePlanetUnit,
@@ -25,6 +26,7 @@ import {
   planetLabel,
   planetRadius,
   spiralAngle,
+  spiralArc,
   spiralElevation,
   spiralPoint,
   spiralRadius,
@@ -59,17 +61,30 @@ describe('choosePlanetUnit', () => {
   });
 });
 
-describe('구면 나선', () => {
-  it('현재 시점(s=0)은 정면(-Z)에 놓이고, 시간 거리마다 방위각·고도각이 돌며 반지름이 커진다', () => {
+describe('구면 나선 · 궤도 거리', () => {
+  it('현재 시점(s=0)은 원점(0,0,0)에 놓이고, 시간 거리마다 로그 나선 진행도로 퍼진다', () => {
     const p0 = spiralPoint(0, 0, { radiusScale: 1, angleOffset: 0, elevationOffset: 0 }, new Vector3());
     expect(p0.x).toBeCloseTo(0, 12);
     expect(p0.y).toBeCloseTo(0, 12);
-    expect(p0.z).toBeCloseTo(-c.innerRadius, 12);
+    expect(p0.z).toBeCloseTo(0, 12);
 
-    expect(spiralAngle(2, 0) - spiralAngle(0, 0)).toBeCloseTo(2 * c.twist, 12);
+    expect(spiralAngle(2, 0) - spiralAngle(0, 0)).toBeCloseTo(spiralArc(2) * c.twist, 12);
     expect(spiralAngle(0, 3) - spiralAngle(0, 0)).toBeCloseTo(3 * c.spin, 12);
     expect(spiralElevation(0)).toBeCloseTo(0, 12);
     expect(spiralRadius(-5)).toBeCloseTo(spiralRadius(5), 12);
+    expect(spiralRadius(10)).toBeGreaterThan(spiralRadius(2));
+  });
+
+  it('orbitDistanceForScale 은 각 단계 거리를 잇고 확대할수록 가까워진다', () => {
+    for (const level of LEVELS) {
+      expect(orbitDistanceForScale(levelLogScale(level))).toBeCloseTo(c.orbitDistance[level], 9);
+    }
+    let prev = Infinity;
+    for (const s of sweepStates()) {
+      const d = orbitDistanceForScale(s.logScale);
+      expect(d).toBeLessThan(prev);
+      prev = d;
+    }
   });
 
   it('구면 나선 점은 s=0 을 지날 때 연속이고 사방 360°와 위아래로 뻗으며 거리는 반지름 × 벗어남 비율이다', () => {

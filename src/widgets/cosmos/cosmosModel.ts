@@ -2,7 +2,7 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
 import { DAY_MS, floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
-import { depthPerDay, unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
+import { depthPerDay, LEVELS, levelLogScale, unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
 
 /**
  * 우주 보기: 시간 묶음은 행성, 노트는 행성 둘레를 도는 위성이다.
@@ -70,22 +70,47 @@ export function timeOffsetDepth(state: AxisState, time: number): number {
   return ((state.focusTime - time) / DAY_MS) * depthPerDay(state);
 }
 
-/** 구면 나선 반지름: s=0 에서 innerRadius, 과거·미래로 멀어질수록 radialScale 비율로 커진다 */
+/** 로그 축척에 대응하는 궤도 카메라 거리(단계 사이를 연속 선형 보간, 양끝 여유는 바깥 구간 기울기로 외삽) */
+export function orbitDistanceForScale(logScale: number): number {
+  const dists = tuning.cosmos.orbitDistance;
+  const scales = LEVELS.map((lvl) => levelLogScale(lvl));
+  const values = LEVELS.map((lvl) => dists[lvl]);
+  const last = LEVELS.length - 1;
+  let seg = 0;
+  if (logScale >= scales[last]) {
+    seg = last - 1;
+  } else if (logScale > scales[0]) {
+    for (let i = 0; i < last; i++) {
+      if (logScale <= scales[i + 1]) {
+        seg = i;
+        break;
+      }
+    }
+  }
+  const t = (logScale - scales[seg]) / (scales[seg + 1] - scales[seg]);
+  return Math.max(1.5, values[seg] + (values[seg + 1] - values[seg]) * t);
+}
+
+/** 부호 있는 로그 나선 진행도: s=0 에서 0, 멀어질수록 로그로 완만히 커진다 */
+export function spiralArc(s: number): number {
+  return Math.sign(s) * Math.log1p(tuning.cosmos.spiralKnee * Math.abs(s));
+}
+
+/** 구면 나선 반지름: s=0 이 중심 원점(0,0,0), 과거·미래로 멀어질수록 로그 곡선으로 퍼진다 */
 export function spiralRadius(s: number): number {
-  const c = tuning.cosmos;
-  return c.innerRadius + c.radialScale * Math.abs(s);
+  return tuning.cosmos.radialScale * Math.abs(spiralArc(s));
 }
 
 /** 구면 나선 방위각(0 이 정면 -Z, + 가 오른쪽 +X) */
 export function spiralAngle(s: number, time: number): number {
   const c = tuning.cosmos;
-  return c.twist * s + c.spin * time;
+  return c.twist * spiralArc(s) + c.spin * time;
 }
 
 /** 구면 나선 고도각(라디안. s=0 에서 0 이고 위아래로 감아 돈다) */
 export function spiralElevation(s: number): number {
   const c = tuning.cosmos;
-  return c.elevationAmp * Math.sin(c.elevationFreq * s);
+  return c.elevationAmp * Math.sin(c.elevationFreq * spiralArc(s));
 }
 
 const MAX_ELEVATION = 1.45;
