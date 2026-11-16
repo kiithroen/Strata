@@ -20,6 +20,7 @@ interface LayerMeshes {
   grid: LineSegments<BufferGeometry, LineBasicMaterial>;
   frame: LineSegments<BufferGeometry, LineBasicMaterial>;
   label: Mesh<PlaneGeometry, MeshBasicMaterial>;
+  labelText: string;
   emphasis: number;
 }
 
@@ -82,7 +83,7 @@ export class StrataView {
 
       root.add(fill, grid, frameLines, label);
       this.group.add(root);
-      this.layers.push({ root, fill, grid, frame: frameLines, label, emphasis: 0 });
+      this.layers.push({ root, fill, grid, frame: frameLines, label, labelText: layer.label, emphasis: 0 });
     }
   }
 
@@ -97,6 +98,13 @@ export class StrataView {
       l.grid.material.opacity = s.gridAlpha * a;
       l.frame.material.opacity = s.frameAlpha * a;
       l.label.material.opacity = a;
+      if (this.group.visible) {
+        const tex = this.labels.get(l.labelText, 'major');
+        if (l.label.material.map !== tex.texture) {
+          l.label.material.map = tex.texture;
+          l.label.material.needsUpdate = true;
+        }
+      }
     });
   }
 

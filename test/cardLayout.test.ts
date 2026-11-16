@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { formatStamp } from '../src/core/format';
+import { applyQuality, qualityDefaults } from '../src/core/quality';
 import { cardLayout, faceLayout, type LayoutFace } from '../src/widgets/noteCard/cardLayout';
 
 const FACES: LayoutFace[] = [
@@ -78,6 +79,20 @@ describe('faceLayout', () => {
     expect(Math.abs(ra - rb) / rb).toBeLessThan(0.01);
     expect(a.titleBar.height).toBe(b.titleBar.height);
     expect(a.unit).toBe(b.unit);
+  });
+
+  it('텍스처 품질 설정을 바꿔도 메모의 월드 크기는 변하지 않는다', () => {
+    const memo: LayoutFace = { kind: 'memo', title: '장보기 목록', body: '우유, 계란 한 판, 방울토마토, 드립백 원두 사기' };
+    const before = faceLayout(memo);
+    const otherTex = tuning.quality.options.tex.find((v) => v !== qualityDefaults.tex) ?? qualityDefaults.tex;
+    try {
+      applyQuality({ tex: otherTex });
+      const after = faceLayout(memo);
+      expect(after.worldWidth).toBe(before.worldWidth);
+      expect(after.worldHeight).toBeCloseTo(before.worldHeight, 2);
+    } finally {
+      applyQuality({ tex: qualityDefaults.tex });
+    }
   });
 
   it('고리는 제목 줄 안 왼쪽에 있다', () => {

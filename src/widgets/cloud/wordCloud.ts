@@ -45,7 +45,7 @@ export function layoutCloud(words: readonly CloudWord[]): PlacedWord[] {
       const px = Math.round(c.px[0] + (c.px[1] - c.px[0]) * weight);
       return { text: w.text, px, weight, ...wordBox(w.text, px) };
     })
-    .sort((a, b) => b.px - a.px || (a.text < b.text ? -1 : 1));
+    .sort((a, b) => b.px - a.px || (a.text < b.text ? -1 : a.text > b.text ? 1 : 0));
 
   const placed: (PlacedWord & { w: number; h: number })[] = [];
   const g = c.gapPx;

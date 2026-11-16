@@ -29,13 +29,13 @@ export function wrapLines(
   return lines;
 }
 
-/** 마지막 줄 끝에 말줄임표를 붙이고, 폭을 넘으면 넘지 않을 때까지 글자를 덜어 낸다 */
+/** 마지막 줄 끝에 말줄임표를 붙이고, 폭을 넘으면 넘지 않을 때까지 글자(코드 포인트)를 덜어 낸다 */
 function appendEllipsis(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, lines: string[], maxWidth: number): string[] {
   const last = lines.length - 1;
   if (last < 0) return lines;
-  let line = lines[last];
-  while (line.length > 0 && ctx.measureText(`${line}…`).width > maxWidth) line = line.slice(0, -1);
-  lines[last] = `${line}…`;
+  const chars = [...lines[last]];
+  while (chars.length > 0 && ctx.measureText(`${chars.join('')}…`).width > maxWidth) chars.pop();
+  lines[last] = `${chars.join('')}…`;
   return lines;
 }
 

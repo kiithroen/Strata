@@ -26,4 +26,13 @@ describe('wrapLines', () => {
   it('뒤에 빈 문단만 남았으면 잘린 것이 아니다', () => {
     expect(wrapLines(ctx, 'ab\ncd\n\n', 3, 2)).toEqual(['ab', 'cd']);
   });
+
+  it('서로게이트 쌍 문자를 말줄임표로 잘라도 코드 포인트가 깨지지 않는다', () => {
+    const lines = wrapLines(ctx, 'a😀b😀c', 3, 1);
+    expect(lines).toEqual(['a😀…']);
+    expect([...lines[0]].every((ch) => {
+      const cp = ch.codePointAt(0)!;
+      return cp < 0xd800 || cp > 0xdfff;
+    })).toBe(true);
+  });
 });

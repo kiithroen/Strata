@@ -13,16 +13,35 @@ const MONO = 'ui-monospace, "Cascadia Mono", Consolas, "D2Coding", monospace';
 const CANVAS_HEIGHT = 64;
 const MAX_ENTRIES = 512;
 
-/** 글자 하나를 캔버스 텍스처로 구워 재사용한다. 눈금 라벨과 묶음 배지가 함께 쓴다. */
+export interface LabelRenderer {
+  (text: string, style: LabelStyle): LabelTexture;
+}
+
+/** 글자 하나를 캔버스 텍스처로 구워 재사용한다. 상한을 넘기면 가장 오래 안 쓴 것부터 비운다. */
 export class LabelCache {
   private readonly entries = new Map<string, LabelTexture>();
+
+  constructor(
+    private readonly maxEntries = MAX_ENTRIES,
+    private readonly renderLabel: LabelRenderer = render,
+  ) {}
 
   get(text: string, style: LabelStyle): LabelTexture {
     const key = `${style}\u0000${text}`;
     const hit = this.entries.get(key);
-    if (hit) return hit;
-    if (this.entries.size >= MAX_ENTRIES) this.clear();
-    const made = render(text, style);
+    if (hit) {
+      this.entries.delete(key);
+      this.entries.set(key, hit);
+      return hit;
+    }
+    while (this.entries.size >= this.maxEntries) {
+      const oldest = this.entries.entries().next();
+      if (oldest.done) break;
+      const [oldKey, oldValue] = oldest.value;
+      this.entries.delete(oldKey);
+      oldValue.texture.dispose();
+    }
+    const made = this.renderLabel(text, style);
     this.entries.set(key, made);
     return made;
   }

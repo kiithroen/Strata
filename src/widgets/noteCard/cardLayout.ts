@@ -1,4 +1,5 @@
 import { tuning } from '../../config';
+import { qualityDefaults } from '../../core/quality';
 import { estimatedMeasure, estimateTextWidth, wrapLines } from './textWrap';
 
 export type NoteKind = 'photo' | 'memo' | 'doc';
@@ -51,11 +52,11 @@ export function memoMetrics(unit: number): { titleSize: number; bodySize: number
 /** 메모 제목은 두 줄까지 */
 export const MEMO_TITLE_LINES = 2;
 
-/** 메모의 폭 배율(기준 폭 대비)과 높이/폭 비율. 기준 해상도(card.textureWidth)에서 어림한 글 줄 수로 정한다 */
+/** 메모의 폭 배율(기준 폭 대비)과 높이/폭 비율. 품질 설정으로 바뀐 텍스처 폭과 무관하게 기본 해상도에서 정한다 */
 function memoFit(face: LayoutFace): { scale: number; aspect: number } {
   const c = tuning.card;
   const m = c.memo;
-  const u = c.textureWidth;
+  const u = qualityDefaults.tex;
   const padding = Math.round(u * c.window.paddingRatio);
   const titleH = Math.round(u * c.window.titleRatio);
   const footerH = Math.round(u * c.window.footerRatio);

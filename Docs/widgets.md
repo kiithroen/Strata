@@ -19,7 +19,7 @@
 - 세 종류는 겉모양·강조선·색으로 구분된다. 모두 제목 줄 왼쪽에 실을 묶는 고리가 있고, 상태 줄 왼쪽에 찍은 시각을 적는다.
 - **사진 (`photo`)**: 온전한 직사각 창. 네 모서리 꺾쇠(`card.window.bracketRatio`), 제목 줄 오른쪽의 접기·닫기 단추, 사진 귀퉁이 안쪽의 뷰파인더 꺾쇠, 상태 줄 오른쪽의 재생 막대 같은 눈금이 있다. 사진 비율 그대로 내용 칸을 채우고, 제목 줄 이름은 캡션, 없으면 `IMG_번호`다.
 - **짧은 노트 (`memo`)**: 오른쪽 위 모서리를 깎은(`card.window.chamferRatio`) 쪽지. 제목 줄이 진한 접착 띠(`card.holo.stripAlpha`)이고 `MEMO 번호`를 적는다. 깎은 모서리와 왼쪽 아래 꺾쇠가 밝다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다. 제목 줄 아래 구분선은 겉모양 안에서만 긋는다.
-- 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기준 해상도(`card.textureWidth`)에서 한 번 정해 단순·상세 텍스처도 같은 모양이다.
+- 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기본 해상도(`qualityDefaults.tex`)에서 한 번 정해 품질 설정을 바꾸거나 단순·상세 텍스처를 써도 같은 모양이다.
 - **긴 문서 (`doc`)**: 왼쪽 위에 파일 탭(`card.window.tabRatio`)이 솟은 `1 : √2` 창. 탭에 `TXT_번호.txt`를 적고 탭 윤곽이 밝다. 왼쪽 줄 번호 칸(`card.window.gutterRatio`)에 제목과 문단 줄마다 번호를 붙이고, 오른쪽 스크롤 막대의 손잡이 길이가 보이는 줄 수 / 전체 줄 수다.
 - 겉모양 밖(깎은 모서리, 탭 옆)은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
 

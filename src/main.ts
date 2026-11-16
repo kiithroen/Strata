@@ -60,6 +60,9 @@ new SettingsPanel(settings, readQuality(), (on) => {
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다
 let time = 0;
 let last: number | null = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) last = null;
+});
 stage.renderer.setAnimationLoop((now: number) => {
   const frameMs = last === null ? 0 : now - last;
   const dt = Math.min(frameMs / 1000, tuning.loop.maxStep);
