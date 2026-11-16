@@ -156,7 +156,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const palette = g.hourColors.map((hex) => new Color(hex));
   const noteColors = notes.map((n) => palette[hourColorIndex(n.time)]);
   const branchColor = new Color(g.branchColor);
-  const hubColor = new Color('#ffffff');
+  const hubColor = new Color(g.hubColor);
 
   /** 3차원 구면 나선의 기준 시계열 공간(줌·이동 중에도 노드 배치와 묶음이 흔들리지 않도록 고정한다) */
   const spiralState: AxisState = { focusTime: newest, logScale: levelLogScale('month') };

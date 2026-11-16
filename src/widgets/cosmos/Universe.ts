@@ -186,8 +186,8 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       uPixelRatio: { value: pixelRatio },
       uSize: { value: d.size },
       uOpacity: { value: d.opacity },
-      uColorA: { value: new Color('#9fb8ff') },
-      uColorB: { value: new Color('#ff9fc4') },
+      uColorA: { value: new Color(c.dustColors[0]) },
+      uColorB: { value: new Color(c.dustColors[1]) },
     },
     vertexShader: /* glsl */ `
       attribute float aBase;
@@ -323,9 +323,9 @@ function createNebula(): Mesh<SphereGeometry, ShaderMaterial> {
   const material = new ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
-      uColorA: { value: new Color('#3a1460') },
-      uColorB: { value: new Color('#0e4a5a') },
-      uColorC: { value: new Color('#5a0f22') },
+      uColorA: { value: new Color(tuning.cosmos.nebula.colors[0]) },
+      uColorB: { value: new Color(tuning.cosmos.nebula.colors[1]) },
+      uColorC: { value: new Color(tuning.cosmos.nebula.colors[2]) },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;

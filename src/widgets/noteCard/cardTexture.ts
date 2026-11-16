@@ -1,4 +1,4 @@
-import { CanvasTexture, SRGBColorSpace } from 'three';
+import { CanvasTexture, Color, SRGBColorSpace } from 'three';
 import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import { createRng } from '../../core/random';
@@ -22,10 +22,25 @@ export interface CardFace {
 
 const MONO = 'ui-monospace, "Cascadia Mono", "Malgun Gothic", Consolas, "D2Coding", monospace';
 
-/** 제목 줄 이름: 사진은 캡션, 없으면 종류 코드와 번호 */
-function windowTitle(face: CardFace, kind: NoteKind): string {
-  if (kind === 'photo') return face.title ?? `IMG_${face.id}`;
-  return `${kind === 'memo' ? 'MEMO' : 'TXT'}_${face.id}`;
+/** 노트 종류의 홀로그램 선 색 */
+export function holoTint(kind: NoteKind): string {
+  return tuning.card.holo.kinds[kind];
+}
+
+/** 선 색에서 낸 칠 색들 */
+interface Palette {
+  line: string;
+  dim: string;
+  faint: string;
+  band: string;
+  strip: string;
+}
+
+function palette(kind: NoteKind): Palette {
+  const h = tuning.card.holo;
+  const c = new Color(holoTint(kind));
+  const rgba = (a: number) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
+  return { line: rgba(1), dim: rgba(h.dimAlpha), faint: rgba(h.faintAlpha), band: rgba(h.bandAlpha), strip: rgba(h.stripAlpha) };
 }
 
 function idHash(id: string): number {
@@ -53,168 +68,275 @@ function toTexture(canvas: HTMLCanvasElement, anisotropy: number): CanvasTexture
   return texture;
 }
 
+/** 선과 글자에 빛 번짐을 켜고 끈다. 사진과 바탕에는 쓰지 않는다 */
+function glow(ctx: CanvasRenderingContext2D, color: string | null, width: number): void {
+  if (color === null) {
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    return;
+  }
+  ctx.shadowColor = color;
+  ctx.shadowBlur = width * tuning.card.holo.glowRatio;
+}
+
 /**
- * 가까이서 보는 창 모양 카드. 반투명 바탕 위에 제목 줄(고리·이름·창 단추), 내용, 상태 줄을 그린다.
- * 사진만 제 색이고 나머지는 거의 무채색이다. 흑백으로 바꾸는 건 거리에 따라 셰이더가 한다.
+ * 종류마다 다른 겉모양. 사진은 온전한 직사각 창, 메모는 오른쪽 위 모서리를 깎은 쪽지, 문서는 왼쪽 위에 파일 탭이 솟은 긴 창이다.
+ * 바탕 칠·테두리·클립이 모두 이 길을 쓴다.
+ */
+function outline(ctx: CanvasRenderingContext2D, layout: CardLayout, inset: number): void {
+  const win = tuning.card.window;
+  const w = layout.textureWidth;
+  const h = layout.textureHeight;
+  const i = inset;
+  ctx.beginPath();
+  if (layout.kind === 'memo') {
+    const cut = w * win.chamferRatio;
+    ctx.moveTo(i, i);
+    ctx.lineTo(w - cut, i);
+    ctx.lineTo(w - i, cut);
+    ctx.lineTo(w - i, h - i);
+    ctx.lineTo(i, h - i);
+  } else if (layout.kind === 'doc') {
+    const t = layout.titleBar.height;
+    const tab = w * win.tabRatio;
+    ctx.moveTo(i, i);
+    ctx.lineTo(tab, i);
+    ctx.lineTo(tab + t, t + i);
+    ctx.lineTo(w - i, t + i);
+    ctx.lineTo(w - i, h - i);
+    ctx.lineTo(i, h - i);
+  } else {
+    ctx.rect(i, i, w - i * 2, h - i * 2);
+  }
+  ctx.closePath();
+}
+
+/**
+ * 가까이서 보는 홀로그램 카드. 반투명 남색 바탕에 종류별 색의 빛나는 선과 글자를 그린다.
+ * 흑백으로 바꾸는 건 거리에 따라 셰이더가 한다.
  */
 export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy: number): CanvasTexture {
   const { canvas, ctx } = newCanvas(layout);
-  drawWindow(ctx, layout, false);
-  drawTitle(ctx, layout, windowTitle(face, layout.kind));
-  if (layout.kind === 'memo') drawMemo(ctx, face, layout);
-  else if (layout.kind === 'doc') drawDoc(ctx, face, layout);
-  else drawPhoto(ctx, face, layout);
-  drawFooter(ctx, face, layout);
+  const p = palette(layout.kind);
+  drawBody(ctx, layout, p, false);
+  if (layout.kind === 'memo') drawMemo(ctx, face, layout, p);
+  else if (layout.kind === 'doc') drawDoc(ctx, face, layout, p);
+  else drawPhoto(ctx, face, layout, p);
+  drawFooter(ctx, face, layout, p);
   return toTexture(canvas, anisotropy);
 }
 
 /**
- * 멀리서 보는 단순한 카드. 글자 없이 같은 틀에 사진은 굵은 모자이크, 글은 줄 막대로만 그린다.
+ * 멀리서 보는 단순한 카드. 글자 없이 같은 겉모양에 사진은 굵은 모자이크, 메모는 굵은 막대 몇 줄, 문서는 줄 번호 칸과 가는 막대로만 그린다.
  * layout 은 card.simpleTextureWidth 로 계산한 것을 넘긴다.
  */
 export function createSimpleTexture(face: CardFace, layout: CardLayout, anisotropy: number): CanvasTexture {
   const { canvas, ctx } = newCanvas(layout);
-  const h = tuning.card.holo;
-  drawWindow(ctx, layout, true);
-  const { content, footer } = layout;
+  const p = palette(layout.kind);
   const s = tuning.card.simple;
   const w = layout.textureWidth;
-  if (layout.kind === 'photo' && face.photo) {
-    const cols = s.photoBlocks;
-    const image = face.photo.render(cols);
-    ctx.imageSmoothingEnabled = false;
-    drawCover(ctx, image, content);
-    ctx.imageSmoothingEnabled = true;
+  const { content, footer } = layout;
+  drawBody(ctx, layout, p, true);
+
+  const barH = Math.max(1, Math.round(w * s.barRatio));
+  const gap = Math.max(barH + 1, Math.round(w * s.barGapRatio));
+  const rng = createRng(idHash(face.id));
+  if (layout.kind === 'photo') {
+    if (face.photo) {
+      ctx.imageSmoothingEnabled = false;
+      drawCover(ctx, face.photo.render(s.photoBlocks), content);
+      ctx.imageSmoothingEnabled = true;
+    }
+    drawViewfinder(ctx, content, p.line, Math.max(1, w * tuning.card.window.simpleLineRatio));
+  } else if (layout.kind === 'memo') {
+    // 굵은 글 막대 몇 줄
+    let y = content.y + gap * 0.2;
+    for (let i = 0; y + barH * 1.6 <= content.y + content.height && i < 4; i++) {
+      ctx.fillStyle = i === 0 ? p.line : p.dim;
+      ctx.fillRect(content.x, y, content.width * (i === 0 ? 0.7 : 0.5 + rng() * 0.5), barH * 1.6);
+      y += gap * 1.5;
+    }
   } else {
-    // 글 줄 막대. 첫 줄은 제목처럼 굵고, 나머지는 노트 번호로 정한 길이다
-    const rng = createRng(idHash(face.id));
-    const barH = Math.max(1, Math.round(w * s.barRatio));
-    const gap = Math.max(barH + 1, Math.round(w * s.barGapRatio));
+    // 줄 번호 칸 점과 가는 글 막대
+    const gutter = Math.round(w * tuning.card.window.gutterRatio);
     let y = content.y + gap * 0.3;
-    let first = true;
     while (y + barH <= content.y + content.height) {
-      const len = first ? 0.6 : 0.45 + rng() * 0.55;
-      ctx.fillStyle = first ? h.line : h.dim;
-      ctx.fillRect(content.x, y, content.width * len, first ? barH * 1.5 : barH);
-      y += first ? gap * 1.3 : gap;
-      first = false;
+      ctx.fillStyle = p.faint;
+      ctx.fillRect(content.x, y, gutter * 0.5, barH);
+      ctx.fillStyle = p.dim;
+      ctx.fillRect(content.x + gutter, y, (content.width - gutter) * (0.4 + rng() * 0.6), barH);
+      y += gap;
     }
   }
-  const barH = Math.max(1, Math.round(w * s.barRatio));
-  ctx.fillStyle = h.faint;
+  ctx.fillStyle = p.faint;
   ctx.fillRect(footer.x, footer.y + (footer.height - barH) / 2, footer.width * 0.45, barH);
   return toTexture(canvas, anisotropy);
 }
 
-/** 반투명 바탕, 제목 줄 띠, 흐린 테두리와 밝은 모서리 꺾쇠, 실을 묶는 고리 */
-function drawWindow(ctx: CanvasRenderingContext2D, layout: CardLayout, simple: boolean): void {
+/** 겉모양 바탕, 제목 띠, 테두리, 종류별 강조선, 실을 묶는 고리 */
+function drawBody(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette, simple: boolean): void {
   const h = tuning.card.holo;
   const win = tuning.card.window;
   const w = layout.textureWidth;
   const hh = layout.textureHeight;
   const line = simple ? Math.max(1, w * win.simpleLineRatio) : layout.line;
   const { titleBar, ring } = layout;
+  const glowOn = (c: string) => glow(ctx, simple ? null : c, w);
 
   ctx.clearRect(0, 0, w, hh);
+  outline(ctx, layout, line / 2);
   ctx.fillStyle = h.fill;
-  ctx.fillRect(0, 0, w, hh);
-  ctx.fillStyle = simple ? h.faint : h.titleFill;
-  ctx.fillRect(titleBar.x, titleBar.y, titleBar.width, titleBar.height);
+  ctx.fill();
 
-  ctx.strokeStyle = h.dim;
+  // 제목 띠: 메모는 진한 접착 띠, 문서는 탭 안, 사진은 창 제목 줄
+  ctx.save();
+  outline(ctx, layout, line / 2);
+  ctx.clip();
+  ctx.fillStyle = layout.kind === 'memo' ? p.strip : p.band;
+  ctx.fillRect(0, 0, w, titleBar.height);
+  ctx.restore();
+
+  glowOn(p.dim);
+  ctx.strokeStyle = p.dim;
   ctx.lineWidth = line;
-  ctx.strokeRect(line / 2, line / 2, w - line, hh - line);
-  ctx.beginPath();
-  ctx.moveTo(0, titleBar.height);
-  ctx.lineTo(w, titleBar.height);
+  outline(ctx, layout, line / 2);
   ctx.stroke();
+  if (layout.kind !== 'doc') {
+    ctx.beginPath();
+    ctx.moveTo(0, titleBar.height);
+    ctx.lineTo(w, titleBar.height);
+    ctx.stroke();
+  }
 
-  // 모서리 꺾쇠: 테두리보다 굵고 밝다
-  const b = Math.round(w * win.bracketRatio);
-  const t = line * 1.8;
-  ctx.strokeStyle = h.line;
-  ctx.lineWidth = t;
-  const o = t / 2;
+  // 종류별 강조선: 사진은 네 모서리 꺾쇠, 메모는 깎은 모서리, 문서는 탭 윤곽
+  glowOn(p.line);
+  ctx.strokeStyle = p.line;
+  ctx.lineWidth = line * 1.8;
+  const o = line;
   ctx.beginPath();
-  for (const [x, y, dx, dy] of [
-    [o, o, 1, 1],
-    [w - o, o, -1, 1],
-    [o, hh - o, 1, -1],
-    [w - o, hh - o, -1, -1],
-  ] as const) {
-    ctx.moveTo(x + dx * b, y);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x, y + dy * b);
+  if (layout.kind === 'memo') {
+    const cut = w * win.chamferRatio;
+    ctx.moveTo(w - cut - cut * 0.5, o);
+    ctx.lineTo(w - cut, o);
+    ctx.lineTo(w - o, cut);
+    ctx.lineTo(w - o, cut + cut * 0.5);
+    const b = Math.round(w * win.bracketRatio);
+    ctx.moveTo(o + b, hh - o);
+    ctx.lineTo(o, hh - o);
+    ctx.lineTo(o, hh - o - b);
+  } else if (layout.kind === 'doc') {
+    const t = titleBar.height;
+    const tab = w * win.tabRatio;
+    ctx.moveTo(o, t + o);
+    ctx.lineTo(o, o);
+    ctx.lineTo(tab, o);
+    ctx.lineTo(tab + t, t + o);
+  } else {
+    const b = Math.round(w * win.bracketRatio);
+    for (const [x, y, dx, dy] of [
+      [o, o, 1, 1],
+      [w - o, o, -1, 1],
+      [o, hh - o, 1, -1],
+      [w - o, hh - o, -1, -1],
+    ] as const) {
+      ctx.moveTo(x + dx * b, y);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x, y + dy * b);
+    }
   }
   ctx.stroke();
 
   ctx.lineWidth = line;
   if (simple) {
-    ctx.fillStyle = h.line;
+    ctx.fillStyle = p.line;
     ctx.fillRect(ring.x - ring.size / 2, ring.y - ring.size / 2, ring.size, ring.size);
   } else {
     ctx.beginPath();
     ctx.arc(ring.x, ring.y, ring.size / 2, 0, Math.PI * 2);
     ctx.stroke();
   }
+  glow(ctx, null, w);
 }
 
-/** 제목 줄: 고리 오른쪽에 이름, 오른쪽 끝에 접기·닫기 단추 */
-function drawTitle(ctx: CanvasRenderingContext2D, layout: CardLayout, title: string): void {
-  const h = tuning.card.holo;
-  const { titleBar, ring, padding, line } = layout;
+/** 제목 줄 이름. right 는 이름이 넘지 말아야 할 오른쪽 끝(px) */
+function drawTitleText(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette, text: string, right: number): void {
+  const { titleBar, ring, padding } = layout;
+  const size = Math.max(8, Math.round(titleBar.height * 0.5));
+  ctx.font = `600 ${size}px ${MONO}`;
+  ctx.fillStyle = p.line;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const x = ring.x + ring.size / 2 + padding * 0.8;
+  glow(ctx, p.line, layout.textureWidth);
+  ctx.fillText(truncateText(ctx, text, right - x), x, titleBar.height / 2 + size * 0.05);
+  glow(ctx, null, layout.textureWidth);
+}
+
+/** 사진: 창 단추가 있는 제목 줄, 뷰파인더 꺾쇠를 두른 사진, 상태 줄의 눈금 */
+function drawPhoto(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette): void {
+  const { content, line, titleBar, ring, padding } = layout;
+  const w = layout.textureWidth;
+  if (face.photo) drawCover(ctx, face.photo.render(content.width), content);
+  ctx.strokeStyle = p.dim;
+  ctx.lineWidth = line;
+  ctx.strokeRect(content.x - line / 2, content.y - line / 2, content.width + line, content.height + line);
+  glow(ctx, p.line, w);
+  drawViewfinder(ctx, content, p.line, line * 1.6);
+
+  // 접기·닫기 단추
   const btn = ring.size;
   const cy = titleBar.height / 2;
-  const right = titleBar.width - padding;
-
-  ctx.strokeStyle = h.line;
+  const cx = titleBar.width - padding - btn / 2;
+  ctx.strokeStyle = p.line;
   ctx.lineWidth = line * 1.2;
-  // 닫기(×)
-  const cx = right - btn / 2;
   ctx.beginPath();
   ctx.moveTo(cx - btn / 2, cy - btn / 2);
   ctx.lineTo(cx + btn / 2, cy + btn / 2);
   ctx.moveTo(cx + btn / 2, cy - btn / 2);
   ctx.lineTo(cx - btn / 2, cy + btn / 2);
-  // 접기(밑줄)
   const mx = cx - btn * 1.9;
   ctx.moveTo(mx - btn / 2, cy + btn / 2);
   ctx.lineTo(mx + btn / 2, cy + btn / 2);
   ctx.stroke();
-
-  const size = Math.max(8, Math.round(titleBar.height * 0.5));
-  ctx.font = `600 ${size}px ${MONO}`;
-  ctx.fillStyle = h.line;
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'left';
-  const x = ring.x + ring.size / 2 + padding * 0.8;
-  const maxW = mx - btn - padding * 0.8 - x;
-  ctx.fillText(truncateText(ctx, title, maxW), x, cy + size * 0.05);
+  glow(ctx, null, w);
+  drawTitleText(ctx, layout, p, face.title ?? `IMG_${face.id}`, mx - btn - padding * 0.8);
 }
 
-/** 사진 칸: 사진을 채우고 흐린 선으로 두른다 */
-function drawPhoto(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout): void {
-  const { content, line } = layout;
-  if (face.photo) drawCover(ctx, face.photo.render(content.width), content);
-  ctx.strokeStyle = tuning.card.holo.dim;
-  ctx.lineWidth = line;
-  ctx.strokeRect(content.x - line / 2, content.y - line / 2, content.width + line, content.height + line);
+/** 사진 네 귀퉁이 안쪽의 뷰파인더 꺾쇠 */
+function drawViewfinder(ctx: CanvasRenderingContext2D, r: Rect, color: string, width: number): void {
+  const b = Math.min(r.width, r.height) * 0.12;
+  const o = width * 1.5;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  for (const [x, y, dx, dy] of [
+    [r.x + o, r.y + o, 1, 1],
+    [r.x + r.width - o, r.y + o, -1, 1],
+    [r.x + o, r.y + r.height - o, 1, -1],
+    [r.x + r.width - o, r.y + r.height - o, -1, -1],
+  ] as const) {
+    ctx.moveTo(x + dx * b, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + dy * b);
+  }
+  ctx.stroke();
 }
 
-/** 짧은 노트: 굵은 제목과 큼직한 본문 */
-function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout): void {
-  const h = tuning.card.holo;
+/** 메모: 접착 띠 안에 MEMO 표시, 굵은 제목과 큼직한 본문 */
+function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette): void {
   const { content } = layout;
   const w = layout.textureWidth;
-  const titleSize = Math.max(10, Math.round(w * 0.068));
-  const bodySize = Math.max(9, Math.round(w * 0.056));
+  drawTitleText(ctx, layout, p, `MEMO ${face.id}`, w * (1 - tuning.card.window.chamferRatio) - layout.padding);
+  const titleSize = Math.max(10, Math.round(w * 0.07));
+  const bodySize = Math.max(9, Math.round(w * 0.058));
   const lineH = bodySize * 1.45;
   let y = content.y + layout.padding * 0.3;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
+  glow(ctx, p.line, w);
   if (face.title) {
     ctx.font = `700 ${titleSize}px ${MONO}`;
-    ctx.fillStyle = h.line;
+    ctx.fillStyle = p.line;
     for (const l of wrapLines(ctx, face.title, content.width, 2)) {
       ctx.fillText(l, content.x, y);
       y += titleSize * 1.3;
@@ -223,80 +345,118 @@ function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLay
   }
   if (face.body) {
     ctx.font = `${bodySize}px ${MONO}`;
-    ctx.fillStyle = h.line;
+    ctx.fillStyle = p.line;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / lineH));
     for (const l of wrapLines(ctx, face.body, content.width, maxLines)) {
       ctx.fillText(l, content.x, y);
       y += lineH;
     }
   }
+  glow(ctx, null, w);
 }
 
-/** 긴 문서: 제목, 구분선, 촘촘한 문단. 오른쪽 스크롤 막대가 보이는 분량을 알린다 */
-function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout): void {
-  const h = tuning.card.holo;
+/** 문서: 탭의 파일 이름, 왼쪽 줄 번호 칸, 제목과 촘촘한 문단, 보이는 분량을 알리는 스크롤 막대 */
+function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette): void {
   const { content, line, padding } = layout;
   const w = layout.textureWidth;
-  const titleSize = Math.max(9, Math.round(w * 0.054));
+  drawTitleText(ctx, layout, p, `TXT_${face.id}.txt`, w * tuning.card.window.tabRatio);
+
+  const gutter = Math.round(w * tuning.card.window.gutterRatio);
+  const titleSize = Math.max(9, Math.round(w * 0.052));
   const bodySize = Math.max(8, Math.round(w * 0.04));
   const lineH = bodySize * 1.5;
   const barW = Math.max(2, Math.round(w * 0.012));
-  const textW = content.width - barW - padding;
+  const textX = content.x + gutter;
+  const textW = content.width - gutter - barW - padding;
 
-  ctx.textBaseline = 'top';
-  ctx.textAlign = 'left';
-  let y = content.y + padding * 0.2;
-  ctx.font = `700 ${titleSize}px ${MONO}`;
-  ctx.fillStyle = h.line;
-  ctx.fillText(truncateText(ctx, face.title ?? `DOC ${face.id}`, textW), content.x, y);
-  y += titleSize * 1.5;
-  ctx.strokeStyle = h.dim;
+  // 줄 번호 칸 경계
+  ctx.strokeStyle = p.faint;
   ctx.lineWidth = line;
   ctx.beginPath();
-  ctx.moveTo(content.x, y);
-  ctx.lineTo(content.x + textW, y);
+  ctx.moveTo(textX - padding * 0.5, content.y);
+  ctx.lineTo(textX - padding * 0.5, content.y + content.height);
   ctx.stroke();
-  y += bodySize * 0.8;
+
+  ctx.textBaseline = 'top';
+  let y = content.y + padding * 0.3;
+  let n = 1;
+  const number = (size: number) => {
+    ctx.font = `${Math.round(size * 0.8)}px ${MONO}`;
+    ctx.fillStyle = p.dim;
+    ctx.textAlign = 'right';
+    ctx.fillText(String(n++).padStart(2, '0'), textX - padding, y + size * 0.15);
+    ctx.textAlign = 'left';
+  };
+
+  glow(ctx, p.line, w);
+  number(titleSize);
+  ctx.font = `700 ${titleSize}px ${MONO}`;
+  ctx.fillStyle = p.line;
+  ctx.fillText(truncateText(ctx, face.title ?? `DOC ${face.id}`, textW), textX, y);
+  y += titleSize * 1.6;
 
   const bodyTop = y;
   let shown = 0;
   let total = 0;
   if (face.body) {
     ctx.font = `${bodySize}px ${MONO}`;
-    ctx.fillStyle = h.line;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / lineH));
     const lines = wrapLines(ctx, face.body, textW, maxLines);
     total = wrapLines(ctx, face.body, textW, Number.MAX_SAFE_INTEGER).length;
     shown = lines.length;
     for (const l of lines) {
-      ctx.fillText(l, content.x, y);
+      number(bodySize);
+      ctx.font = `${bodySize}px ${MONO}`;
+      ctx.fillStyle = p.line;
+      ctx.fillText(l, textX, y);
       y += lineH;
     }
   }
+  glow(ctx, null, w);
 
   // 스크롤 막대: 흐린 홈 위에 보이는 비율만큼의 손잡이
   const trackX = content.x + content.width - barW;
   const trackH = content.y + content.height - bodyTop;
-  ctx.fillStyle = h.faint;
+  ctx.fillStyle = p.faint;
   ctx.fillRect(trackX, bodyTop, barW, trackH);
-  ctx.fillStyle = h.line;
+  ctx.fillStyle = p.line;
   ctx.fillRect(trackX, bodyTop, barW, trackH * (total > 0 ? Math.min(1, shown / total) : 1));
 }
 
-/** 상태 줄: 왼쪽에 찍은 시각, 오른쪽에 노트 번호 */
-function drawFooter(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout): void {
-  const h = tuning.card.holo;
-  const { footer } = layout;
+/** 상태 줄: 왼쪽에 찍은 시각, 오른쪽에 노트 번호. 사진은 번호 대신 눈금 띠 */
+function drawFooter(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette): void {
+  const { footer, line } = layout;
+  const w = layout.textureWidth;
   const size = Math.max(8, Math.round(footer.height * 0.5));
   const cy = footer.y + footer.height / 2;
   ctx.font = `${size}px ${MONO}`;
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = h.line;
+  ctx.fillStyle = p.line;
   ctx.textAlign = 'left';
+  glow(ctx, p.line, w);
   ctx.fillText(formatStamp(face.createdAt), footer.x, cy);
-  ctx.fillStyle = h.dim;
-  ctx.textAlign = 'right';
-  ctx.fillText(`#${face.id}`, footer.x + footer.width, cy);
+  glow(ctx, null, w);
+  if (layout.kind === 'photo') {
+    // 재생 막대 같은 눈금: 노트 번호로 정한 자리까지 밝다
+    const ticks = 12;
+    const span = footer.width * 0.32;
+    const step = span / ticks;
+    const lit = 2 + (idHash(face.id) % (ticks - 2));
+    ctx.lineWidth = line * 1.2;
+    for (let i = 0; i < ticks; i++) {
+      const x = footer.x + footer.width - span + i * step + step / 2;
+      const th = size * (i % 3 === 0 ? 0.9 : 0.55);
+      ctx.strokeStyle = i < lit ? p.line : p.faint;
+      ctx.beginPath();
+      ctx.moveTo(x, cy - th / 2);
+      ctx.lineTo(x, cy + th / 2);
+      ctx.stroke();
+    }
+  } else {
+    ctx.fillStyle = p.dim;
+    ctx.textAlign = 'right';
+    ctx.fillText(`#${face.id}`, footer.x + footer.width, cy);
+  }
 }
 
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {

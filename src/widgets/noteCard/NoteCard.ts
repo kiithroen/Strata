@@ -3,7 +3,7 @@ import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
 import { faceLayout, type CardLayout } from './cardLayout';
 import { createCardMaterial, type CardLook } from './cardMaterial';
-import { createCardTexture, createSimpleTexture, type CardFace } from './cardTexture';
+import { createCardTexture, createSimpleTexture, holoTint, type CardFace } from './cardTexture';
 import { CardMotion, type FloatParams, type Pose } from './cardMotion';
 
 export interface NoteCardOptions {
@@ -58,6 +58,7 @@ export class NoteCard {
       width: this.layout.worldWidth,
       height: this.layout.worldHeight,
       bendPhase: phase / 1000,
+      tint: holoTint(kind),
     });
     this.bendPhase = phase / 1000;
     const seg = tuning.card.segments;

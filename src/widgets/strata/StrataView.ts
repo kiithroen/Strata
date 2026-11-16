@@ -31,7 +31,7 @@ export class StrataView {
   readonly group = new Group();
   private layers: LayerMeshes[] = [];
   private readonly labelGeometry = new PlaneGeometry(1, 1);
-  private readonly color = new Color(tuning.card.holo.line);
+  private readonly color = new Color(tuning.look.accent);
 
   constructor(private readonly labels: LabelCache) {}
 

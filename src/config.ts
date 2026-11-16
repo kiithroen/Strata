@@ -16,13 +16,12 @@ export const tuning = {
     far: 150,
   },
 
+  /** 화면 전체의 색: 짙은 남색 바탕에 청록 강조, 푸른빛 흰 글자. HUD(CSS 변수)도 main.ts 가 이 값으로 맞춘다 */
   look: {
-    background: '#07070a',
-    accent: '#d1222b',
-    text: '#e9e6e1',
-    textDim: '#8a8782',
-    panel: 'rgba(10, 10, 14, 0.78)',
-    frameLine: 'rgba(233, 230, 225, 0.55)',
+    background: '#020814',
+    accent: '#38d4ff',
+    text: '#d3f1ff',
+    textDim: '#5e8aa6',
     fogNear: 6,
     fogFar: 22,
     scanlineDensity: 180,
@@ -45,16 +44,32 @@ export const tuning = {
     simpleTextureWidth: 96,
     /**
      * 창 모양 카드: 제목 줄과 아래 상태 줄 높이, 안쪽 여백, 테두리 선 굵기, 모서리 꺾쇠 길이(모두 텍스처 폭 대비).
-     * 단순한 텍스처는 선이 뭉개지지 않게 simpleLineRatio 를 쓴다
+     * 단순한 텍스처는 선이 뭉개지지 않게 simpleLineRatio 를 쓴다.
+     * chamferRatio 는 메모의 깎은 모서리 크기, tabRatio 는 문서 제목 탭 폭, gutterRatio 는 문서 줄 번호 칸 폭이다
      */
-    window: { titleRatio: 0.085, footerRatio: 0.075, paddingRatio: 0.04, lineRatio: 0.005, simpleLineRatio: 0.022, bracketRatio: 0.07 },
-    /** 홀로그램 색: 선·글자, 흐린 선·글자, 창 바탕(반투명), 제목 줄 바탕, 사진 칸 바탕 */
+    window: {
+      titleRatio: 0.085,
+      footerRatio: 0.075,
+      paddingRatio: 0.04,
+      lineRatio: 0.005,
+      simpleLineRatio: 0.022,
+      bracketRatio: 0.07,
+      chamferRatio: 0.17,
+      tabRatio: 0.58,
+      gutterRatio: 0.1,
+    },
+    /**
+     * 홀로그램 색. kinds 는 노트 종류별 선·글자 색으로, 멀리서 흑백으로 바꿀 때도 이 색으로 물든다.
+     * fill 은 창 바탕, 나머지는 선 색에서 낸 흐린 선·옅은 선·제목 띠·메모 띠의 불투명도, glowRatio 는 선과 글자의 빛 번짐(폭 대비)이다
+     */
     holo: {
-      line: '#d9e7ee',
-      dim: 'rgba(217, 231, 238, 0.45)',
-      faint: 'rgba(217, 231, 238, 0.18)',
-      fill: 'rgba(8, 13, 18, 0.62)',
-      titleFill: 'rgba(217, 231, 238, 0.13)',
+      kinds: { photo: '#48d6ff', memo: '#5ef0c8', doc: '#7fa4ff' },
+      fill: 'rgba(3, 13, 32, 0.74)',
+      dimAlpha: 0.5,
+      faintAlpha: 0.2,
+      bandAlpha: 0.14,
+      stripAlpha: 0.34,
+      glowRatio: 0.014,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
     simple: { photoBlocks: 9, barRatio: 0.045, barGapRatio: 0.085 },
@@ -212,7 +227,8 @@ export const tuning = {
     graph: {
       branchWidth: 1.8,
       spokeWidth: 1.0,
-      branchColor: '#d4d6ff',
+      branchColor: '#7fd2ff',
+      hubColor: '#e4f8ff',
       branchAlpha: 0.5,
       spokeAlpha: 0.55,
       nodeSize: 0.09,
@@ -230,7 +246,7 @@ export const tuning = {
       /** 종이 탭 판정 반경(CSS px). 화면에 보이는 종이 반지름이 이보다 크면 그쪽을 쓴다 */
       paperTapRadius: 38,
       burst: { inner: 0.06, spacing: 0.055, pullSpread: 0.85, pullCurve: 1.5, depthJitter: 0.05, spin: 0.06 },
-      hourColors: ['#4a64ff', '#3fd2ff', '#7dffb6', '#ffe07a', '#ff6fae', '#b783ff'],
+      hourColors: ['#2a5cff', '#2f9dff', '#38d4ff', '#7fe9ff', '#5a7dff', '#8fb4ff'],
     },
     /**
      * 돌풍에 날리는 종이(위성).
@@ -275,13 +291,15 @@ export const tuning = {
      * armRadiusFloor: 팔 먼지 반지름 배율 하한, haloRadius·haloElevation: 흩어진 먼지의 반지름 배율 범위와 고도각 범위,
      * coreRadius: 원점 근처 먼지가 모이지 않게 두는 최소 월드 반지름
      */
+    /** 먼지 색 두 가지(점마다 그 사이에서 고른다) */
+    dustColors: ['#6fd6ff', '#4a6dff'],
     dust: { count: 9000, armRadiusFloor: 0.35, haloRadius: [0.35, 1.2], haloElevation: 1.4, coreRadius: 0.3, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
     stars: { count: 2600, radius: 55, size: 1.8 },
     /**
      * 성운 배경. bakeSize 가 0 이면 매 프레임 화면 해상도로 계산하고, 양수면 그 크기(px)의 큐브맵에 구워 두고
      * refreshSeconds(게임 시간)마다 다시 굽는다
      */
-    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2 },
+    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, colors: ['#0b1f66', '#05445e', '#16127a'] },
   },
 
   /**

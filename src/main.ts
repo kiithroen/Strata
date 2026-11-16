@@ -25,6 +25,14 @@ const tabsEl = document.getElementById('widget-tabs');
 const hintEl = document.getElementById('hint');
 if (!container || !tabsEl || !hintEl) throw new Error('index.html 구조가 맞지 않는다');
 
+// HUD 색은 tuning.look 을 따른다
+const rootStyle = document.documentElement.style;
+rootStyle.setProperty('--bg', tuning.look.background);
+rootStyle.setProperty('--text', tuning.look.text);
+rootStyle.setProperty('--text-dim', tuning.look.textDim);
+rootStyle.setProperty('--accent', tuning.look.accent);
+document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tuning.look.background);
+
 // 저장된 품질 설정은 위젯이 튜닝 값을 읽기 전에 적용한다
 const settings = loadSettings();
 applyQuality(settings.quality);

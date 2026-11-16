@@ -15,15 +15,16 @@
 
 파일: `src/widgets/noteCard/`
 
-노트 하나를 나타내는 양면 홀로그램 창이다. 반투명 바탕(`card.holo.fill`)에 위에서부터 제목 줄, 내용 칸, 상태 줄을 둔 창 모양을 캔버스에 그려 텍스처로 쓴다(`cardTexture.ts`). 선과 글자는 거의 무채색(`card.holo`)이고 사진만 제 색이다.
-- 공통 틀: 흐린 테두리와 밝은 모서리 꺾쇠(`card.window.bracketRatio`), 제목 줄 띠(`card.holo.titleFill`). 제목 줄 왼쪽에 실을 묶는 고리, 가운데에 이름, 오른쪽 끝에 접기·닫기 단추를 그린다. 상태 줄에는 찍은 시각과 노트 번호를 적는다.
-- **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채운다. 제목 줄 이름은 캡션, 없으면 `IMG_번호`다.
-- **짧은 노트 (`memo`)**: 정사각 창에 굵은 제목과 큼직한 본문. 이름은 `MEMO_번호`다.
-- **긴 문서 (`doc`)**: `1 : √2` 창에 제목·구분선·촘촘한 문단. 오른쪽 스크롤 막대의 손잡이 길이가 보이는 줄 수 / 전체 줄 수다. 이름은 `TXT_번호`다.
+노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 종류별 색(`card.holo.kinds`)의 빛나는 선과 글자(`card.holo.glowRatio`)로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선·제목 띠는 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 사진만 제 색이다.
+- 세 종류는 겉모양·강조선·색으로 구분된다. 모두 제목 줄 왼쪽에 실을 묶는 고리가 있고, 상태 줄 왼쪽에 찍은 시각을 적는다.
+- **사진 (`photo`)**: 온전한 직사각 창. 네 모서리 꺾쇠(`card.window.bracketRatio`), 제목 줄 오른쪽의 접기·닫기 단추, 사진 귀퉁이 안쪽의 뷰파인더 꺾쇠, 상태 줄 오른쪽의 재생 막대 같은 눈금이 있다. 사진 비율 그대로 내용 칸을 채우고, 제목 줄 이름은 캡션, 없으면 `IMG_번호`다.
+- **짧은 노트 (`memo`)**: 오른쪽 위 모서리를 깎은(`card.window.chamferRatio`) 정사각 쪽지. 제목 줄이 진한 접착 띠(`card.holo.stripAlpha`)이고 `MEMO 번호`를 적는다. 깎은 모서리와 왼쪽 아래 꺾쇠가 밝다. 굵은 제목과 큼직한 본문이다.
+- **긴 문서 (`doc`)**: 왼쪽 위에 파일 탭(`card.window.tabRatio`)이 솟은 `1 : √2` 창. 탭에 `TXT_번호.txt`를 적고 탭 윤곽이 밝다. 왼쪽 줄 번호 칸(`card.window.gutterRatio`)에 제목과 문단 줄마다 번호를 붙이고, 오른쪽 스크롤 막대의 손잡이 길이가 보이는 줄 수 / 전체 줄 수다.
+- 겉모양 밖(깎은 모서리, 탭 옆)은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
 
 **멀고 가까움** (`cardMaterial.ts`, `createSimpleTexture`)
-- 카드마다 텍스처가 둘이다. 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`)다. 단순한 텍스처는 글자 없이 같은 틀에 사진은 굵은 모자이크(`card.simple.photoBlocks`), 글은 줄 막대(`card.simple`)로만 그린다.
-- 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(`card.holo.line`으로 물든 밝기)을 제 색으로 섞는다. 한 장 안에서는 같은 값이다. 펼치는 카드는 둘 다 1이다.
+- 카드마다 텍스처가 둘이다. 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`)다. 단순한 텍스처는 글자 없이 같은 겉모양에 사진은 굵은 모자이크(`card.simple.photoBlocks`)와 뷰파인더 꺾쇠, 메모는 굵은 막대 몇 줄, 문서는 줄 번호 칸 점과 가는 막대(`card.simple`)로만 그린다.
+- 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(그 카드 종류 색으로 물든 밝기)을 제 색으로 섞는다. 한 장 안에서는 같은 값이다. 펼치는 카드는 둘 다 1이다.
 - 단순한 모양일수록 옅어진다(`card.lod.farAlpha`). 펼친 카드는 바탕 불투명도를 `card.lod.focusAlpha` 이상으로 올려 뒤 카드가 글을 가리지 않게 한다.
 
 **실 묶는 고리** (`paperPin.ts`)
@@ -47,7 +48,7 @@
 **그리기** (`cardMaterial.ts`, `NoteCard.ts`)
 - 모든 카드가 `CardLook` 유니폼 객체를 함께 쓴다. 시간과 안개 범위는 데모가 한 번만 갱신한다.
 - 배치가 넘기는 불투명도(`fade`)를 받는다. 펼치는 중인 카드는 불투명도와 상관없이 보이고, 거의 투명한 카드는 그리지 않는다.
-- 펼친 카드는 테두리에 홀로그램 선 색 빛이 돌고 주사선·잡음·깜빡임이 옅어진다. 깊이에 따라 안개 범위에서 배경색으로 녹는다.
+- 펼친 카드는 테두리에 종류 색 빛이 돌고 주사선·잡음·깜빡임이 옅어진다. 깊이에 따라 안개 범위에서 배경색으로 녹는다.
 - 양면 홀로그램이다. 따로 그린 뒷면이 없고, 뒤에서 보면 가로를 뒤집어 글자가 바로 읽힌다.
 - 홀로그램 효과: 위에서 아래로 훑는 밝은 띠(`card.flicker.sweepSpeed`, `sweepStrength`), 카드마다 때가 다른 깜빡임(`card.flicker.rate`, `chance`, `depth`), 주사선(`look.scanline*`).
 - 휨(`CardLook.uBend`, 0~1): 메시를 `card.segments` 칸 격자로 나누고, 정점 셰이더가 카드 좌표의 가로·세로 물결과 가로 말림(`card.bend`)을 더한 높이만큼 앞뒤로 민다. 종이마다 노트 번호로 정한 위상만큼 어긋나게 출렁이고, 펼치는 동안에는 평평해진다.
@@ -91,7 +92,7 @@
 - `setLevel`, `focusOn(time, level)`, `shift(±1)`(지금 단계 단위의 평균 길이만큼, 주어진 범위 안에서)이 있다.
 
 **그리기** (`AxisView.ts`)
-- 바닥 높이 `axis.railY`에 폭 `axis.railHalfWidth`의 양옆 레일을 가장 최근 노트 깊이부터 `axis.farDepth`까지 깐다. 큰 눈금은 레일 밖으로 `axis.majorTickOverhang`만큼 나오고, 초점면에는 강조색 선이 지난다.
+- 바닥 높이 `axis.railY`에 폭 `axis.railHalfWidth`의 양옆 레일을 가장 최근 노트 깊이부터 `axis.farDepth`까지 깐다. 큰 눈금은 레일 밖으로 `axis.majorTickOverhang`만큼 나오고, 초점면에는 강조색(`look.accent`) 선이 지난다.
 - 눈금 글자는 왼쪽 레일 안쪽에 서 있고 높이는 `axis.labelHeight`(작은 눈금 `axis.minorLabelHeight`)다.
 - 시간축 데모는 장면 안개를 `axis.fogNear`~`axis.fogFar`로 바꾸고 바닥 격자를 숨긴다.
 
@@ -167,7 +168,7 @@
 - 창은 앞면이 위를 보도록 눕고, 창의 위쪽이 판 안쪽(보는 쪽 반대)을 향한다.
 
 **층 판** (`StrataView`)
-- 층마다 아주 옅은 바탕(`strata.fillAlpha`), 흐린 격자(`strata.gridStep`, `strata.gridAlpha`), 테두리와 모서리 꺾쇠(`strata.frameAlpha`), 앞 왼쪽 모서리 밖의 날짜(`strata.labelHeight`)를 그린다. 판은 창 무리보다 `strata.margin`만큼 넓다.
+- 층마다 강조색(`look.accent`)으로 아주 옅은 바탕(`strata.fillAlpha`), 흐린 격자(`strata.gridStep`, `strata.gridAlpha`), 테두리와 모서리 꺾쇠(`strata.frameAlpha`), 앞 왼쪽 모서리 밖의 날짜(`strata.labelHeight`)를 그린다. 판은 창 무리보다 `strata.margin`만큼 넓다.
 - 바라보는 층은 밝고 나머지 층은 `strata.otherLayerAlpha` 배로 옅다.
 
 **조작**

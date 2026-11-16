@@ -23,7 +23,7 @@ export interface CardLook {
   uWaveSpeed: { value: Vector2 };
   uCurl: { value: number };
   uCurlSpeed: { value: number };
-  /** 홀로그램 선 색. 흑백으로 바꾼 사진도 이 색으로 물든다 */
+  /** 홀로그램 선 색의 기본값. 재질마다 노트 종류 색(CardMaterialOptions.tint)으로 바꿔 쓴다 */
   uHoloTint: { value: Color };
   uDetailRange: { value: Vector2 };
   uColorRange: { value: Vector2 };
@@ -59,7 +59,7 @@ export function createCardLook(): CardLook {
     uWaveSpeed: { value: new Vector2(...b.waveSpeed) },
     uCurl: { value: b.curl },
     uCurlSpeed: { value: b.curlSpeed },
-    uHoloTint: { value: new Color(tuning.card.holo.line) },
+    uHoloTint: { value: new Color(l.accent) },
     uDetailRange: { value: new Vector2(...lod.detail) },
     uColorRange: { value: new Vector2(...lod.color) },
     uFarAlpha: { value: lod.farAlpha },
@@ -167,13 +167,15 @@ void main() {
   // 양면 홀로그램: 뒤에서 봐도 글자가 바로 읽히게 가로를 뒤집는다
   vec2 uv = vec2(gl_FrontFacing ? vUv.x : 1.0 - vUv.x, vUv.y);
   vec4 color = mix(texture2D(mapSimple, uv), texture2D(map, uv), vDetail);
+  // 겉모양 밖(메모의 깎은 모서리, 문서 탭 옆)은 비어 있다. 아래 효과들도 그 자리는 건드리지 않는다
+  float body = smoothstep(0.0, 0.25, color.a);
 
   // 멀면 흑백으로 물들고 가까울수록 제 색이 돌아온다
   float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
   color.rgb = mix(uHoloTint * gray, color.rgb, vColor);
   color.a *= mix(uFarAlpha, 1.0, vDetail);
   // 펼친 카드는 바탕을 거의 불투명하게 해 뒤 카드가 글을 가리지 않게 한다
-  color.a = mix(color.a, max(color.a, uFocusAlpha), uFocus);
+  color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
 
   float live = 1.0 - uFocus;
   // 비스듬히 볼수록 가장자리가 밝아진다
@@ -181,7 +183,7 @@ void main() {
   float facing = abs(dot(nrm, normalize(-vViewPos)));
   float glint = pow(1.0 - facing, 3.0) * uGlint * uShade * live;
   color.rgb += uHoloTint * glint;
-  color.a = min(1.0, color.a + glint * 0.5);
+  color.a = min(1.0, color.a + glint * 0.5 * body);
 
   // 위에서 아래로 훑는 밝은 띠
   float sweep = fract(vUv.y + uTime * uSweep.x + uBendPhase);
@@ -199,7 +201,7 @@ void main() {
   // 펼친 카드의 테두리 빛. 가로 거리를 높이 단위로 맞춰 네 변의 두께를 같게 한다
   vec2 edgeDist = min(vUv, 1.0 - vUv);
   edgeDist.x *= uAspect;
-  float edge = 1.0 - smoothstep(0.0, uEdgeWidth, min(edgeDist.x, edgeDist.y));
+  float edge = (1.0 - smoothstep(0.0, uEdgeWidth, min(edgeDist.x, edgeDist.y))) * body;
   color.rgb = mix(color.rgb, uHoloTint, edge * uFocus);
   color.a = max(color.a, edge * uFocus);
 
@@ -227,6 +229,8 @@ export interface CardMaterialOptions {
   height: number;
   /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다. 깜빡임·훑는 띠의 때도 어긋낸다 */
   bendPhase: number;
+  /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때, 테두리 빛·반짝임·훑는 띠도 이 색이다 */
+  tint: string;
 }
 
 export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
@@ -235,6 +239,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       ...o.look,
       map: { value: o.map },
       mapSimple: { value: o.mapSimple },
+      uHoloTint: { value: new Color(o.tint) },
       uAspect: { value: o.width / o.height },
       uCardSize: { value: new Vector2(o.width, o.height) },
       uBendPhase: { value: o.bendPhase },
