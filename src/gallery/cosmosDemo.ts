@@ -1,6 +1,6 @@
 import { Color, Quaternion, Vector3, type Fog } from 'three';
 import { tuning } from '../config';
-import { floorTo } from '../core/calendar';
+import { DAY_MS, floorTo } from '../core/calendar';
 import { damp } from '../core/motion';
 import { createRng, range } from '../core/random';
 import { createFakeNotes } from '../dev/fakeNotes';
@@ -46,6 +46,7 @@ import { paperPin, pinPoint } from '../widgets/noteCard/paperPin';
 import {
   AxisController,
   clusterNotes,
+  depthPerDay,
   levelLogScale,
   type AxisState,
   type Cluster,
@@ -162,6 +163,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   let hubs: Hub[] = [];
   let nodes: CosmosNode[] = [];
   let pinnedTime: number | null = newest;
+  /** 먼지 흐름을 재는 지난 프레임의 시점 */
+  let lastFocusTime = controller.current.focusTime;
 
   // 공전 시계: 손가락이 닿아 있으면 멈추고 떼면 다시 흐른다
   let orbitClock = 0;
@@ -336,7 +339,11 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       cameraRig.step(dt);
       cameraRig.applyTo(stage.camera);
       stage.camera.getWorldPosition(cameraPosition);
-      universe.update(orbitClock, 0, cameraPosition);
+      // 시점이 옮겨 간 시간 거리만큼 먼지가 나선팔을 따라 흐른다(과거로 가면 음수)
+      const focusNow = controller.current.focusTime;
+      const scrollS = ((focusNow - lastFocusTime) / DAY_MS) * depthPerDay(spiralState);
+      lastFocusTime = focusNow;
+      universe.update(orbitClock, scrollS, cameraPosition);
 
       const unit = choosePlanetUnit(spiralState);
       clusters = clusterNotes(notes, unit);
