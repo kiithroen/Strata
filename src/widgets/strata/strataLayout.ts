@@ -1,5 +1,6 @@
 import { Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
+import type { PlacedWord } from '../cloud/wordCloud';
 import type { Pose } from '../noteCard/cardMotion';
 
 /** 층에 깔 노트 창 하나: 기본 월드 크기(배율 1), 관련도(0~1), 자리를 정하는 번호 */
@@ -16,6 +17,8 @@ export interface StrataLayerInput {
   label: string;
   anchorTime: number;
   tiles: readonly StrataTileInput[];
+  /** 멀리서 층 위에 보이는 태그 워드 클라우드 */
+  words?: readonly PlacedWord[];
 }
 
 /** 층 판 위 자리. x 는 판의 오른쪽, z 는 판의 앞쪽(보는 쪽)이다. radius 는 비튼 창이 차지하는 원의 반지름 */
@@ -34,6 +37,7 @@ export interface StrataLayer {
   anchorTime: number;
   /** 고른 층을 0으로 한 높이. 최근 층이 위다 */
   y: number;
+  words: readonly PlacedWord[];
   halfWidth: number;
   halfDepth: number;
   tiles: StrataTile[];
@@ -104,6 +108,7 @@ export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: nu
       label: layer.label,
       anchorTime: layer.anchorTime,
       y: (focusIndex - li) * s.layerGap,
+      words: layer.words ?? [],
       halfWidth: (cols * cell) / 2 + s.margin,
       halfDepth: (rows * cell) / 2 + s.margin,
       tiles,

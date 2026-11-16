@@ -5,9 +5,6 @@ import {
   Color,
   DynamicDrawUsage,
   Group,
-  Mesh,
-  MeshBasicMaterial,
-  PlaneGeometry,
   Points,
   ShaderMaterial,
   Vector3,
@@ -18,7 +15,7 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
-import { facingQuaternion } from './cosmosModel';
+import { ScreenLabels } from '../common/screenLabels';
 
 /**
  * 우주 보기의 선 그래프: 가지(허브 ↔ 행성, 허브끼리), 살(행성 → 노트 점), 점, 빛 무리, 글자.
@@ -30,26 +27,18 @@ export class GraphView {
   private readonly spokes: LineBatch;
   private readonly dots: PointBatch;
   private readonly glows: PointBatch;
-  private readonly labelGeometry = new PlaneGeometry(1, 1);
-  private readonly labelPool: Mesh<PlaneGeometry, MeshBasicMaterial>[] = [];
-  private labelCount = 0;
+  private readonly labels: ScreenLabels;
   /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
   alphaScale = 1;
-  /** 카메라에서 거리 1 인 곳에서 화면 1 CSS px 이 차지하는 월드 길이. 글자를 화면 크기로 맞출 때 쓴다 */
-  private worldPerPx = 0.001;
-  private readonly labelUp = new Vector3();
 
-  constructor(
-    private readonly labels: LabelCache,
-    maxSegments: number,
-    maxPoints: number,
-  ) {
+  constructor(labelCache: LabelCache, maxSegments: number, maxPoints: number) {
+    this.labels = new ScreenLabels(labelCache);
     const g = tuning.cosmos.graph;
     this.branches = new LineBatch(maxSegments, g.branchWidth);
     this.spokes = new LineBatch(maxSegments, g.spokeWidth);
     this.dots = new PointBatch(maxPoints, false);
     this.glows = new PointBatch(maxPoints, true);
-    this.group.add(this.glows.points, this.branches.line, this.spokes.line, this.dots.points);
+    this.group.add(this.glows.points, this.branches.line, this.spokes.line, this.dots.points, this.labels.group);
   }
 
   /** 화면 크기(CSS px)와 시야각이 바뀌면 다시 맞춘다 */
@@ -59,7 +48,7 @@ export class GraphView {
     const scale = (height * pixelRatio) / (2 * Math.tan((fovDeg * Math.PI) / 360));
     this.dots.setScale(scale);
     this.glows.setScale(scale);
-    this.worldPerPx = (2 * Math.tan((fovDeg * Math.PI) / 360)) / Math.max(1, height);
+    this.labels.setViewport(height, fovDeg);
   }
 
   begin(): void {
@@ -67,7 +56,7 @@ export class GraphView {
     this.spokes.begin();
     this.dots.begin();
     this.glows.begin();
-    this.labelCount = 0;
+    this.labels.begin();
   }
 
   branch(a: Vector3, b: Vector3, color: Color, alpha: number): void {
@@ -86,32 +75,9 @@ export class GraphView {
     this.glows.add(p, color, size, alpha * this.alphaScale);
   }
 
-  /**
-   * 카메라를 향한 글자. 거리와 상관없이 화면에서 heightPx(CSS px) 높이로 보이고, 화면 위쪽으로 offsetPx 만큼 옮겨 놓는다(음수면 아래)
-   */
-  label(p: Vector3, text: string, heightPx: number, rawAlpha: number, cameraPosition: Vector3, offsetPx = 0): void {
-    const alpha = rawAlpha * this.alphaScale;
-    if (alpha < 0.01) return;
-    const k = p.distanceTo(cameraPosition) * this.worldPerPx;
-    let mesh = this.labelPool[this.labelCount];
-    if (!mesh) {
-      mesh = new Mesh(this.labelGeometry, new MeshBasicMaterial({ transparent: true, depthWrite: false, fog: true }));
-      this.labelPool.push(mesh);
-      this.group.add(mesh);
-    }
-    this.labelCount++;
-    const l = this.labels.get(text, 'major');
-    if (mesh.material.map !== l.texture) {
-      mesh.material.map = l.texture;
-      mesh.material.needsUpdate = true;
-    }
-    const height = heightPx * k;
-    mesh.scale.set(height * l.aspect, height, 1);
-    facingQuaternion(p, cameraPosition, mesh.quaternion);
-    this.labelUp.set(0, 1, 0).applyQuaternion(mesh.quaternion);
-    mesh.position.copy(p).addScaledVector(this.labelUp, offsetPx * k);
-    mesh.material.opacity = alpha;
-    mesh.visible = true;
+  /** 카메라를 향한 글자. 거리와 상관없이 화면에서 heightPx(CSS px) 높이로 보이고, 화면 위쪽으로 offsetPx 만큼 옮겨 놓는다(음수면 아래) */
+  label(p: Vector3, text: string, heightPx: number, alpha: number, cameraPosition: Vector3, offsetPx = 0): void {
+    this.labels.add(p, text, heightPx, alpha * this.alphaScale, cameraPosition, 0, offsetPx);
   }
 
   end(): void {
@@ -119,7 +85,7 @@ export class GraphView {
     this.spokes.end();
     this.dots.end();
     this.glows.end();
-    for (let i = this.labelCount; i < this.labelPool.length; i++) this.labelPool[i].visible = false;
+    this.labels.end();
   }
 
   dispose(): void {
@@ -127,8 +93,7 @@ export class GraphView {
     this.spokes.dispose();
     this.dots.dispose();
     this.glows.dispose();
-    this.labelGeometry.dispose();
-    for (const m of this.labelPool) m.material.dispose();
+    this.labels.dispose();
   }
 }
 

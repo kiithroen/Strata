@@ -7,7 +7,10 @@ import { createFakeNotes } from '../dev/fakeNotes';
 import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
 import { listenGestures } from '../input/gesture';
 import { CameraRig } from '../widgets/camera/cameraRig';
+import { drawCloud } from '../widgets/cloud/CloudView';
+import { cloudVisibility, layoutCloud, screenFraction, topTags } from '../widgets/cloud/wordCloud';
 import { LabelCache } from '../widgets/common/labelCache';
+import { ScreenLabels } from '../widgets/common/screenLabels';
 import {
   RegroupBlend,
   buildHubs,
@@ -146,9 +149,13 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
   const graph = new GraphView(labels, notes.length * 3, notes.length * 3);
   stage.scene.add(graph.group);
+  /** 태그 워드 클라우드 글자. 지층 보기에서도 은하처럼 옅어지지 않게 그래프와 따로 둔다 */
+  const cloudLabels = new ScreenLabels(labels);
+  stage.scene.add(cloudLabels.group);
   const syncViewport = () => {
     const el = stage.renderer.domElement;
     graph.setViewport(el.clientWidth, el.clientHeight, stage.renderer.getPixelRatio(), stage.camera.fov);
+    cloudLabels.setViewport(el.clientHeight, stage.camera.fov);
   };
   syncViewport();
   const stopResize = stage.onResize(syncViewport);
@@ -185,6 +192,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
       glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
       label: planetLabel(unit, floorTo(unit, cluster.anchorTime), n),
+      /** 멀리서 보이는 태그 워드 클라우드 */
+      words: layoutCloud(topTags(cluster.members.map((m) => notes[m].tags), tuning.cloud.maxWords)),
       affinities,
       /** 관련도 높은 순서의 묶음 안 번호 */
       order: Array.from({ length: n }, (_, i) => i).sort((a, b) => affinities[b] - affinities[a]),
@@ -263,6 +272,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         key: planet.cluster.key,
         label: planet.label,
         anchorTime: planet.cluster.anchorTime,
+        words: planet.words,
         tiles: planet.cluster.members.map((m, k) => ({
           index: m,
           id: notes[m].id,
@@ -452,6 +462,11 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       cameraRig.step(dt);
       cameraRig.applyTo(stage.camera);
       stage.camera.getWorldPosition(cameraPosition);
+      // 카드가 멀어 작아지면 묶음 위에 태그 낱말이 떠오르고, 더 작아지면 카드가 사라진다
+      const p11 = 1 / Math.tan((stage.camera.fov * Math.PI) / 360);
+      const satelliteHeight = tuning.card.width * c.satelliteScale;
+      cloudLabels.begin();
+      strata.measure(cameraPosition, p11, cloudLabels);
       // 시점이 옮겨 간 시간 거리만큼 먼지가 나선팔을 따라 흐른다(과거로 가면 음수)
       const focusNow = controller.current.focusTime;
       const scrollS = ((focusNow - lastFocusTime) / DAY_MS) * depthPerDay(spiralState);
@@ -485,6 +500,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         graph.dot(st.position, hubColor, st.size, alpha);
         graph.glow(st.position, st.color, planet.glowSize, g.glowAlpha * alpha);
         graph.label(st.position, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
+        const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
+        drawCloud(cloudLabels, st.position, planet.words, far.words * alpha * (1 - mix), cameraPosition);
 
         facingQuaternion(st.position, cameraPosition, burstQuat);
         const r = planet.radius;
@@ -501,7 +518,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           flightQuaternion(flights[m], tau, offset, home.quaternion);
           home.scale = c.satelliteScale;
           const card = cards[m];
-          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * st.fade * paperFade[m];
+          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * st.fade * paperFade[m] * (1 - far.cards);
           const fade = strata.blendCard(m, home, baseFade);
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
 
@@ -595,6 +612,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       controller.step(dt);
 
       graph.end();
+      cloudLabels.end();
       readout.update();
       scrubber.update();
     },
@@ -609,6 +627,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       stage.camera.quaternion.identity();
       stage.camera.updateMatrixWorld();
       stage.scene.remove(graph.group);
+      stage.scene.remove(cloudLabels.group);
+      cloudLabels.dispose();
       graph.dispose();
       stage.scene.remove(universe.group);
       universe.dispose();

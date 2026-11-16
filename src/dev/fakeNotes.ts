@@ -5,7 +5,10 @@ import type { NoteKind } from '../widgets/noteCard/cardLayout';
 import type { NoteRef } from '../widgets/timeAxis/axisModel';
 
 const HOUR_MS = 3_600_000;
-const TAG_POOL = ['여행', '일상', '메모', '작업', '음식', '산책', '영수증', '아이디어'] as const;
+const TAG_POOL = [
+  '여행', '일상', '메모', '작업', '음식', '산책', '영수증', '아이디어',
+  '카페', '가족', '운동', '독서', '회의', '사진', '바다', '쇼핑',
+] as const;
 
 const MEMO_SAMPLES: readonly { title: string; body?: string }[] = [
   { title: '장보기 목록', body: '우유, 계란 한 판, 방울토마토, 드립백 원두 사기' },

@@ -2,6 +2,9 @@ import { Raycaster, Vector2, Vector3 } from 'three';
 import { tuning } from '../config';
 import { damp } from '../core/motion';
 import type { CameraRig } from '../widgets/camera/cameraRig';
+import { drawCloud } from '../widgets/cloud/CloudView';
+import { cloudVisibility, screenFraction } from '../widgets/cloud/wordCloud';
+import type { ScreenLabels } from '../widgets/common/screenLabels';
 import type { LabelCache } from '../widgets/common/labelCache';
 import { createPose, type Pose } from '../widgets/noteCard/cardMotion';
 import {
@@ -39,6 +42,9 @@ export class StrataMode {
   private frame: StrataFrame = { origin: new Vector3(), yaw: 0 };
   private focus = 0;
   private readonly placed = new Map<number, { layer: StrataLayer; tile: StrataTile }>();
+  /** 층마다 카드가 멀어 사라진 정도(0~1). measure 가 매 프레임 구한다 */
+  private readonly hidden = new Map<StrataLayer, number>();
+  private readonly center = new Vector3();
   private saved: Saved | null = null;
   private pushed = false;
   /** 화면 단추·Esc 로 나가며 되돌린 방문 기록의 popstate 는 이미 처리했으니 한 번 건너뛴다 */
@@ -173,7 +179,23 @@ export class StrataMode {
     home.position.lerp(this.pose.position, w);
     home.quaternion.slerp(this.pose.quaternion, w);
     home.scale += (this.pose.scale - home.scale) * w;
-    return fade + (1 - fade) * w;
+    const shown = 1 - (this.hidden.get(p.layer) ?? 0);
+    return fade * (1 - w) + shown * w;
+  }
+
+  /**
+   * 층마다 카드가 화면에서 차지하는 크기를 재서, 멀면 층 위에 태그 워드 클라우드를 그리고 더 멀면 카드를 감춘다(blendCard).
+   * p11 은 투영 행렬의 [1][1] 이다
+   */
+  measure(cameraPosition: Vector3, p11: number, labels: ScreenLabels): void {
+    if (this.mix <= 0) return;
+    const height = tuning.card.width * tuning.strata.cardScale[1];
+    for (const layer of this.layers) {
+      strataPoint(this.frame, 0, layer.y, 0, this.center);
+      const far = cloudVisibility(screenFraction(height, this.center.distanceTo(cameraPosition), p11));
+      this.hidden.set(layer, far.cards);
+      drawCloud(labels, this.center, layer.words, far.words * this.mix, cameraPosition);
+    }
   }
 
   update(dt: number): void {
@@ -184,6 +206,7 @@ export class StrataMode {
       if (this.layers.length > 0) {
         this.layers = [];
         this.placed.clear();
+        this.hidden.clear();
         this.view.clear();
       }
     }
