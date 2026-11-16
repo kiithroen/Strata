@@ -3,7 +3,7 @@ import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
 import { faceLayout, type CardLayout } from './cardLayout';
 import { createCardMaterial, type CardLook } from './cardMaterial';
-import { createCardTexture, paperColors, type CardFace } from './cardTexture';
+import { createCardTexture, createSimpleTexture, type CardFace } from './cardTexture';
 import { CardMotion, type FloatParams, type Pose } from './cardMotion';
 
 export interface NoteCardOptions {
@@ -18,8 +18,8 @@ export interface NoteCardOptions {
 const HIDDEN = 0.002;
 
 /**
- * 사진 노트 카드 위젯. 배치가 넘기는 자리에 떠 있다가 펼치면 카메라 앞으로 나와 화면에 맞게 커진다.
- * 떠 있을 때는 작은 텍스처를, 펼치는 동안에는 선명한 텍스처를 따로 만들어 쓴다.
+ * 노트 카드 위젯: 양면 홀로그램 창. 배치가 넘기는 자리에 떠 있다가 펼치면 카메라 앞으로 나와 화면에 맞게 커진다.
+ * 멀리서는 단순한 텍스처, 가까이서는 작은 텍스처, 펼치는 동안에는 선명한 텍스처를 쓴다. 둘 사이 전환은 셰이더가 한다.
  */
 export class NoteCard {
   readonly id: string;
@@ -32,6 +32,7 @@ export class NoteCard {
   readonly bendPhase: number;
 
   private readonly baseTexture: CanvasTexture;
+  private readonly simpleTexture: CanvasTexture;
   private detailTexture: CanvasTexture | null = null;
   private readonly anisotropy: number;
   private readonly labels: LabelCache;
@@ -46,15 +47,17 @@ export class NoteCard {
     const kind = opts.face.kind ?? 'photo';
     this.layout = faceLayout(kind, opts.face.photo);
     this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy);
+    const simpleLayout = faceLayout(kind, opts.face.photo, tuning.card.simpleTextureWidth);
+    this.simpleTexture = createSimpleTexture(opts.face, simpleLayout, opts.anisotropy);
     let phase = 0;
     for (let i = 0; i < this.id.length; i++) phase = (phase * 31 + this.id.charCodeAt(i)) % 6283;
     const material = createCardMaterial({
       map: this.baseTexture,
+      mapSimple: this.simpleTexture,
       look: opts.look,
       width: this.layout.worldWidth,
       height: this.layout.worldHeight,
       bendPhase: phase / 1000,
-      paperBack: paperColors(opts.face).back,
     });
     this.bendPhase = phase / 1000;
     const seg = tuning.card.segments;
@@ -129,6 +132,7 @@ export class NoteCard {
   dispose(): void {
     this.mesh.geometry.dispose();
     this.baseTexture.dispose();
+    this.simpleTexture.dispose();
     this.detailTexture?.dispose();
     this.mesh.material.dispose();
     if (this.badge) {

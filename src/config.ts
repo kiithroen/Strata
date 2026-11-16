@@ -41,41 +41,35 @@ export const tuning = {
     textureWidth: 320,
     /** 펼친 카드에 따로 만들어 쓰는 선명한 텍스처 폭(px) */
     detailTextureWidth: 1024,
-    /** 폴라로이드 사진 카드: 위·좌우 여백(폭 대비)과 두툼한 아래쪽 인화지 여백(사진 폭 대비) */
-    paddingRatio: 0.065,
-    labelRatio: 0.24,
-    /** 종이 색(폴라로이드 앞·뒷면), 인쇄 글자 색, 사진 테두리·안쪽 그림자 */
-    paper: '#f5f3ec',
-    paperBack: '#e6e2d6',
-    ink: '#2c2b29',
-    inkDim: '#86827a',
-    photoLine: 'rgba(0, 0, 0, 0.18)',
-    photoInsetShadow: 'rgba(0, 0, 0, 0.14)',
-    /** 짧은 노트(포스트잇): 정사각 비율, 기준 폭 대비 배율, 안쪽 여백, 윗변 접착 띠 비율, 색 조합 */
-    memo: {
-      widthScale: 0.84,
-      paddingRatio: 0.09,
-      stripRatio: 0.13,
-      /** 아래 날짜 줄 높이(텍스처 높이 대비) */
-      labelRatio: 0.14,
-      palette: [
-        { front: '#f4df72', strip: '#e5cd56', back: '#e2cb5f' },
-        { front: '#f4df72', strip: '#e5cd56', back: '#e2cb5f' },
-        { front: '#bfe5f2', strip: '#a6d2e2', back: '#add5e3' },
-        { front: '#f6c7ce', strip: '#e5afb8', back: '#e5b5bd' },
-        { front: '#c9ecc2', strip: '#b2daa9', back: '#b7dcb0' },
-      ],
+    /** 멀리서 쓰는 단순한 텍스처 폭(px). 글자 없이 틀·막대·모자이크만 그린다 */
+    simpleTextureWidth: 96,
+    /**
+     * 창 모양 카드: 제목 줄과 아래 상태 줄 높이, 안쪽 여백, 테두리 선 굵기, 모서리 꺾쇠 길이(모두 텍스처 폭 대비).
+     * 단순한 텍스처는 선이 뭉개지지 않게 simpleLineRatio 를 쓴다
+     */
+    window: { titleRatio: 0.085, footerRatio: 0.075, paddingRatio: 0.04, lineRatio: 0.005, simpleLineRatio: 0.022, bracketRatio: 0.07 },
+    /** 홀로그램 색: 선·글자, 흐린 선·글자, 창 바탕(반투명), 제목 줄 바탕, 사진 칸 바탕 */
+    holo: {
+      line: '#d9e7ee',
+      dim: 'rgba(217, 231, 238, 0.45)',
+      faint: 'rgba(217, 231, 238, 0.18)',
+      fill: 'rgba(8, 13, 18, 0.62)',
+      titleFill: 'rgba(217, 231, 238, 0.13)',
     },
-    /** 긴 문서(A4): 1:√2 세로 비율, 기준 폭 대비 배율, 안쪽 여백, 헤더 높이 비율, 용지·줄 색 */
-    doc: {
-      widthScale: 1.05,
-      paddingRatio: 0.085,
-      headerRatio: 0.15,
-      paper: '#f6f7f4',
-      paperBack: '#eaebe6',
-      ruleLine: 'rgba(60, 85, 130, 0.12)',
-      marginLine: 'rgba(209, 34, 43, 0.22)',
-    },
+    /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
+    simple: { photoBlocks: 9, barRatio: 0.045, barGapRatio: 0.085 },
+    /**
+     * 멀고 가까움에 따른 모습. 값은 카드 높이가 화면 높이에서 차지하는 비율이다.
+     * detail 범위에서 단순한 모양이 제대로 된 모양으로, color 범위에서 흑백이 제 색으로 바뀐다.
+     * farAlpha 는 단순한 모양일 때의 불투명도 배율, focusAlpha 는 펼친 카드 바탕의 최소 불투명도(뒤가 비쳐 글이 흐려지지 않게),
+     * glint 는 비스듬히 볼 때 가장자리가 밝아지는 정도다
+     */
+    lod: { detail: [0.045, 0.11], color: [0.12, 0.26], farAlpha: 0.7, focusAlpha: 0.94, glint: 0.5 },
+    /** 홀로그램 깜빡임: 초당 판정 횟수, 한 번 판정에서 깜빡일 확률, 깜빡일 때 밝기. 훑는 띠: 속도(1/초), 밝기 */
+    flicker: { rate: 14, chance: 0.025, depth: 0.55, sweepSpeed: 0.12, sweepStrength: 0.12 },
+    /** 짧은 노트(메모)는 정사각, 긴 문서는 1:√2 세로 비율이다. 기준 폭 대비 배율 */
+    memo: { widthScale: 0.84 },
+    doc: { widthScale: 1.05 },
     /** 휨 격자 칸 수(가로·세로) */
     segments: 10,
     /**
@@ -83,10 +77,8 @@ export const tuning = {
      * 높이는 카드 폭 대비다
      */
     bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [1.9, 1.5], curl: 0.32, curlSpeed: 0.6 },
-    /** 압정: 윗변에서 내려온 거리(높이 대비), 가운데에서 좌우로 벗어나는 최대 정도(폭 대비), 앞면 위로 뜬 높이(폭 대비) */
-    pin: { inset: 0.06, jitter: 0.16, lift: 0.025 },
-    /** 압정 자리 윗변에 붙인 테이프: 색, 폭·높이(카드 폭 대비), 최대 기울기(라디안) */
-    tape: { color: 'rgba(232, 168, 82, 0.82)', edge: 'rgba(170, 110, 40, 0.35)', width: 0.34, height: 0.085, tilt: 0.14 },
+    /** 실이 묶이는 자리(제목 줄 왼쪽 고리)가 앞면 위로 뜬 높이(폭 대비) */
+    pin: { lift: 0.012 },
   },
 
   float: {

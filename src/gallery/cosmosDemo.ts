@@ -157,7 +157,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const dotBlends = notes.map(() => new RegroupBlend());
   const paperFade = new Float64Array(notes.length);
   const flights = notes.map((n) => flightParams(n.id));
-  const pins = notes.map((n) => paperPin(n.id));
+  const pins = cards.map((card) => paperPin(card.layout));
   const homes = notes.map(createPose);
 
   // 시계열 공간이 고정돼 있어 묶음·허브·관련도·글자는 한 번만 구하고, 노드 위치 벡터도 재사용한다
@@ -420,7 +420,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * st.fade * paperFade[m];
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, baseFade));
 
-          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 수사 보드처럼 종이에 꽂힌 압정에 실로 묶이고,
+          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
           burstOffset(rank, spin, offset, affinity).applyQuaternion(burstQuat);
           target.copy(st.position).add(offset);

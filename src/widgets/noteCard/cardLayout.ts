@@ -2,81 +2,82 @@ import { tuning } from '../../config';
 
 export type NoteKind = 'photo' | 'memo' | 'doc';
 
-/** 카드 텍스처(px)와 월드 크기. 노트 종류에 따라 폴라로이드·포스트잇·A4 비율로 정해진다. */
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 창 모양 카드의 텍스처(px)와 월드 크기. 위에서부터 제목 줄, 내용 칸, 아래 상태 줄이다.
+ * 사진은 사진 비율을 지키고, 짧은 노트(메모)는 정사각, 긴 문서는 1:√2 세로 비율이다.
+ */
 export interface CardLayout {
   kind: NoteKind;
   textureWidth: number;
   textureHeight: number;
   padding: number;
-  photo: { x: number; y: number; width: number; height: number };
-  label: { x: number; y: number; width: number; height: number };
+  /** 테두리 선 굵기(px) */
+  line: number;
+  titleBar: Rect;
+  /** 제목 줄 왼쪽 고리. 노드에서 나온 실이 여기에 묶인다 */
+  ring: { x: number; y: number; size: number };
+  content: Rect;
+  footer: Rect;
   worldWidth: number;
   worldHeight: number;
 }
 
 /** textureWidth 를 바꿔도 월드 크기와 비율은 같다. 텍스처 해상도만 달라진다. */
-export function cardLayout(imageWidth: number, imageHeight: number, textureWidth: number = tuning.card.textureWidth): CardLayout {
-  const c = tuning.card;
-  const padding = Math.round(textureWidth * c.paddingRatio);
-  const photoWidth = textureWidth - padding * 2;
-  const photoHeight = Math.round((photoWidth * imageHeight) / imageWidth);
-  const labelHeight = Math.round(photoWidth * c.labelRatio);
-  const textureHeight = padding + photoHeight + labelHeight;
-  return {
-    kind: 'photo',
-    textureWidth,
-    textureHeight,
-    padding,
-    photo: { x: padding, y: padding, width: photoWidth, height: photoHeight },
-    label: { x: padding, y: padding + photoHeight, width: photoWidth, height: labelHeight },
-    worldWidth: c.width,
-    worldHeight: (c.width * textureHeight) / textureWidth,
-  };
-}
-
-/** 노트 종류(폴라로이드 사진 · 정사각 포스트잇 · A4 문서)에 맞춘 레이아웃을 계산한다. */
 export function faceLayout(
   kind: NoteKind,
   photo?: { width: number; height: number },
   textureWidth: number = tuning.card.textureWidth,
 ): CardLayout {
-  if (kind === 'photo') {
-    const w = photo?.width ?? 4;
-    const h = photo?.height ?? 3;
-    return cardLayout(w, h, textureWidth);
-  }
   const c = tuning.card;
-  if (kind === 'memo') {
-    const padding = Math.round(textureWidth * c.memo.paddingRatio);
-    const textureHeight = textureWidth;
-    const worldWidth = c.width * c.memo.widthScale;
-    const bodyWidth = textureWidth - padding * 2;
-    const stripHeight = Math.round(textureHeight * c.memo.stripRatio);
-    const labelHeight = Math.round(textureHeight * c.memo.labelRatio);
-    return {
-      kind,
-      textureWidth,
-      textureHeight,
-      padding,
-      photo: { x: padding, y: stripHeight + padding * 0.4, width: bodyWidth, height: textureHeight - stripHeight - labelHeight - padding },
-      label: { x: padding, y: textureHeight - labelHeight - padding * 0.3, width: bodyWidth, height: labelHeight },
-      worldWidth,
-      worldHeight: worldWidth,
-    };
+  const win = c.window;
+  const w = textureWidth;
+  const padding = Math.round(w * win.paddingRatio);
+  const line = Math.max(1, w * win.lineRatio);
+  const titleH = Math.round(w * win.titleRatio);
+  const footerH = Math.round(w * win.footerRatio);
+  const innerW = w - padding * 2;
+
+  let textureHeight: number;
+  let worldWidth: number;
+  if (kind === 'photo') {
+    const iw = photo?.width ?? 4;
+    const ih = photo?.height ?? 3;
+    const photoH = Math.round((innerW * ih) / iw);
+    textureHeight = titleH + padding + photoH + footerH;
+    worldWidth = c.width;
+  } else if (kind === 'memo') {
+    textureHeight = w;
+    worldWidth = c.width * c.memo.widthScale;
+  } else {
+    textureHeight = Math.round(w * Math.SQRT2);
+    worldWidth = c.width * c.doc.widthScale;
   }
-  const padding = Math.round(textureWidth * c.doc.paddingRatio);
-  const textureHeight = Math.round(textureWidth * Math.SQRT2);
-  const worldWidth = c.width * c.doc.widthScale;
-  const bodyWidth = textureWidth - padding * 2;
-  const headerHeight = Math.round(textureHeight * c.doc.headerRatio);
+
+  const contentY = titleH + padding;
+  const ringSize = Math.round(titleH * 0.42);
   return {
     kind,
-    textureWidth,
+    textureWidth: w,
     textureHeight,
     padding,
-    photo: { x: padding, y: padding + headerHeight, width: bodyWidth, height: textureHeight - padding * 2 - headerHeight },
-    label: { x: padding, y: padding, width: bodyWidth, height: headerHeight },
+    line,
+    titleBar: { x: 0, y: 0, width: w, height: titleH },
+    ring: { x: padding + ringSize / 2, y: titleH / 2, size: ringSize },
+    content: { x: padding, y: contentY, width: innerW, height: textureHeight - contentY - footerH },
+    footer: { x: padding, y: textureHeight - footerH, width: innerW, height: footerH },
     worldWidth,
-    worldHeight: (worldWidth * textureHeight) / textureWidth,
+    worldHeight: (worldWidth * textureHeight) / w,
   };
+}
+
+/** 사진 카드 레이아웃 */
+export function cardLayout(imageWidth: number, imageHeight: number, textureWidth: number = tuning.card.textureWidth): CardLayout {
+  return faceLayout('photo', { width: imageWidth, height: imageHeight }, textureWidth);
 }

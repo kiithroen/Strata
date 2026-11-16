@@ -2,29 +2,26 @@ import { Euler, Quaternion, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { bendHeight } from '../src/widgets/noteCard/paperBend';
+import { faceLayout } from '../src/widgets/noteCard/cardLayout';
 import { paperPin, pinPoint } from '../src/widgets/noteCard/paperPin';
 
-const ids = Array.from({ length: 80 }, (_, i) => String(i + 1).padStart(4, '0'));
+const layouts = (['photo', 'memo', 'doc'] as const).map((kind) => faceLayout(kind, { width: 640, height: 480 }));
 
 describe('paperPin', () => {
-  it('압정은 윗변에서 pin.inset 아래, 가운데에서 pin.jitter 안쪽에 꽂히고 노트마다 자리가 다르다', () => {
-    const p = tuning.card.pin;
-    const us = new Set<number>();
-    for (const id of ids) {
-      const pin = paperPin(id);
-      expect(paperPin(id)).toEqual(pin);
-      expect(pin.v).toBeCloseTo(0.5 - p.inset, 12);
-      expect(Math.abs(pin.u)).toBeLessThanOrEqual(p.jitter);
-      expect(Math.abs(pin.tilt)).toBeLessThanOrEqual(tuning.card.tape.tilt);
-      us.add(Math.round(pin.u * 1000));
+  it('실은 제목 줄 왼쪽 고리 자리에 묶인다', () => {
+    for (const l of layouts) {
+      const pin = paperPin(l);
+      expect((pin.u + 0.5) * l.textureWidth).toBeCloseTo(l.ring.x, 9);
+      expect((0.5 - pin.v) * l.textureHeight).toBeCloseTo(l.ring.y, 9);
+      expect(pin.u).toBeLessThan(0);
+      expect(pin.v).toBeGreaterThan(0);
     }
-    expect(us.size).toBeGreaterThan(ids.length / 2);
   });
 });
 
 describe('pinPoint', () => {
   it('회전이 없으면 종이 위 (u × 폭, v × 높이, lift × 폭) × 배율 자리다', () => {
-    const pin = paperPin('0007');
+    const pin = paperPin(layouts[0]);
     const pos = new Vector3(1, -2, -6);
     const out = pinPoint(pos, new Quaternion(), 0.5, 1.2, 0.9, pin, 0.03, new Vector3());
     expect(out.x).toBeCloseTo(1 + pin.u * 1.2 * 0.5, 12);
@@ -39,8 +36,8 @@ describe('pinPoint', () => {
     const s = 0.3;
     const lift = tuning.card.pin.lift;
     const out = new Vector3();
-    ids.slice(0, 20).forEach((id, i) => {
-      const pin = paperPin(id);
+    Array.from({ length: 20 }, (_, i) => i).forEach((i) => {
+      const pin = paperPin(layouts[i % layouts.length]);
       const q = new Quaternion().setFromEuler(new Euler(i * 0.7, i * 1.3, i * 0.4));
       pinPoint(pos, q, s, w, h, pin, lift, out);
       const local = out.clone().sub(pos);

@@ -15,23 +15,27 @@
 
 파일: `src/widgets/noteCard/`
 
-노트 하나를 나타내는 종이다. 노트 타입(`photo`, `memo`, `doc`)에 따라 모양과 질감을 달리해 캔버스에 그려 텍스처로 쓴다.
-- **사진 (`photo`)**: 폴라로이드 인화지(`card.paper`, `card.paperBack`)에 사진 테두리·안쪽 음영(`card.photoLine`, `card.photoInsetShadow`)과 두툼한 아래쪽 여백(`card.labelRatio`)을 두고 날짜·번호·캡션을 인쇄한다.
-- **짧은 노트 (`memo`)**: 정사각 포스트잇(`card.memo`: 파스텔 색지 조합, 윗변 접착 띠) 위에 제목·짧은 본문·날짜를 인쇄한다.
-- **긴 문서 (`doc`)**: `1 : √2` A4 용지(`card.doc`: 여백선·가로줄) 위에 제목·날짜 헤더와 여러 줄 문단을 인쇄한다.
+노트 하나를 나타내는 양면 홀로그램 창이다. 반투명 바탕(`card.holo.fill`)에 위에서부터 제목 줄, 내용 칸, 상태 줄을 둔 창 모양을 캔버스에 그려 텍스처로 쓴다(`cardTexture.ts`). 선과 글자는 거의 무채색(`card.holo`)이고 사진만 제 색이다.
+- 공통 틀: 흐린 테두리와 밝은 모서리 꺾쇠(`card.window.bracketRatio`), 제목 줄 띠(`card.holo.titleFill`). 제목 줄 왼쪽에 실을 묶는 고리, 가운데에 이름, 오른쪽 끝에 접기·닫기 단추를 그린다. 상태 줄에는 찍은 시각과 노트 번호를 적는다.
+- **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채운다. 제목 줄 이름은 캡션, 없으면 `IMG_번호`다.
+- **짧은 노트 (`memo`)**: 정사각 창에 굵은 제목과 큼직한 본문. 이름은 `MEMO_번호`다.
+- **긴 문서 (`doc`)**: `1 : √2` 창에 제목·구분선·촘촘한 문단. 오른쪽 스크롤 막대의 손잡이 길이가 보이는 줄 수 / 전체 줄 수다. 이름은 `TXT_번호`다.
 
-**압정과 테이프** (`paperPin.ts`)
-- 압정은 윗변에서 `card.pin.inset`(높이 대비) 아래, 가운데에서 좌우로 `card.pin.jitter`(폭 대비) 안쪽에 노트 번호로 정한 자리에 꽂힌다. `pinPoint`가 종이의 위치·회전·배율로 월드 자리를 구한다.
-- 압정은 앞면 위로 뜬다. 그 자리의 종이 휨 높이(`paperBend.ts`의 `bendHeight`, 셰이더와 같은 식)에 `card.pin.lift`(폭 대비)를 더한 만큼 띄워, 앞에서는 종이 위에 보이고 뒤에서는 종이에 가려진다.
-- 같은 가로 자리 윗변에 마스킹 테이프(`card.tape`: 색, 폭·높이, 최대 기울기)를 텍스처에 그린다.
+**멀고 가까움** (`cardMaterial.ts`, `createSimpleTexture`)
+- 카드마다 텍스처가 둘이다. 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`)다. 단순한 텍스처는 글자 없이 같은 틀에 사진은 굵은 모자이크(`card.simple.photoBlocks`), 글은 줄 막대(`card.simple`)로만 그린다.
+- 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(`card.holo.line`으로 물든 밝기)을 제 색으로 섞는다. 한 장 안에서는 같은 값이다. 펼치는 카드는 둘 다 1이다.
+- 단순한 모양일수록 옅어진다(`card.lod.farAlpha`). 펼친 카드는 바탕 불투명도를 `card.lod.focusAlpha` 이상으로 올려 뒤 카드가 글을 가리지 않게 한다.
+
+**실 묶는 고리** (`paperPin.ts`)
+- 노드에서 나온 실은 제목 줄 왼쪽 고리에 묶인다. 자리는 레이아웃 비율로 정해져 텍스처 해상도와 상관없다. `pinPoint`가 종이의 위치·회전·배율로 월드 자리를 구한다.
+- 고리 자리는 앞면 위로 뜬다. 그 자리의 휨 높이(`paperBend.ts`의 `bendHeight`, 셰이더와 같은 식)에 `card.pin.lift`(폭 대비)를 더한다.
 
 **사진 원본** (`cardTexture.ts`의 `PhotoSource`)
 - 사진은 폭·높이와 `render(targetWidth)`를 가진다. 텍스처를 만들 때 필요한 해상도로 그려 받고, 결과는 들고 있지 않는다.
 
 **크기와 텍스처** (`cardLayout.ts`, `NoteCard.ts`)
-- 폴라로이드(`photo`)는 위·좌우 여백(`card.paddingRatio`)을 두고 사진 비율을 그대로 지키며, 아래쪽 여백(`card.labelRatio`)을 두툼하게 붙여 인화지 모양을 낸다.
-- 포스트잇(`memo`)은 정사각 비율에 폭 `card.width × card.memo.widthScale`, A4 문서(`doc`)는 `1 : √2` 비율에 폭 `card.width × card.doc.widthScale`이다. 텍스처 폭을 바꿔도 월드 크기는 같다.
-- 떠 있는 카드는 `card.textureWidth` 텍스처를 쓴다. 펼치기 시작하면 `card.detailTextureWidth` 텍스처를 따로 만들어 바꿔 끼우고, 다 닫히면 버린다.
+- 제목 줄·상태 줄 높이와 안쪽 여백은 텍스처 폭 대비(`card.window`)다. 사진은 사진 비율을 지키고 폭이 `card.width`, 메모는 정사각에 폭 `card.width × card.memo.widthScale`, 문서는 `1 : √2`에 폭 `card.width × card.doc.widthScale`이다. 텍스처 폭을 바꿔도 월드 크기와 칸 비율은 같다.
+- 떠 있는 카드는 단순한 텍스처와 `card.textureWidth` 텍스처를 쓴다. 펼치기 시작하면 `card.detailTextureWidth` 텍스처를 따로 만들어 바꿔 끼우고, 다 닫히면 버린다.
 
 **움직임** (`cardMotion.ts`의 `CardMotion`)
 - 배치(필드·시간축)가 매 프레임 기본 자세(위치·회전·배율)를 넘긴다. 떠 있는 카드는 기본 자세에 흔들림을 더한 자세를 지연 없이 따라간다.
@@ -43,10 +47,11 @@
 **그리기** (`cardMaterial.ts`, `NoteCard.ts`)
 - 모든 카드가 `CardLook` 유니폼 객체를 함께 쓴다. 시간과 안개 범위는 데모가 한 번만 갱신한다.
 - 배치가 넘기는 불투명도(`fade`)를 받는다. 펼치는 중인 카드는 불투명도와 상관없이 보이고, 거의 투명한 카드는 그리지 않는다.
-- 펼친 카드는 테두리에 강조색 빛이 돌고 주사선과 잡음이 옅어진다. 깊이에 따라 안개 범위에서 배경색으로 녹는다.
-- 양면이다. 뒷면은 인쇄 없는 각 타입·색상의 종이결만 보인다.
+- 펼친 카드는 테두리에 홀로그램 선 색 빛이 돌고 주사선·잡음·깜빡임이 옅어진다. 깊이에 따라 안개 범위에서 배경색으로 녹는다.
+- 양면 홀로그램이다. 따로 그린 뒷면이 없고, 뒤에서 보면 가로를 뒤집어 글자가 바로 읽힌다.
+- 홀로그램 효과: 위에서 아래로 훑는 밝은 띠(`card.flicker.sweepSpeed`, `sweepStrength`), 카드마다 때가 다른 깜빡임(`card.flicker.rate`, `chance`, `depth`), 주사선(`look.scanline*`).
 - 휨(`CardLook.uBend`, 0~1): 메시를 `card.segments` 칸 격자로 나누고, 정점 셰이더가 카드 좌표의 가로·세로 물결과 가로 말림(`card.bend`)을 더한 높이만큼 앞뒤로 민다. 종이마다 노트 번호로 정한 위상만큼 어긋나게 출렁이고, 펼치는 동안에는 평평해진다.
-- 조명(`CardLook.uShade`, 0~1): 휜 면의 법선으로 밝기와 옅은 윤기를 낸다. 펼치는 동안에는 꺼진다. 우주 보기만 휨과 조명을 켠다.
+- 반짝임(`CardLook.uShade`, 0~1): 휜 면을 비스듬히 볼수록 가장자리가 밝아진다(`card.lod.glint`). 펼치는 동안에는 꺼진다. 우주 보기만 휨과 반짝임을 켠다.
 - `setBadge(text)`로 카드 오른쪽 위에 배지를 붙인다(높이 `axis.badgeHeight`). 글자 텍스처는 `widgets/common/labelCache.ts`가 구워 재사용한다.
 
 **갤러리 데모** (`src/gallery/noteCardDemo.ts`)
@@ -110,7 +115,7 @@
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
 - `clusterAffinities`가 묶음 안 각 노트의 관련도(0~1)를 절대 기준으로 구한다. 시간 점수는 묶음 중앙값 시각과의 거리로 `exp(−|dt| / (행성 단위 길이 × cosmos.affinity.timeScale))`이다. 묶음에 태그가 있으면 태그 점수(노트 태그마다 그 태그를 가진 묶음 노트 비율의 평균 ÷ √태그 수)와 `cosmos.affinity.timeWeight` 비율로 섞는다. 몰아 찍은 노트는 모두 노드 가까이에, 흩어진 노트는 멀리 놓인다.
 - k 번째(관련도 높은 순) 노트 점은 노드 둘레의 카메라를 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½) + burst.pullSpread × (1 − 관련도)^burst.pullCurve`이고, 앞뒤로 `burst.depthJitter`만큼 흔들리며 원판 전체가 `burst.spin`으로 돈다. 관련도가 높을수록 노드 가까이에 모이고 낮을수록 긴 살 끝에 놓인다.
-- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 수사 보드처럼 살이 종이에 꽂힌 압정(`noteCard/paperPin.ts`)에 실로 묶여 함께 끌려다니고, 압정 머리(`graph.pinSize`)를 그 노트 색으로 그린다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 압정 사이를 그만큼 옮겨 간다.
+- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 살이 창 제목 줄의 고리(`noteCard/paperPin.ts`)에 실로 묶여 함께 끌려다니고, 묶인 자리에 점(`graph.pinSize`)을 그 노트 색으로 그린다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 고리 사이를 그만큼 옮겨 간다.
 - 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
 
@@ -125,7 +130,7 @@
 - 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 제 면 안에서 살짝 흔들리는 빈도(`swarm.rollFreq`), 팔랑이는 축 방향과 빈도(`swarm.flutterFreq`)가 정해진다.
 - 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × (1 − 관련도)^swarm.pullCurve`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)라 관련도가 높은 종이일수록 짧은 실로 노드 가까이에서 빠르게 돈다.
 - 은하 전체에 돌풍이 분다. 세기 `gust(t)`는 느린 사인 둘의 합(0~1, `swarm.gust.freq`, `swarm.gust.phase`)이고, 종이의 움직임은 `1 + gust.boost × gust`를 미리 적분한 돌풍 시계 `gustTime`으로 잰다. 돌풍이 셀수록 빨리 돌고 더 흔들리며, 난기류 흔들림도 `swarm.wobble × (1 + swarm.gustWobble × gust)`로 커진다. 흔들림의 궤도 안쪽(노드 쪽) 성분은 `−한계 × tanh(깊이 / 한계)`로 눌러 궤도 반지름 × `swarm.wobbleInward`보다 깊이 들어가지 않는다. 종이가 노드 중심을 파고들어 바깥 방향이 사라지는 일을 막는다.
-- 종이 자세: 사진·테이프·압정이 있는 앞면이 노드 바깥쪽(노드에서 종이로 향하는 방향을 궤도면에 투영한 방향)을 향하고 위아래로 바로 선 채, 제 면 안의 작은 기울기(`swarm.rollAmp`)와 수직인 두 축 팔랑임(`swarm.flutterAmp`, `swarm.flutterAmp2`)으로 적당히 흔들린다. 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 카메라를 보지 않으므로 노드 뒤쪽 종이는 뒷면을 보인다. 크기는 `card.width × cosmos.satelliteScale`이다.
+- 종이 자세: 앞면이 노드 바깥쪽(노드에서 종이로 향하는 방향을 궤도면에 투영한 방향)을 향하고 위아래로 바로 선 채, 제 면 안의 작은 기울기(`swarm.rollAmp`)와 수직인 두 축 팔랑임(`swarm.flutterAmp`, `swarm.flutterAmp2`)으로 적당히 흔들린다. 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 카메라를 보지 않으므로 노드 뒤쪽 종이는 뒤에서 본 홀로그램이다. 크기는 `card.width × cosmos.satelliteScale`이다.
 - 위쪽은 월드 +Y를 앞면에 수직으로 투영한 벡터에 `swarm.poleUpBias × (앞면·Y)² ×` 궤도면 법선(+Y 쪽)을 더한 방향이다. 노드 위·아래(극)를 지나는 종이도 자세가 끊기지 않고 이어진다.
 - 다른 노드로 옮겨 갈 때만 `RegroupBlend`로 잇고, 그 밖에는 목표 위치를 지연 없이 따른다.
 
