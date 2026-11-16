@@ -1,4 +1,4 @@
-import type { Fog } from 'three';
+import { Vector3, type Fog } from 'three';
 import { tuning } from '../config';
 import { createRng, range } from '../core/random';
 import { createFakeNotes } from '../dev/fakeNotes';
@@ -107,11 +107,34 @@ export function mountTimeAxisDemo(stage: Stage): TimeAxisDemo {
 
   const focus = new CardFocus(stage, cards);
   const canvas = stage.renderer.domElement;
+  const projected = new Vector3();
+
+  /** 핀치·휠 중심에서 gesture.pinchAnchorRadius 안의 가장 가까운 보이는 카드가 지금 놓인 시각 */
+  const pickAnchorTime = (x: number, y: number): number | null => {
+    const rect = canvas.getBoundingClientRect();
+    let best: number | null = null;
+    let bestDist: number = tuning.gesture.pinchAnchorRadius;
+    cards.forEach((card, i) => {
+      if (!card.visible || card.mesh.material.uniforms.uFade.value < 0.05) return;
+      projected.copy(card.mesh.position).project(stage.camera);
+      if (projected.z < -1 || projected.z > 1) return;
+      const sx = rect.left + ((projected.x + 1) / 2) * rect.width;
+      const sy = rect.top + ((1 - projected.y) / 2) * rect.height;
+      const d = Math.hypot(sx - x, sy - y);
+      if (d <= bestDist) {
+        bestDist = d;
+        best = current[i].time;
+      }
+    });
+    return best;
+  };
+
   const navigation = new AxisNavigation({
     controller,
     minTime: oldest,
     maxTime: newest,
     viewportHeight: () => canvas.clientHeight,
+    pickAnchorTime,
     isBlocked: () => focus.focused !== null,
     onTap: ({ x, y }) => {
       if (focus.focused) {

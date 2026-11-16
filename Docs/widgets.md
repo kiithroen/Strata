@@ -160,5 +160,6 @@
 - `focusPoint`는 `goalTarget`과 최대 거리를 설정해 `gesture.focusRate`로 부드럽게 이동한다.
 
 **시간축 탐색** (`AxisNavigation`, `time-axis` 데모)
-- `time-axis` 데모(`dragTime: true`)에서는 세로 끌기(`gesture.dragDepthPerScreen`)와 관성(`gesture.inertiaDecay`, `gesture.inertiaStopSpeed`)으로 이동하고, 핀치(`gesture.pinchScale`, `gesture.pinchAnchorRadius`)와 마우스 휠(`gesture.wheelScalePer100`, `gesture.wheelSnapDelay`)로 시점을 고정한 채 `nearestLevel` 단계로 스냅한다.
+- `time-axis` 데모(`dragTime: true`)에서는 세로 끌기(`gesture.dragDepthPerScreen`)와 관성(`gesture.inertiaDecay`, `gesture.inertiaStopSpeed`)으로 이동하고, 핀치(`gesture.pinchScale`)와 마우스 휠(`gesture.wheelScalePer100`, `gesture.wheelSnapDelay`)로 축척을 바꾸고 놓으면 `nearestLevel` 단계로 스냅한다.
+- 핀치·휠 중심에서 `gesture.pinchAnchorRadius`(CSS px) 안의 가장 가까운 보이는 카드(`pickAnchorTime`)가 지금 놓인 시각을 같은 깊이에 고정한다. 카드가 없으면 초점면을 고정한다.
 - 우주 보기는 `AxisNavigation` 대신 `CameraRig`와 `timeScrubber.ts`로 3D 탐색을 처리하며, 펼쳐진 카드가 있을 때(`isBlocked`)는 조작을 막고 탭 닫기만 허용한다.
