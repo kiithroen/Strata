@@ -388,7 +388,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
         facingQuaternion(st.position, cameraPosition, burstQuat);
         const r = planetRadius(n);
-        const affinities = clusterAffinities(notes, cluster.members);
+        const affinities = clusterAffinities(notes, cluster.members, unit);
         const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => affinities[b] - affinities[a]);
         order.forEach((idx, rank) => {
           const m = cluster.members[idx];

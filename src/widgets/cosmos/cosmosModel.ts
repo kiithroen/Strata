@@ -1,6 +1,6 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
-import { DAY_MS, floorTo, type TimeUnit } from '../../core/calendar';
+import { DAY_MS, UNIT_DAYS, floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
 import { depthPerDay, unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
 
@@ -168,18 +168,23 @@ function clamp01(x: number): number {
 }
 
 /**
- * 묶음 안 각 노트가 그 노드에 끌리는 관련도(0~1, 1이 가장 강함).
- * 날짜 축에서는 묶음 중앙 시각과의 근접성과 태그 주제 집중도를 합쳐 계산한다.
+ * 묶음 안 각 노트가 그 노드에 끌리는 관련도(0~1, 1이 가장 강함). 묶음 안 순위가 아니라 절대 기준이라
+ * 몰아 찍은 노트들은 모두 강하게, 흩어진 노트는 약하게 끌린다.
+ * - 시간: 묶음 중앙값 시각과의 거리 dt 로 exp(−|dt| / (행성 단위 길이 × cosmos.affinity.timeScale))
+ * - 태그: 묶음에 태그가 하나라도 있으면, 노트 태그마다 그 태그를 가진 묶음 노트 비율의 평균 ÷ √(태그 수)를
+ *   cosmos.affinity.timeWeight : (1 − timeWeight) 로 시간 점수와 섞는다
+ * notes 는 최근 것부터 정렬돼 있어야 한다(clusterNotes 와 같다).
  */
-export function clusterAffinities(notes: readonly NoteRef[], members: readonly number[]): number[] {
+export function clusterAffinities(notes: readonly NoteRef[], members: readonly number[], unit: TimeUnit): number[] {
   const n = members.length;
   if (n === 0) return [];
   if (n === 1) return [1];
 
-  const medianTime = n === 2 ? notes[members[0]].time : notes[members[Math.floor(n / 2)]].time;
-  const dts = members.map((m) => Math.abs(notes[m].time - medianTime));
-  const nonZero = dts.filter((d) => d > 0).sort((a, b) => a - b);
-  const scale = nonZero.length > 0 ? nonZero[Math.floor(nonZero.length / 2)] : 1;
+  const a = tuning.cosmos.affinity;
+  const mid = Math.floor(n / 2);
+  const medianTime =
+    n % 2 === 1 ? notes[members[mid]].time : (notes[members[mid - 1]].time + notes[members[mid]].time) / 2;
+  const window = UNIT_DAYS[unit] * DAY_MS * a.timeScale;
 
   const tagCounts = new Map<string, number>();
   for (const m of members) {
@@ -188,38 +193,19 @@ export function clusterAffinities(notes: readonly NoteRef[], members: readonly n
     for (const tag of new Set(tags)) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
   }
 
-  const metrics = new Float64Array(n);
-  let minMetric = Infinity;
-  let maxMetric = -Infinity;
-  for (let i = 0; i < n; i++) {
-    const note = notes[members[i]];
-    const timeScore = Math.exp(-dts[i] / (scale * 1.5));
-    let metric = timeScore;
-    if (tagCounts.size > 0) {
-      const tags = note.tags;
-      let tagScore = 0;
-      if (tags && tags.length > 0) {
-        let sum = 0;
-        for (const tag of tags) sum += (tagCounts.get(tag) ?? 0) / n;
-        tagScore = (sum / tags.length) * (1 / Math.sqrt(tags.length));
-      }
-      metric = 0.6 * timeScore + 0.4 * tagScore;
+  return members.map((m) => {
+    const note = notes[m];
+    const timeScore = Math.exp(-Math.abs(note.time - medianTime) / window);
+    if (tagCounts.size === 0) return timeScore;
+    const tags = note.tags;
+    let tagScore = 0;
+    if (tags && tags.length > 0) {
+      let sum = 0;
+      for (const tag of tags) sum += (tagCounts.get(tag) ?? 0) / n;
+      tagScore = sum / tags.length / Math.sqrt(tags.length);
     }
-    metric += hash01(hashString(note.id), 99) * 1e-6;
-    metrics[i] = metric;
-    if (metric < minMetric) minMetric = metric;
-    if (metric > maxMetric) maxMetric = metric;
-  }
-
-  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => metrics[b] - metrics[a]);
-  const span = maxMetric - minMetric;
-  const result = new Array<number>(n);
-  order.forEach((idx, rank) => {
-    const normMetric = span > 1e-9 ? (metrics[idx] - minMetric) / span : 1;
-    const rankScore = 1 - rank / (n - 1);
-    result[idx] = clamp01(0.55 * normMetric + 0.45 * rankScore);
+    return clamp01(a.timeWeight * timeScore + (1 - a.timeWeight) * tagScore);
   });
-  return result;
 }
 
 /**

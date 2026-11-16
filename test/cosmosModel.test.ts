@@ -30,7 +30,7 @@ import {
   spiralPoint,
   spiralRadius,
 } from '../src/widgets/cosmos/cosmosModel';
-import { floorTo } from '../src/core/calendar';
+import { DAY_MS, UNIT_DAYS, floorTo } from '../src/core/calendar';
 import { createFakeNotes } from '../src/dev/fakeNotes';
 import { LEVELS, clusterNotes, levelLogScale, unitSpacing, type AxisState } from '../src/widgets/timeAxis/axisModel';
 
@@ -382,7 +382,7 @@ describe('선 그래프', () => {
   });
 
   it('묶음 관련도는 0~1 이고 시간 중심·주제 태그가 맞는 노트가 더 강하게 끌린다', () => {
-    expect(clusterAffinities([{ id: '1', time: NOW }], [0])).toEqual([1]);
+    expect(clusterAffinities([{ id: '1', time: NOW }], [0], 'day')).toEqual([1]);
 
     const notes = [
       { id: 'outlier', time: NOW + 10 * 3_600_000, tags: ['영수증', '메모', '할인'] },
@@ -391,7 +391,7 @@ describe('선 그래프', () => {
       { id: 'core-3', time: NOW - 60_000, tags: ['여행'] },
       { id: 'side', time: NOW - 120_000, tags: ['일상', '메모'] },
     ];
-    const affinities = clusterAffinities(notes, [0, 1, 2, 3, 4]);
+    const affinities = clusterAffinities(notes, [0, 1, 2, 3, 4], 'day');
     for (const a of affinities) {
       expect(a).toBeGreaterThanOrEqual(0);
       expect(a).toBeLessThanOrEqual(1);
@@ -400,6 +400,30 @@ describe('선 그래프', () => {
     expect(affinities[2]).toBeGreaterThan(affinities[4]);
     expect(affinities[2]).toBeGreaterThan(affinities[0]);
     expect(affinities[1]).toBeGreaterThan(affinities[0]);
+  });
+
+  it('관련도는 묶음 안 순위가 아니라 절대 기준이라 몰아 찍은 노트는 모두 강하게 끌린다', () => {
+    const MIN = 60_000;
+    const window = UNIT_DAYS.day * DAY_MS * c.affinity.timeScale;
+    // 1분 간격으로 몰아 찍은 다섯 장(태그 없음): 모두 중앙값에서 2분 안이다
+    const burst = [2, 1, 0, -1, -2].map((k) => ({ id: `b${k}`, time: NOW + k * MIN }));
+    const burstA = clusterAffinities(burst, [0, 1, 2, 3, 4], 'day');
+    for (const v of burstA) expect(v).toBeGreaterThanOrEqual(Math.exp(-(2 * MIN) / window) - 1e-12);
+
+    // 두 장짜리 묶음도 한쪽을 0 으로 밀어내지 않는다
+    const pair = clusterAffinities([burst[0], burst[1]], [0, 1], 'day');
+    for (const v of pair) expect(v).toBeGreaterThanOrEqual(Math.exp(-(0.5 * MIN) / window) - 1e-12);
+
+    // 같은 시각·같은 태그 노트는 같은 관련도다
+    const same = [0, 1, 2].map((k) => ({ id: `s${k}`, time: NOW, tags: ['여행'] }));
+    const sameA = clusterAffinities(same, [0, 1, 2], 'day');
+    expect(new Set(sameA).size).toBe(1);
+
+    // 하루 단위 묶음에서 반나절 떨어진 노트는 그만큼 약하다
+    const spread = [{ id: 'x', time: NOW + 12 * 60 * MIN }, ...burst.slice(1, 4)];
+    const spreadA = clusterAffinities(spread, [0, 1, 2, 3], 'day');
+    const median = (spread[1].time + spread[2].time) / 2;
+    expect(spreadA[0]).toBeCloseTo(Math.exp(-Math.abs(spread[0].time - median) / window), 9);
   });
 
   it('점 색은 노트가 찍힌 시각을 하루를 나눈 칸으로 고른다', () => {

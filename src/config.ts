@@ -187,6 +187,11 @@ export const tuning = {
     planetFocusDistance: 4.2,
     hubFocusDistance: 7.8,
     initialOrbit: { yaw: 0.35, pitch: 0.28 },
+    /**
+     * 노트가 행성에 끌리는 관련도: timeScale 은 시간 점수가 1/e 로 줄어드는 거리(행성 단위 길이 대비),
+     * timeWeight 는 묶음에 태그가 있을 때 시간 점수의 비중(나머지는 태그 점수)
+     */
+    affinity: { timeScale: 0.25, timeWeight: 0.6 },
     /** 행성마다 구면 나선에서 벗어나는 정도: 반지름 비율, 방위각, 고도각 */
     radiusJitter: 0.16,
     angleJitter: 0.22,
