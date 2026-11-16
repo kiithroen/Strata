@@ -207,6 +207,11 @@ export const tuning = {
     maxDistance: 36,
     initialOrbit: { yaw: 0.35, pitch: 0.28 },
     /**
+     * 은하에서 처음 탭한 노드로 다가가기: 행성·허브별 카메라 거리 상한(이미 더 가까우면 그대로),
+     * 다가간 노드의 빛 크기 배율과 그 빛이 커지는 빠르기
+     */
+    approach: { planetDistance: 4.2, hubDistance: 7.8, glowScale: 1.8, glowRate: 6 },
+    /**
      * 노트가 행성에 끌리는 관련도: timeScale 은 시간 점수가 1/e 로 줄어드는 거리(행성 단위 길이 대비),
      * timeWeight 는 묶음에 태그가 있을 때 시간 점수의 비중(나머지는 태그 점수)
      */

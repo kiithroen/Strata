@@ -40,6 +40,7 @@ import {
   type TapTarget,
 } from '../widgets/cosmos/cosmosModel';
 import { GraphView } from '../widgets/cosmos/GraphView';
+import { TapApproach, approachDistance } from '../widgets/cosmos/tapApproach';
 import { Universe } from '../widgets/cosmos/Universe';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import { createPose } from '../widgets/noteCard/cardMotion';
@@ -80,6 +81,10 @@ export interface CosmosDemo extends WidgetDemo {
   focusedId(): string | null;
   /** 월드 위치의 화면 좌표(CSS px). 브라우저 확인 스크립트가 탭할 자리를 구할 때 쓴다 */
   screenOf(position: Vector3): { x: number; y: number };
+  /** 은하에서 노드를 탭한 것처럼 처리한다: 처음이면 다가가고, 다가간 노드면 지층 보기로 들어간다 */
+  tapNode(node: CosmosNode): void;
+  /** 지금 다가간 노드의 키 */
+  approachedKey(): string | null;
   /** 노드가 속한 위 묶음을 지층 보기로 펼친다 */
   enterStrata(node: CosmosNode): void;
   exitStrata(): void;
@@ -93,7 +98,8 @@ export interface CosmosDemo extends WidgetDemo {
  * 우주 보기 데모. 시간 묶음은 나선팔 위의 빛나는 노드이고, 노드에서 노트 점이 방사형 선으로 뻗는다.
  * 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다.
  * 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
- * 은하에서는 노드든 종이든 탭하면 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 종이는 지층 보기에서 탭해야 펼친다.
+ * 은하에서 노드나 종이를 처음 탭하면 그 노드로 다가가고(종이는 그 행성), 다가간 노드를 한 번 더 탭하면
+ * 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 종이는 지층 보기에서 탭해야 펼친다.
  */
 export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const c = tuning.cosmos;
@@ -293,10 +299,26 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   planets.forEach((p, pi) => {
     for (const m of p.cluster.members) planetOfNote[m] = pi;
   });
-  const enterStrataOfCard = (card: NoteCard) => {
+  const planetNodeOfCard = (card: NoteCard): CosmosNode | null => {
     const ci = cardIndex.get(card);
     const pi = ci === undefined ? -1 : planetOfNote[ci];
-    if (pi >= 0) enterStrata(planets[pi].node);
+    return pi >= 0 ? planets[pi].node : null;
+  };
+
+  // 은하 탭 두 단계: 처음 탭한 노드로 다가가고, 다가간 노드를 다시 탭하면 지층 보기로 들어간다
+  const approach = new TapApproach();
+  /** 다가간 노드의 빛이 커진 정도(0~1). 다른 노드로 다가가면 0부터 다시 커진다 */
+  let approachGlow = 0;
+  const tapNode = (node: CosmosNode | null) => {
+    if (!node) return;
+    if (approach.tap(node.key) === 'enter') {
+      enterStrata(node);
+      return;
+    }
+    approachGlow = 0;
+    pinnedTime = node.anchorTime;
+    controller.target.focusTime = node.anchorTime;
+    cameraRig.focusPoint(node.position, approachDistance(node.kind));
   };
 
   const stopGestures = listenGestures(canvas, {
@@ -318,6 +340,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     },
     onPanStart: () => {
       if (focus.focused) return;
+      approach.clear();
       panning = true;
       pinnedTime = null;
       cameraRig.cancelInertia();
@@ -331,6 +354,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     },
     onPinchStart: (e) => {
       if (focus.focused) return;
+      approach.clear();
       pinnedTime = null;
       lastPinchX = e.x;
       lastPinchY = e.y;
@@ -351,7 +375,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         focus.set(null);
         return;
       }
-      // 광선이 종이에 정확히 맞으면 그 종이다. 지층 보기에서는 현재 지층 카드만, 은하에서는 그 종이의 묶음으로 지층 보기에 들어간다
+      // 광선이 종이에 정확히 맞으면 그 종이다. 지층 보기에서는 현재 지층 카드만 펼치고, 은하에서는 그 종이의 행성을 탭한 것으로 친다
       const cardHit = focus.pickHit(
         x,
         y,
@@ -359,7 +383,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       );
       if (cardHit) {
         if (strata.active) focus.set(cardHit.card);
-        else enterStrataOfCard(cardHit.card);
+        else tapNode(planetNodeOfCard(cardHit.card));
         return;
       }
       // 지층 보기에서 카드를 빗나간 탭은 빈 곳 층 판 선택으로만 넘긴다(종이 여유 반경이 층 전환을 가로채지 않게)
@@ -395,8 +419,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       const i = pickNearest(targets, x, y);
       if (i < 0) return;
       const chosen = picks[i];
-      if ('card' in chosen) enterStrataOfCard(chosen.card);
-      else enterStrata(chosen.node);
+      tapNode('card' in chosen ? planetNodeOfCard(chosen.card) : chosen.node);
     },
   });
 
@@ -412,6 +435,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         pinnedTime = strata.focusTime;
         return;
       }
+      approach.clear();
       pinnedTime = t;
       controller.current.focusTime = t;
       controller.target.focusTime = t;
@@ -435,6 +459,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     focus: (card) => focus.set(card),
     focusedId: () => focus.focused?.id ?? null,
     screenOf,
+    tapNode,
+    approachedKey: () => approach.approached,
     enterStrata,
     exitStrata: () => strata.exit(),
     pickStrataLayer: (x, y) => strata.pickLayer(x, y),
@@ -477,6 +503,9 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       const gustNow = gust(orbitClock);
       const spin = g.burst.spin * orbitClock;
       const pose = focus.pose();
+      approachGlow = damp(approachGlow, approach.approached ? 1 : 0, c.approach.glowRate, dt);
+      /** 다가간 노드의 빛 크기 배율 */
+      const glowOf = (key: string) => (key === approach.approached ? 1 + (c.approach.glowScale - 1) * approachGlow : 1);
       graph.begin();
 
       for (const planet of planets) {
@@ -488,7 +517,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
         const alpha = planet.fade * cosmosFade(dist);
         graph.dot(pos, hubColor, planet.size, alpha);
-        graph.glow(pos, planet.color, planet.glowSize, g.glowAlpha * alpha);
+        graph.glow(pos, planet.color, planet.glowSize * glowOf(planet.node.key), g.glowAlpha * alpha);
         graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
         const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
         drawCloud(cloudLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition);
@@ -559,7 +588,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           graph.branch(prevHub, hp, branchColor, g.branchAlpha * Math.min(hubAlpha, cosmosFade(prevHub.distanceTo(cameraPosition))));
         }
         graph.dot(hp, hubColor, g.hubSize, hubAlpha);
-        graph.glow(hp, branchColor, g.hubGlowSize, g.glowAlpha * hubAlpha);
+        graph.glow(hp, branchColor, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
         graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, g.hubLabelPx * 1.1);
         prevHub = hp;
       }
