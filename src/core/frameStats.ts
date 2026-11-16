@@ -6,7 +6,10 @@ export interface FrameSummary {
   medianMs: number;
   p95Ms: number;
   maxMs: number;
-  /** 프레임 간격이 중앙값 × dropRatio 를 넘은 프레임 수와 비율 */
+  /**
+   * 끊긴 프레임 수와 비율. 앞뒤 이웃 간격 중 짧은 쪽 × dropRatio 를 넘으면 끊김으로 센다.
+   * 화면 주사율이 바뀌어도(적응형 주사율의 60↔120Hz 전환) 전환 지점 하나만 걸린다
+   */
   dropped: number;
   droppedRatio: number;
   updateAvgMs: number;
@@ -43,6 +46,21 @@ export class FrameStats {
     this.count = Math.min(this.count + 1, this.capacity);
   }
 
+  /** 들어온 순서대로 훑으며 이웃 간격과 견준다 */
+  private countDropped(): number {
+    const n = this.count;
+    if (n < 2) return 0;
+    const start = n < this.capacity ? 0 : this.next;
+    const at = (i: number) => this.frame[(start + i) % this.capacity];
+    let dropped = 0;
+    for (let i = 0; i < n; i++) {
+      const prev = i > 0 ? at(i - 1) : Infinity;
+      const next = i < n - 1 ? at(i + 1) : Infinity;
+      if (at(i) > Math.min(prev, next) * this.dropRatio) dropped++;
+    }
+    return dropped;
+  }
+
   reset(): void {
     this.count = 0;
     this.next = 0;
@@ -59,9 +77,7 @@ export class FrameStats {
     const sorted = Array.from(this.frame.subarray(0, n)).sort((a, b) => a - b);
     const sum = sorted.reduce((s, v) => s + v, 0);
     const median = quantile(sorted, 0.5);
-    const limit = median * this.dropRatio;
-    let dropped = 0;
-    for (const v of sorted) if (v > limit) dropped++;
+    const dropped = this.countDropped();
     const upd = stats(this.update.subarray(0, n));
     const ren = stats(this.render.subarray(0, n));
     return {
