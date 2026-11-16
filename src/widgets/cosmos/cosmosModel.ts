@@ -292,9 +292,9 @@ export interface Flight {
   speed: number;
   wobbleFreq: [number, number, number];
   wobblePhase: [number, number, number];
-  /** 제 면 안에서 빙글 도는 처음 각도와 빠르기 */
+  /** 제 면 안에서 좌우로 기우는 기본 각도와 흔들림 빈도 */
   roll: number;
-  spinRate: number;
+  rollFreq: number;
   /** 앞면을 기울이는 첫째 축의 방향(종이 면 안의 각도). 둘째 축은 그에 수직이다 */
   rockAxis: number;
   flutterFreq: number;
@@ -313,8 +313,8 @@ export function flightParams(noteId: string): Flight {
     speed: direction * pick(h, 7, s.speedJitter),
     wobbleFreq: [pick(h, 8, s.wobbleFreq), pick(h, 9, s.wobbleFreq), pick(h, 10, s.wobbleFreq)],
     wobblePhase: [hash01(h, 11) * TAU, hash01(h, 12) * TAU, hash01(h, 13) * TAU],
-    roll: hash01(h, 14) * TAU,
-    spinRate: (hash01(h, 19) < 0.5 ? -1 : 1) * pick(h, 20, s.spinRate),
+    roll: (hash01(h, 14) * 2 - 1) * s.rollAmp,
+    rollFreq: pick(h, 20, s.rollFreq),
     rockAxis: hash01(h, 21) * TAU,
     flutterFreq: pick(h, 23, s.flutterFreq),
     flutterPhase: hash01(h, 24) * TAU,
@@ -378,7 +378,10 @@ export function flightOffset(
 }
 
 const FRONT = new Vector3(0, 0, 1);
+const ORIGIN = new Vector3(0, 0, 0);
+const ALT_UP = new Vector3(0, 0, 1);
 const outwardDir = new Vector3();
+const alignMatrix = new Matrix4();
 const alignQuat = new Quaternion();
 const rollQuat = new Quaternion();
 const rockQuat = new Quaternion();
@@ -387,14 +390,15 @@ const rockAxis = new Vector3();
 
 /**
  * 종이 자세. 사진·테이프·압정이 있는 앞면(+Z)이 노드 바깥쪽(outward: 노드에서 종이로 향하는 방향)을 향하고,
- * 제 면 안에서 빙글 돌며(swarm.spinRate) 두 축으로 팔랑인다(swarm.flutterAmp, swarm.flutterAmp2).
- * 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 노드 뒤쪽 종이는 카메라에 뒷면을 보인다.
+ * 위아래가 크게 뒤집히지 않도록 바로 선 상태에서 제 면 안 좌우 흔들림(swarm.rollAmp, rollFreq)과
+ * 두 축 팔랑임(swarm.flutterAmp, swarm.flutterAmp2)으로 잔잔하게 흔들린다. 노드 뒤쪽 종이는 카메라에 뒷면을 보인다.
  */
 export function flightQuaternion(f: Flight, tau: number, outward: Vector3, out: Quaternion): Quaternion {
   const s = tuning.cosmos.swarm;
   outwardDir.copy(outward).normalize();
-  alignQuat.setFromUnitVectors(FRONT, outwardDir);
-  rollQuat.setFromAxisAngle(FRONT, f.roll + f.spinRate * tau);
+  alignMatrix.lookAt(outwardDir, ORIGIN, Math.abs(outwardDir.y) > 0.99 ? ALT_UP : up);
+  alignQuat.setFromRotationMatrix(alignMatrix);
+  rollQuat.setFromAxisAngle(FRONT, f.roll + s.rollAmp * Math.sin(f.rollFreq * tau + f.flutterPhase));
   rockAxis.set(Math.cos(f.rockAxis), Math.sin(f.rockAxis), 0);
   rockQuat.setFromAxisAngle(rockAxis, s.flutterAmp * Math.sin(f.flutterFreq * tau + f.flutterPhase));
   rockAxis.set(-Math.sin(f.rockAxis), Math.cos(f.rockAxis), 0);

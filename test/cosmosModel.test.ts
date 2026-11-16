@@ -229,8 +229,9 @@ describe('돌풍에 날리는 종이', () => {
         if (prev) moved = Math.max(moved, q.angleTo(prev));
         prev = q.clone();
       }
-      // 제자리에 굳어 있지 않고 빙글 돌며 팔랑인다
+      // 제자리에 굳어 있지 않고 적당히 팔랑이되 제 면 안에서 크게 뒤집히지 않는다
       expect(moved).toBeGreaterThan(0);
+      expect(Math.abs(f.roll)).toBeLessThanOrEqual(s.rollAmp + 1e-12);
     }
   });
 
