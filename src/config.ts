@@ -59,11 +59,12 @@ export const tuning = {
       gutterRatio: 0.1,
     },
     /**
-     * 홀로그램 색. kinds 는 노트 종류별 선·글자 색으로, 멀리서 흑백으로 바꿀 때도 이 색으로 물든다.
+     * 홀로그램 색. kinds 는 사진·문서의 선·글자 색, memoColors 는 메모가 고르는 포스트잇 색이다. 멀리서 흑백으로 바꿀 때도 그 카드 색으로 물든다.
      * fill 은 창 바탕, 나머지는 선 색에서 낸 흐린 선·옅은 선·제목 띠·메모 띠의 불투명도, glowRatio 는 선과 글자의 빛 번짐(폭 대비)이다
      */
     holo: {
-      kinds: { photo: '#48d6ff', memo: '#5ef0c8', doc: '#7fa4ff' },
+      kinds: { photo: '#48d6ff', doc: '#7fa4ff' },
+      memoColors: ['#5ef0c8', '#ffcf5a', '#ff7fbf'],
       fill: 'rgba(3, 13, 32, 0.74)',
       dimAlpha: 0.5,
       faintAlpha: 0.2,
@@ -82,8 +83,12 @@ export const tuning = {
     lod: { detail: [0.045, 0.11], color: [0.12, 0.26], farAlpha: 0.7, focusAlpha: 0.94, glint: 0.5 },
     /** 홀로그램 깜빡임: 초당 판정 횟수, 한 번 판정에서 깜빡일 확률, 깜빡일 때 밝기. 훑는 띠: 속도(1/초), 밝기 */
     flicker: { rate: 14, chance: 0.025, depth: 0.55, sweepSpeed: 0.12, sweepStrength: 0.12 },
-    /** 짧은 노트(메모)는 정사각, 긴 문서는 1:√2 세로 비율이다. 기준 폭 대비 배율 */
-    memo: { widthScale: 0.84 },
+    /**
+     * 짧은 노트(메모): 글 양에 맞춰 크기가 바뀐다. 폭은 기준 폭 대비 widthScales 범위에서 글 폭(어림, 글자 크기 단위)이 fullText 에 가까울수록 넓고,
+     * 높이는 제목·본문 줄 수에 맞추되 폭 대비 aspect 범위로 자른다. 글자 크기는 텍스처 기준 폭 대비 titleRatio·bodyRatio, 줄 간격 배율 lineHeight
+     */
+    memo: { widthScales: [0.6, 0.92], fullText: 40, aspect: [0.5, 1.3], titleRatio: 0.07, bodyRatio: 0.058, lineHeight: 1.45 },
+    /** 긴 문서는 1:√2 세로 비율이다. 기준 폭 대비 배율 */
     doc: { widthScale: 1.05 },
     /** 휨 격자 칸 수(가로·세로) */
     segments: 10,

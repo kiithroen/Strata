@@ -7,12 +7,18 @@ import type { NoteRef } from '../widgets/timeAxis/axisModel';
 const HOUR_MS = 3_600_000;
 const TAG_POOL = ['여행', '일상', '메모', '작업', '음식', '산책', '영수증', '아이디어'] as const;
 
-const MEMO_SAMPLES: readonly { title: string; body: string }[] = [
+const MEMO_SAMPLES: readonly { title: string; body?: string }[] = [
   { title: '장보기 목록', body: '우유, 계란 한 판, 방울토마토, 드립백 원두 사기' },
   { title: '화면 비율 체크', body: '폴더블 펼쳤을 때 폰트 크기랑 여백 다시 재 보기' },
   { title: '읽을 책', body: '인터페이스 역사와 공간 기억에 관한 단상 메모' },
   { title: '약속 확인', body: '금요일 19시 시청역 3번 출구 앞 카페에서 만나기' },
   { title: '산책길 발견', body: '골목 끝 오래된 서점 간판 색감이 꽤 좋았음' },
+  { title: '우산 챙기기' },
+  { title: '비밀번호 힌트', body: '첫 고양이 이름' },
+  {
+    title: '이번 주 할 일',
+    body: '세탁소 맡긴 코트 찾기, 치과 예약 변경, 보고서 초안 금요일까지, 엄마 생신 선물 고르기, 화분 분갈이, 자전거 바람 넣기',
+  },
 ];
 
 const DOC_SAMPLES: readonly { title: string; body: string }[] = [

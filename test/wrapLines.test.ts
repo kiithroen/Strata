@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wrapLines } from '../src/widgets/noteCard/cardTexture';
+import { wrapLines } from '../src/widgets/noteCard/textWrap';
 
 // 글자 하나가 폭 1 인 가짜 측정기
 const ctx = { measureText: (s: string) => ({ width: [...s].length }) as TextMetrics };

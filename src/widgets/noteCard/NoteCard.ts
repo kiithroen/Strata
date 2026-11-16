@@ -44,10 +44,9 @@ export class NoteCard {
     this.face = opts.face;
     this.anisotropy = opts.anisotropy;
     this.labels = opts.labels;
-    const kind = opts.face.kind ?? 'photo';
-    this.layout = faceLayout(kind, opts.face.photo);
+    this.layout = faceLayout(opts.face);
     this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy);
-    const simpleLayout = faceLayout(kind, opts.face.photo, tuning.card.simpleTextureWidth);
+    const simpleLayout = faceLayout(opts.face, tuning.card.simpleTextureWidth);
     this.simpleTexture = createSimpleTexture(opts.face, simpleLayout, opts.anisotropy);
     let phase = 0;
     for (let i = 0; i < this.id.length; i++) phase = (phase * 31 + this.id.charCodeAt(i)) % 6283;
@@ -58,7 +57,7 @@ export class NoteCard {
       width: this.layout.worldWidth,
       height: this.layout.worldHeight,
       bendPhase: phase / 1000,
-      tint: holoTint(kind),
+      tint: holoTint(opts.face),
     });
     this.bendPhase = phase / 1000;
     const seg = tuning.card.segments;
@@ -147,7 +146,7 @@ export class NoteCard {
     const u = this.mesh.material.uniforms;
     const opening = this.motion.focused || this.motion.focus > HIDDEN;
     if (opening && !this.detailTexture) {
-      const detailLayout = faceLayout(this.layout.kind, this.face.photo, tuning.card.detailTextureWidth);
+      const detailLayout = faceLayout(this.face, tuning.card.detailTextureWidth);
       this.detailTexture = createCardTexture(this.face, detailLayout, this.anisotropy);
       u.map.value = this.detailTexture;
     } else if (!opening && this.detailTexture) {

@@ -5,7 +5,7 @@ import { bendHeight } from '../src/widgets/noteCard/paperBend';
 import { faceLayout } from '../src/widgets/noteCard/cardLayout';
 import { paperPin, pinPoint } from '../src/widgets/noteCard/paperPin';
 
-const layouts = (['photo', 'memo', 'doc'] as const).map((kind) => faceLayout(kind, { width: 640, height: 480 }));
+const layouts = (['photo', 'memo', 'doc'] as const).map((kind) => faceLayout({ kind, photo: { width: 640, height: 480 }, title: '제목' }));
 
 describe('paperPin', () => {
   it('실은 제목 줄 왼쪽 고리 자리에 묶인다', () => {
