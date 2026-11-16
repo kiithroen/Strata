@@ -100,13 +100,12 @@ export function spiralElevation(s: number): number {
   return c.elevationAmp * Math.sin(c.elevationFreq * spiralArc(s));
 }
 
-const MAX_ELEVATION = 1.45;
-
 /** 현재 시점을 중심으로 사방 360° 구면 나선 위의 3D 좌표 */
 export function spiralPoint(s: number, time: number, jitter: PlanetJitter, out: Vector3): Vector3 {
   const r = spiralRadius(s) * jitter.radiusScale;
   const alpha = spiralAngle(s, time) + jitter.angleOffset;
-  const phi = Math.max(-MAX_ELEVATION, Math.min(MAX_ELEVATION, spiralElevation(s) + jitter.elevationOffset));
+  const maxE = tuning.cosmos.maxElevation;
+  const phi = Math.max(-maxE, Math.min(maxE, spiralElevation(s) + jitter.elevationOffset));
   const cosPhi = Math.cos(phi);
   return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }
@@ -158,7 +157,8 @@ export function hubPoint(childOffsets: readonly number[], time: number, out: Vec
   const sAvg = sumS / count;
   const r = (sumR / count) * tuning.cosmos.graph.hubRadius;
   const alpha = spiralAngle(sAvg, time);
-  const phi = Math.max(-MAX_ELEVATION, Math.min(MAX_ELEVATION, spiralElevation(sAvg)));
+  const maxE = tuning.cosmos.maxElevation;
+  const phi = Math.max(-maxE, Math.min(maxE, spiralElevation(sAvg)));
   const cosPhi = Math.cos(phi);
   return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }

@@ -52,7 +52,7 @@ export function faceLayout(
     const worldWidth = c.width * c.memo.widthScale;
     const bodyWidth = textureWidth - padding * 2;
     const stripHeight = Math.round(textureHeight * c.memo.stripRatio);
-    const labelHeight = Math.round(textureHeight * 0.14);
+    const labelHeight = Math.round(textureHeight * c.memo.labelRatio);
     return {
       kind,
       textureWidth,

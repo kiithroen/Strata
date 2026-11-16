@@ -79,9 +79,11 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
     arm[i] = i % 2 === 0 ? 1 : -1;
     const halo = rng() < d.halo;
     // 구면 나선팔 먼지는 팔 둘레에 모이고, 일부는 구 전체에 흩어진다
-    rad[i] = halo ? 0.35 + rng() * 0.85 : Math.max(0.35, 1 + gauss() * d.spread);
+    rad[i] = halo
+      ? d.haloRadius[0] + rng() * (d.haloRadius[1] - d.haloRadius[0])
+      : Math.max(d.armRadiusFloor, 1 + gauss() * d.spread);
     ang[i] = halo ? (rng() * 2 - 1) * Math.PI : gauss() * d.angleSpread;
-    elev[i] = halo ? (rng() * 2 - 1) * 1.4 : gauss() * d.angleSpread;
+    elev[i] = halo ? (rng() * 2 - 1) * d.haloElevation : gauss() * d.angleSpread;
     size[i] = 0.4 + Math.pow(rng(), 3) * 1.6;
     tint[i] = rng();
   }
@@ -105,6 +107,8 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       uTwist: { value: c.twist },
       uElevAmp: { value: c.elevationAmp },
       uElevFreq: { value: c.elevationFreq },
+      uMaxElev: { value: c.maxElevation },
+      uCoreRadius: { value: d.coreRadius },
       uSpin: { value: c.spin },
       uPixelRatio: { value: pixelRatio },
       uSize: { value: d.size },
@@ -127,6 +131,8 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       uniform float uTwist;
       uniform float uElevAmp;
       uniform float uElevFreq;
+      uniform float uMaxElev;
+      uniform float uCoreRadius;
       uniform float uSpin;
       uniform float uPixelRatio;
       uniform float uSize;
@@ -135,9 +141,9 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
       void main() {
         float t = fract(aBase + (aArm * uOffset) / uMaxArc);
         float arc = aArm * t * uMaxArc;
-        float r = max(0.3, uRadialScale * abs(arc) * aRad);
+        float r = max(uCoreRadius, uRadialScale * abs(arc) * aRad);
         float alpha = uTwist * arc + uSpin * uTime + aAng;
-        float phi = clamp(uElevAmp * sin(uElevFreq * arc) + aElev, -1.45, 1.45);
+        float phi = clamp(uElevAmp * sin(uElevFreq * arc) + aElev, -uMaxElev, uMaxElev);
         float cosPhi = cos(phi);
         vec3 pos = vec3(r * cosPhi * sin(alpha), r * sin(phi), -r * cosPhi * cos(alpha));
         vec4 mv = modelViewMatrix * vec4(pos, 1.0);

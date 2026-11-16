@@ -49,6 +49,8 @@ export const tuning = {
       widthScale: 0.84,
       paddingRatio: 0.09,
       stripRatio: 0.13,
+      /** 아래 날짜 줄 높이(텍스처 높이 대비) */
+      labelRatio: 0.14,
       palette: [
         { front: '#f4df72', strip: '#e5cd56', back: '#e2cb5f' },
         { front: '#f4df72', strip: '#e5cd56', back: '#e2cb5f' },
@@ -196,6 +198,8 @@ export const tuning = {
     radiusJitter: 0.16,
     angleJitter: 0.22,
     elevationJitter: 0.16,
+    /** 나선 위 점의 고도각 상한(라디안). 노드·허브와 먼지가 함께 쓴다 */
+    maxElevation: 1.45,
     /** 은하 전체가 도는 속도(라디안/초) */
     spin: 0.015,
     /** 행성(시간 묶음 노드)의 반지름: 종이가 나는 띠의 안쪽 기준. 위성 수의 제곱근 × planetGrowth 를 더하고 planetMaxRadius 를 넘지 않는다 */
@@ -269,8 +273,12 @@ export const tuning = {
     planetFadeRate: 4,
     /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
     holdRate: 30,
-    /** 먼지: 구면 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 구 전체에 흩어지는 비율 */
-    dust: { count: 9000, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
+    /**
+     * 먼지: 구면 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 구 전체에 흩어지는 비율.
+     * armRadiusFloor: 팔 먼지 반지름 배율 하한, haloRadius·haloElevation: 흩어진 먼지의 반지름 배율 범위와 고도각 범위,
+     * coreRadius: 원점 근처 먼지가 모이지 않게 두는 최소 월드 반지름
+     */
+    dust: { count: 9000, armRadiusFloor: 0.35, haloRadius: [0.35, 1.2], haloElevation: 1.4, coreRadius: 0.3, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
     stars: { count: 2600, radius: 55, size: 1.8 },
   },
 
