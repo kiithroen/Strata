@@ -89,14 +89,6 @@ export class AxisNavigation {
     this.controller.focusOn(clampFocusTime(time, this.minTime, this.maxTime), level);
   }
 
-  /** 시간 스크러버 등에서 즉시 시점을 옮긴다 */
-  scrubTo(time: number): void {
-    this.cancelMotion();
-    const next = clampFocusTime(time, this.minTime, this.maxTime);
-    this.controller.current.focusTime = next;
-    this.controller.target.focusTime = next;
-  }
-
   onTouchCountChange(count: number): void {
     if (count > 0) this.velocityTime = 0;
     this.options.onTouchCountChange?.(count);

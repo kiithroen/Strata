@@ -181,7 +181,7 @@ export const tuning = {
     elevationAmp: 0.72,
     elevationFreq: 1.25,
     /** 궤도 카메라 거리 범위·기본 거리·노드 탭 포커스 거리·초기 각도(라디안) */
-    orbitDistance: { year: 16.5, month: 11.0, day: 6.8, note: 4.0 },
+    initialDistance: 11.0,
     minDistance: 1.6,
     maxDistance: 36,
     planetFocusDistance: 4.2,
@@ -265,9 +265,8 @@ export const tuning = {
     /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
     holdRate: 30,
     /** 먼지: 구면 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 구 전체에 흩어지는 비율 */
-    dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
+    dust: { count: 9000, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
     stars: { count: 2600, radius: 55, size: 1.8 },
-    coreSize: 9,
   },
 
   dev: {
@@ -310,7 +309,6 @@ export const tuning = {
     lookDragScale: 2.2,
     lookInertiaDecay: 4.2,
     lookStopSpeed: 0.015,
-    lookTurnRate: 6.5,
     zoomRate: 14,
     focusRate: 7,
     wheelZoomSpeed: 0.18,

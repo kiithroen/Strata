@@ -46,23 +46,6 @@ describe('CameraRig', () => {
     }
   });
 
-  it('faceDirection 은 최단 각도로 부드럽게 목표 방향을 향한다', () => {
-    const run = (hz: number) => {
-      const rig = makeRig({ yaw: Math.PI - 0.2, pitch: 0.5 });
-      rig.faceDirection(-Math.PI + 0.2, 0);
-      for (let i = 0; i < hz / 3; i++) rig.step(1 / hz);
-      return { yaw: rig.yaw, pitch: rig.pitch };
-    };
-    const ref = run(60);
-    // +π-0.2 에서 -π+0.2 로 최단 경로(±π 경계)를 넘어 간다
-    expect(Math.abs(ref.yaw)).toBeGreaterThan(Math.PI - 0.25);
-    for (const hz of [30, 120, 144]) {
-      const other = run(hz);
-      expect(shortestAngleDiff(ref.yaw, other.yaw)).toBeCloseTo(0, 9);
-      expect(other.pitch).toBeCloseTo(ref.pitch, 9);
-    }
-  });
-
   it('applyTo 는 distance 구면 위에 카메라를 놓고 원점(0,0,0)을 바라본다', () => {
     const cam = new PerspectiveCamera(tuning.camera.fovDeg, 1, 0.1, 60);
     const rig = makeRig({ yaw: Math.PI / 2, pitch: 0, distance: 12 });

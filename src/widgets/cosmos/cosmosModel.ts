@@ -2,7 +2,7 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
 import { DAY_MS, floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
-import { depthPerDay, LEVELS, levelLogScale, unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
+import { depthPerDay, unitSpacing, type AxisState, type Cluster, type NoteRef } from '../timeAxis/axisModel';
 
 /**
  * 우주 보기: 시간 묶음은 행성, 노트는 행성 둘레를 도는 위성이다.
@@ -68,27 +68,6 @@ export function planetJitter(key: string): PlanetJitter {
 /** 현재 시점(focusTime)에서 시각 time 까지의 부호 있는 거리(월드 깊이 단위. 양수는 과거, 음수는 미래) */
 export function timeOffsetDepth(state: AxisState, time: number): number {
   return ((state.focusTime - time) / DAY_MS) * depthPerDay(state);
-}
-
-/** 로그 축척에 대응하는 궤도 카메라 거리(단계 사이를 연속 선형 보간, 양끝 여유는 바깥 구간 기울기로 외삽) */
-export function orbitDistanceForScale(logScale: number): number {
-  const dists = tuning.cosmos.orbitDistance;
-  const scales = LEVELS.map((lvl) => levelLogScale(lvl));
-  const values = LEVELS.map((lvl) => dists[lvl]);
-  const last = LEVELS.length - 1;
-  let seg = 0;
-  if (logScale >= scales[last]) {
-    seg = last - 1;
-  } else if (logScale > scales[0]) {
-    for (let i = 0; i < last; i++) {
-      if (logScale <= scales[i + 1]) {
-        seg = i;
-        break;
-      }
-    }
-  }
-  const t = (logScale - scales[seg]) / (scales[seg + 1] - scales[seg]);
-  return Math.max(1.5, values[seg] + (values[seg + 1] - values[seg]) * t);
 }
 
 /** 부호 있는 로그 나선 진행도: s=0 에서 0, 멀어질수록 로그로 완만히 커진다 */

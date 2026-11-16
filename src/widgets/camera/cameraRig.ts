@@ -45,9 +45,6 @@ export class CameraRig {
   goalDistance: number;
   readonly target = new Vector3();
   readonly goalTarget = new Vector3();
-  private targetYaw: number;
-  private targetPitch: number;
-  private turning = false;
   private isDragging = false;
   private yawVel = 0;
   private pitchVel = 0;
@@ -55,14 +52,12 @@ export class CameraRig {
   constructor(private readonly options: CameraRigOptions) {
     this.yaw = wrapAngle(options.initialYaw ?? 0);
     this.pitch = clampPitch(options.initialPitch ?? 0);
-    this.distance = clampDistance(options.initialDistance ?? tuning.cosmos.orbitDistance.month);
+    this.distance = clampDistance(options.initialDistance ?? tuning.cosmos.initialDistance);
     this.goalDistance = this.distance;
     if (options.initialTarget) {
       this.target.copy(options.initialTarget);
       this.goalTarget.copy(options.initialTarget);
     }
-    this.targetYaw = this.yaw;
-    this.targetPitch = this.pitch;
   }
 
   get dragging(): boolean {
@@ -72,14 +67,6 @@ export class CameraRig {
   cancelInertia(): void {
     this.yawVel = 0;
     this.pitchVel = 0;
-  }
-
-  /** 시선 각도를 목표(기본 정면)로 부드럽게 돌린다 */
-  faceDirection(yaw = 0, pitch = 0): void {
-    this.targetYaw = wrapAngle(yaw);
-    this.targetPitch = clampPitch(pitch);
-    this.turning = true;
-    this.cancelInertia();
   }
 
   /** 궤도 중심(target)을 지정 3D 좌표로 부드럽게 옮기고 필요하면 거리를 좁힌다 */
@@ -131,7 +118,6 @@ export class CameraRig {
 
   onDragStart(): void {
     this.isDragging = true;
-    this.turning = false;
     this.cancelInertia();
   }
 
@@ -165,20 +151,6 @@ export class CameraRig {
     this.target.lerp(this.goalTarget, fFocus);
 
     if (this.isDragging) return;
-
-    if (this.turning) {
-      const f = approachFactor(g.lookTurnRate, dt);
-      const dyaw = shortestAngleDiff(this.yaw, this.targetYaw);
-      const dpitch = this.targetPitch - this.pitch;
-      this.yaw = wrapAngle(this.yaw + dyaw * f);
-      this.pitch = clampPitch(this.pitch + dpitch * f);
-      if (Math.abs(dyaw) < 1e-4 && Math.abs(dpitch) < 1e-4) {
-        this.yaw = this.targetYaw;
-        this.pitch = this.targetPitch;
-        this.turning = false;
-      }
-      return;
-    }
 
     if (this.yawVel === 0 && this.pitchVel === 0) return;
     const r = g.lookInertiaDecay;

@@ -203,7 +203,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     viewportHeight: () => canvas.clientHeight,
     initialYaw: c.initialOrbit.yaw,
     initialPitch: c.initialOrbit.pitch,
-    initialDistance: c.orbitDistance.month,
+    initialDistance: c.initialDistance,
   });
 
   const stopGestures = listenGestures(canvas, {

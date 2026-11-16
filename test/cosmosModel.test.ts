@@ -9,7 +9,6 @@ import {
   clusterAffinities,
   hourColorIndex,
   hubPoint,
-  orbitDistanceForScale,
   pickNearest,
   parentUnit,
   choosePlanetUnit,
@@ -73,18 +72,6 @@ describe('구면 나선 · 궤도 거리', () => {
     expect(spiralElevation(0)).toBeCloseTo(0, 12);
     expect(spiralRadius(-5)).toBeCloseTo(spiralRadius(5), 12);
     expect(spiralRadius(10)).toBeGreaterThan(spiralRadius(2));
-  });
-
-  it('orbitDistanceForScale 은 각 단계 거리를 잇고 확대할수록 가까워진다', () => {
-    for (const level of LEVELS) {
-      expect(orbitDistanceForScale(levelLogScale(level))).toBeCloseTo(c.orbitDistance[level], 9);
-    }
-    let prev = Infinity;
-    for (const s of sweepStates()) {
-      const d = orbitDistanceForScale(s.logScale);
-      expect(d).toBeLessThan(prev);
-      prev = d;
-    }
   });
 
   it('구면 나선 점은 s=0 을 지날 때 연속이고 사방 360°와 위아래로 뻗으며 거리는 반지름 × 벗어남 비율이다', () => {

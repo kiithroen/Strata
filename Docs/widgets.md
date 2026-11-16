@@ -105,7 +105,6 @@
 - 행성 단위는 `month` 기준 고정 시계열 축척(`choosePlanetUnit`)으로 정하고, 같은 단위 칸의 노트가 한 행성이 되어 그 칸에서 가장 최근 노트의 시각에 놓인다. 줌·이동 중에도 노드 배치와 묶음은 흔들리지 않는다.
 - 로그 나선 진행도는 `spiralArc(s) = sign(s) × ln(1 + cosmos.spiralKnee × |s|)`다. 반지름 `cosmos.radialScale × |spiralArc(s)|`, 방위각 `cosmos.twist × spiralArc(s) + cosmos.spin × 공전 시계`, 고도각 `cosmos.elevationAmp × sin(cosmos.elevationFreq × spiralArc(s))`(수직 상한 클램프)로 3차원 구면 나선 위에 놓는다.
 - 나선 위 자리는 묶음 키로 정한 난수 편차(`cosmos.radiusJitter`, `cosmos.angleJitter`, `cosmos.elevationJitter`)만큼 벗어난다. 같은 묶음은 늘 같은 자리다.
-- `orbitDistanceForScale`은 단계별 거리 표(`cosmos.orbitDistance`)를 연속 보간하는 보조 함수다.
 - 노드는 흰 점(`graph.nodeSize`, 노트 수에 따라 조금 커짐)과 가장 최근 노트 색의 빛 무리(`graph.glowSize`, `graph.glowAlpha`), 아래쪽 `날짜 · 노트 수` 글자(`cosmos.planetLabelHeight`)로 그린다. 묶음이 바뀌면 빠진 노드는 마지막 자리에서 옅어지고 새 노드는 나타난다(`cosmos.planetFadeRate`).
 
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
