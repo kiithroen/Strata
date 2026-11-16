@@ -1,9 +1,10 @@
 import type { WebGLRenderer } from 'three';
 import { tuning } from '../config';
 import { FrameStats } from '../core/frameStats';
+import { photoQueue } from '../dev/localNotes';
 
 /**
- * 실기기 성능 표시(설정 화면에서 켠다). 프레임 간격·CPU 시간 통계, 그리기 호출 수, 해상도, GPU 이름, 지금 품질 값을 보여 준다.
+ * 실기기 성능 표시(설정 화면에서 켠다). 프레임 간격·CPU 시간 통계, 그리기 호출 수, 텍스처 수와 사진 디코딩 큐, 해상도, GPU 이름, 지금 품질 값을 보여 준다.
  * 렌더링 결과에는 끼어들지 않는다.
  */
 export class PerfOverlay {
@@ -50,7 +51,7 @@ export class PerfOverlay {
       `끊김 ${f(s.droppedRatio * 100)}% (${s.dropped}/${s.frames})`,
       `CPU 갱신 ${f(s.updateAvgMs)} (${f(s.updateMaxMs)})  그리기 ${f(s.renderAvgMs)} (${f(s.renderMaxMs)})`,
       `호출 ${info.render.calls}  삼각형 ${kilo(info.render.triangles)}  점 ${kilo(info.render.points)}  선 ${kilo(info.render.lines)}`,
-      `텍스처 ${info.memory.textures}  형상 ${info.memory.geometries}`,
+      `텍스처 ${info.memory.textures}  형상 ${info.memory.geometries}  사진 디코딩 ${photoQueue.active} (대기 ${photoQueue.pending})`,
       `${canvas.width}×${canvas.height} @${f(pr, 2)} (dpr ${f(window.devicePixelRatio, 2)})  aa ${tuning.render.antialias ? 'on' : 'off'}`,
       `먼지 ${tuning.cosmos.dust.count}  별 ${tuning.cosmos.stars.count}  성운 ${nebula}  격자 ${tuning.card.segments}  텍스처 ${tuning.card.textureWidth}`,
       this.gpu,

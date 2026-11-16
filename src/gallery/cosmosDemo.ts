@@ -3,8 +3,7 @@ import { tuning } from '../config';
 import { DAY_MS, floorTo } from '../core/calendar';
 import { damp } from '../core/motion';
 import { createRng, range } from '../core/random';
-import { createFakeNotes } from '../dev/fakeNotes';
-import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
+import { createFakeNoteData, type NoteData } from '../dev/noteData';
 import { listenGestures } from '../input/gesture';
 import { CameraRig } from '../widgets/camera/cameraRig';
 import { drawCloud } from '../widgets/cloud/CloudView';
@@ -101,7 +100,11 @@ export interface CosmosDemo extends WidgetDemo {
  * 은하에서 노드나 종이를 처음 탭하면 그 노드로 다가가고(종이는 그 행성), 다가간 노드를 한 번 더 탭하면
  * 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 종이는 지층 보기에서 탭해야 펼친다.
  */
-export function mountCosmosDemo(stage: Stage): CosmosDemo {
+/** 가짜 노트의 가장 최근 시각 */
+const FAKE_NEWEST = new Date(2026, 10, 15, 21, 30).getTime();
+
+/** data 를 넘기면 그 노트로 띄운다(실데이터 임시 주입). 비었거나 없으면 가짜 노트다 */
+export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const c = tuning.cosmos;
   const g = c.graph;
   stage.grid.visible = false;
@@ -119,10 +122,9 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const universe = new Universe(stage.renderer);
   stage.scene.add(universe.group);
 
-  const newest = new Date(2026, 10, 15, 21, 30).getTime();
-  const notes = createFakeNotes(newest);
+  const { notes, photos } = data && data.notes.length > 0 ? data : createFakeNoteData(FAKE_NEWEST);
+  const newest = notes[0].time;
   const oldest = notes[notes.length - 1].time;
-  const photos = createPlaceholderPhotos(notes.length, tuning.dev.noteSeed + 1);
   const rng = createRng(tuning.dev.noteSeed + 2);
   const cards = notes.map((note, i) => {
     const card = new NoteCard({
@@ -130,7 +132,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         id: note.id,
         createdAt: new Date(note.time),
         kind: note.kind,
-        photo: note.kind === 'photo' || !note.kind ? photos[i] : undefined,
+        photo: photos[i],
         title: note.title,
         body: note.body,
       },

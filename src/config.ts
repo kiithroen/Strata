@@ -368,6 +368,13 @@ export const tuning = {
     noteSeed: 1115,
     spanDays: 600,
     bursts: 22,
+    /**
+     * 실데이터 임시 불러오기: 킵 노트 본문이 docMinChars 자 이상이면 긴 문서,
+     * 사진 디코딩 동시 작업 수(decodeConcurrency)와 크기·EXIF 를 찾을 때 읽는 파일 앞부분 바이트(headerBytes)
+     */
+    docMinChars: 160,
+    decodeConcurrency: 2,
+    headerBytes: 262144,
   },
 
   input: {

@@ -5,11 +5,19 @@ import { createRng } from '../../core/random';
 import { memoMetrics, MEMO_TITLE_LINES, type CardLayout, type NoteKind, type Rect } from './cardLayout';
 import { wrapLines } from './textWrap';
 
-/** 사진 원본. 필요한 해상도로 그때그때 그려 받는다. 텍스처를 만든 뒤에는 결과를 들고 있지 않는다. */
+/**
+ * 사진 원본. 필요한 해상도로 그때그때 그려 받는다. 텍스처를 만든 뒤에는 결과를 들고 있지 않는다.
+ * 디코딩해야 하는 원본은 Promise 로 주고, urgent 면 기다리는 디코딩보다 먼저 한다. 받은 ImageBitmap 은 쓴 쪽이 닫는다.
+ */
 export interface PhotoSource {
   width: number;
   height: number;
-  render(targetWidth: number): CanvasImageSource;
+  render(targetWidth: number, urgent?: boolean): CanvasImageSource | Promise<CanvasImageSource>;
+}
+
+/** 다 쓴 사진 그림을 놓는다. ImageBitmap 이면 닫아 메모리를 바로 돌려준다 */
+export function releasePhoto(image: CanvasImageSource): void {
+  if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) image.close();
 }
 
 export interface CardFace {
@@ -121,25 +129,51 @@ function outline(ctx: CanvasRenderingContext2D, layout: CardLayout, inset: numbe
 
 /**
  * 가까이서 보는 홀로그램 카드. 반투명 남색 바탕에 종류별 색의 빛나는 선과 글자를 그린다.
- * 흑백으로 바꾸는 건 거리에 따라 셰이더가 한다.
+ * 흑백으로 바꾸는 건 거리에 따라 셰이더가 한다. photo 는 사진 칸에 그릴 그림이고, 아직 없으면 빈 칸으로 그린다.
  */
-export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy: number): CanvasTexture {
+export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy: number, photo: CanvasImageSource | null = null): CanvasTexture {
   const { canvas, ctx } = newCanvas(layout);
+  drawCard(ctx, face, layout, photo);
+  return toTexture(canvas, anisotropy);
+}
+
+/** 사진이 늦게 오면 같은 캔버스에 다시 그리고 올린다 */
+export function redrawCardTexture(texture: CanvasTexture, face: CardFace, layout: CardLayout, photo: CanvasImageSource | null): void {
+  drawCard(canvasContext(texture), face, layout, photo);
+  texture.needsUpdate = true;
+}
+
+function drawCard(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, photo: CanvasImageSource | null): void {
   const p = palette(face);
   drawBody(ctx, layout, p, false);
   if (layout.kind === 'memo') drawMemo(ctx, face, layout, p);
   else if (layout.kind === 'doc') drawDoc(ctx, face, layout, p);
-  else drawPhoto(ctx, face, layout, p);
+  else drawPhoto(ctx, face, layout, p, photo);
   drawFooter(ctx, face, layout, p);
-  return toTexture(canvas, anisotropy);
+}
+
+function canvasContext(texture: CanvasTexture): CanvasRenderingContext2D {
+  const ctx = (texture.image as HTMLCanvasElement).getContext('2d');
+  if (!ctx) throw new Error('2D 캔버스를 만들 수 없다');
+  return ctx;
 }
 
 /**
  * 멀리서 보는 단순한 카드. 글자 없이 같은 겉모양에 사진은 굵은 모자이크, 메모는 굵은 막대 몇 줄, 문서는 줄 번호 칸과 가는 막대로만 그린다.
- * layout 은 card.simpleTextureWidth 로 계산한 것을 넘긴다.
+ * layout 은 card.simpleTextureWidth 로 계산한 것을 넘긴다. photo 는 아무 해상도든 되고 모자이크로 줄여 그린다.
  */
-export function createSimpleTexture(face: CardFace, layout: CardLayout, anisotropy: number): CanvasTexture {
+export function createSimpleTexture(face: CardFace, layout: CardLayout, anisotropy: number, photo: CanvasImageSource | null = null): CanvasTexture {
   const { canvas, ctx } = newCanvas(layout);
+  drawSimple(ctx, face, layout, photo);
+  return toTexture(canvas, anisotropy);
+}
+
+export function redrawSimpleTexture(texture: CanvasTexture, face: CardFace, layout: CardLayout, photo: CanvasImageSource | null): void {
+  drawSimple(canvasContext(texture), face, layout, photo);
+  texture.needsUpdate = true;
+}
+
+function drawSimple(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, photo: CanvasImageSource | null): void {
   const p = palette(face);
   const s = tuning.card.simple;
   const w = layout.unit;
@@ -150,9 +184,9 @@ export function createSimpleTexture(face: CardFace, layout: CardLayout, anisotro
   const gap = Math.max(barH + 1, Math.round(w * s.barGapRatio));
   const rng = createRng(idHash(face.id));
   if (layout.kind === 'photo') {
-    if (face.photo) {
+    if (photo) {
       ctx.imageSmoothingEnabled = false;
-      drawCover(ctx, face.photo.render(s.photoBlocks), content);
+      drawCover(ctx, mosaic(photo, s.photoBlocks), content);
       ctx.imageSmoothingEnabled = true;
     }
     drawViewfinder(ctx, content, p.line, Math.max(1, w * tuning.card.window.simpleLineRatio));
@@ -178,7 +212,20 @@ export function createSimpleTexture(face: CardFace, layout: CardLayout, anisotro
   }
   ctx.fillStyle = p.faint;
   ctx.fillRect(footer.x, footer.y + (footer.height - barH) / 2, footer.width * 0.45, barH);
-  return toTexture(canvas, anisotropy);
+}
+
+/** 폭 blocks 칸으로 줄인 그림. 키워 그릴 때 부드럽게 하지 않으면 굵은 모자이크가 된다 */
+function mosaic(image: CanvasImageSource, blocks: number): HTMLCanvasElement {
+  const iw = (image as { width: number }).width;
+  const ih = (image as { height: number }).height;
+  const canvas = document.createElement('canvas');
+  canvas.width = blocks;
+  canvas.height = Math.max(1, Math.round((blocks * ih) / iw));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D 캔버스를 만들 수 없다');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
 }
 
 /** 겉모양 바탕, 제목 띠, 테두리, 종류별 강조선, 실을 묶는 고리 */
@@ -287,10 +334,10 @@ function drawTitleText(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Pal
 }
 
 /** 사진: 창 단추가 있는 제목 줄, 뷰파인더 꺾쇠를 두른 사진, 상태 줄의 눈금 */
-function drawPhoto(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette): void {
+function drawPhoto(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette, photo: CanvasImageSource | null): void {
   const { content, line, titleBar, ring, padding } = layout;
   const w = layout.unit;
-  if (face.photo) drawCover(ctx, face.photo.render(content.width), content);
+  if (photo) drawCover(ctx, photo, content);
   ctx.strokeStyle = p.dim;
   ctx.lineWidth = line;
   ctx.strokeRect(content.x - line / 2, content.y - line / 2, content.width + line, content.height + line);

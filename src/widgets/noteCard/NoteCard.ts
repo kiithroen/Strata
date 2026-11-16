@@ -3,7 +3,15 @@ import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
 import { faceLayout, type CardLayout } from './cardLayout';
 import { createCardMaterial, type CardLook } from './cardMaterial';
-import { createCardTexture, createSimpleTexture, holoTint, type CardFace } from './cardTexture';
+import {
+  createCardTexture,
+  createSimpleTexture,
+  holoTint,
+  redrawCardTexture,
+  redrawSimpleTexture,
+  releasePhoto,
+  type CardFace,
+} from './cardTexture';
 import { CardMotion, type FloatParams, type Pose } from './cardMotion';
 
 export interface NoteCardOptions {
@@ -20,6 +28,7 @@ const HIDDEN = 0.002;
 /**
  * 노트 카드 위젯: 양면 홀로그램 창. 배치가 넘기는 자리에 떠 있다가 펼치면 카메라 앞으로 나와 화면에 맞게 커진다.
  * 멀리서는 단순한 텍스처, 가까이서는 작은 텍스처, 펼치는 동안에는 선명한 텍스처를 쓴다. 둘 사이 전환은 셰이더가 한다.
+ * 사진을 디코딩해야 하면 사진 칸을 비워 두고 그렸다가 사진이 오면 다시 그린다. 선명한 텍스처는 사진이 온 뒤에 바꾼다.
  */
 export class NoteCard {
   readonly id: string;
@@ -38,6 +47,11 @@ export class NoteCard {
   private readonly labels: LabelCache;
   private badge: Mesh<PlaneGeometry, MeshBasicMaterial> | null = null;
   private badgeText: string | null = null;
+  private disposed = false;
+  /** 선명한 텍스처용 사진을 기다리는 중인지 */
+  private detailPending = false;
+  /** 닫았다 다시 펼칠 때 앞서 기다리던 사진을 버리려고 펼칠 때마다 올린다 */
+  private detailRequest = 0;
 
   constructor(opts: NoteCardOptions) {
     this.id = opts.face.id;
@@ -45,9 +59,24 @@ export class NoteCard {
     this.anisotropy = opts.anisotropy;
     this.labels = opts.labels;
     this.layout = faceLayout(opts.face);
-    this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy);
     const simpleLayout = faceLayout(opts.face, tuning.card.simpleTextureWidth);
-    this.simpleTexture = createSimpleTexture(opts.face, simpleLayout, opts.anisotropy);
+    const photo = opts.face.photo?.render(this.layout.content.width) ?? null;
+    const ready = photo instanceof Promise ? null : photo;
+    this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy, ready);
+    this.simpleTexture = createSimpleTexture(opts.face, simpleLayout, opts.anisotropy, ready);
+    if (ready) releasePhoto(ready);
+    if (photo instanceof Promise) {
+      photo.then(
+        (image) => {
+          if (!this.disposed) {
+            redrawCardTexture(this.baseTexture, this.face, this.layout, image);
+            redrawSimpleTexture(this.simpleTexture, this.face, simpleLayout, image);
+          }
+          releasePhoto(image);
+        },
+        () => {},
+      );
+    }
     let phase = 0;
     for (let i = 0; i < this.id.length; i++) phase = (phase * 31 + this.id.charCodeAt(i)) % 6283;
     const material = createCardMaterial({
@@ -130,6 +159,7 @@ export class NoteCard {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.mesh.geometry.dispose();
     this.baseTexture.dispose();
     this.simpleTexture.dispose();
@@ -143,16 +173,38 @@ export class NoteCard {
 
   /** 펼치기 시작하면 선명한 텍스처로 바꾸고, 다 닫히면 버린다 */
   private updateDetail(): void {
-    const u = this.mesh.material.uniforms;
     const opening = this.motion.focused || this.motion.focus > HIDDEN;
-    if (opening && !this.detailTexture) {
+    if (opening && !this.detailTexture && !this.detailPending) {
       const detailLayout = faceLayout(this.face, tuning.card.detailTextureWidth);
-      this.detailTexture = createCardTexture(this.face, detailLayout, this.anisotropy);
-      u.map.value = this.detailTexture;
-    } else if (!opening && this.detailTexture) {
-      u.map.value = this.baseTexture;
-      this.detailTexture.dispose();
+      const photo = this.face.photo?.render(detailLayout.content.width, true) ?? null;
+      if (!(photo instanceof Promise)) {
+        this.showDetail(detailLayout, photo);
+        return;
+      }
+      this.detailPending = true;
+      const request = ++this.detailRequest;
+      const settle = (image: CanvasImageSource | null) => {
+        if (request !== this.detailRequest) {
+          if (image) releasePhoto(image);
+          return;
+        }
+        this.detailPending = false;
+        if (!this.disposed) this.showDetail(detailLayout, image);
+        else if (image) releasePhoto(image);
+      };
+      photo.then(settle, () => settle(null));
+    } else if (!opening && (this.detailTexture || this.detailPending)) {
+      this.detailRequest++;
+      this.detailPending = false;
+      this.mesh.material.uniforms.map.value = this.baseTexture;
+      this.detailTexture?.dispose();
       this.detailTexture = null;
     }
+  }
+
+  private showDetail(layout: CardLayout, photo: CanvasImageSource | null): void {
+    this.detailTexture = createCardTexture(this.face, layout, this.anisotropy, photo);
+    if (photo) releasePhoto(photo);
+    this.mesh.material.uniforms.map.value = this.detailTexture;
   }
 }

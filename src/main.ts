@@ -1,6 +1,8 @@
 import './style.css';
 import { tuning } from './config';
 import { applyQuality, readQuality } from './core/quality';
+import { importLocalNotes } from './dev/localNotes';
+import { mountCosmosDemo } from './gallery/cosmosDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
 import { PerfOverlay } from './gallery/perfOverlay';
 import { loadSettings } from './gallery/settings';
@@ -16,14 +18,20 @@ declare global {
       time: () => number;
       /** 게임 시간을 seconds 만큼 고정 간격으로 진행하고 한 번 그린다. 창이 숨어 프레임이 멈춰도 확인할 수 있다 */
       advance: (seconds: number, hz?: number) => number;
+      /** 설정 화면의 실데이터 불러오기와 같다. 결과 글을 돌려준다 */
+      importFiles: (files: File[]) => Promise<string>;
     };
   }
 }
 
-const container = document.getElementById('stage');
-const tabsEl = document.getElementById('widget-tabs');
-const hintEl = document.getElementById('hint');
-if (!container || !tabsEl || !hintEl) throw new Error('index.html 구조가 맞지 않는다');
+function byId(elementId: string): HTMLElement {
+  const e = document.getElementById(elementId);
+  if (!e) throw new Error('index.html 구조가 맞지 않는다');
+  return e;
+}
+const container = byId('stage');
+const tabsEl = byId('widget-tabs');
+const hintEl = byId('hint');
 
 // HUD 색은 tuning.look 을 따른다
 const rootStyle = document.documentElement.style;
@@ -38,8 +46,9 @@ const settings = loadSettings();
 applyQuality(settings.quality);
 
 const stage = new Stage(container);
-const { id, factory } = pickDemo(location.search);
-const demo = factory(stage);
+const picked = pickDemo(location.search);
+let id = picked.id;
+let demo: WidgetDemo = picked.factory(stage);
 hintEl.textContent = demo.hint;
 
 // 위젯 사이를 오가는 탭
@@ -51,11 +60,31 @@ for (const widgetId of Object.keys(widgetDemos)) {
   tabsEl.appendChild(a);
 }
 
+/** 고른 파일을 노트로 읽어 우주 보기를 그 노트로 다시 띄운다. 다른 위젯을 보고 있었으면 우주 보기로 바꾼다 */
+async function importFiles(files: File[], progress?: (text: string) => void): Promise<string> {
+  const result = await importLocalNotes(files, (done, total) => progress?.(`읽는 중 ${done}/${total}`));
+  const { photos, memos, skipped } = result;
+  const summary = `사진 ${photos}장 · 메모 ${memos}장${skipped > 0 ? ` · 건너뜀 ${skipped}` : ''}`;
+  if (result.data.notes.length === 0) return `띄울 노트가 없다 (${summary})`;
+  demo.dispose();
+  demo = mountCosmosDemo(stage, result.data);
+  id = 'cosmos';
+  hintEl.textContent = demo.hint;
+  for (const a of tabsEl.querySelectorAll('a')) a.className = a.textContent === id.toUpperCase() ? 'active' : '';
+  history.replaceState(history.state, '', '?w=cosmos');
+  return summary;
+}
+
 let perf: PerfOverlay | null = settings.perf ? new PerfOverlay(stage.renderer) : null;
-new SettingsPanel(settings, readQuality(), (on) => {
-  perf?.dispose();
-  perf = on ? new PerfOverlay(stage.renderer) : null;
-});
+new SettingsPanel(
+  settings,
+  readQuality(),
+  (on) => {
+    perf?.dispose();
+    perf = on ? new PerfOverlay(stage.renderer) : null;
+  },
+  importFiles,
+);
 
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다
 let time = 0;
@@ -83,9 +112,14 @@ stage.renderer.setAnimationLoop((now: number) => {
 
 if (import.meta.env.DEV) {
   window.__strata = {
-    id,
-    demo,
+    get id() {
+      return id;
+    },
+    get demo() {
+      return demo;
+    },
     time: () => time,
+    importFiles: (files) => importFiles(files),
     advance(seconds, hz = 60) {
       const steps = Math.round(seconds * hz);
       for (let i = 0; i < steps; i++) {

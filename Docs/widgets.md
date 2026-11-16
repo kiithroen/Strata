@@ -33,11 +33,13 @@
 - 고리 자리는 앞면 위로 뜬다. 그 자리의 휨 높이(`paperBend.ts`의 `bendHeight`, 셰이더와 같은 식)에 `card.pin.lift`(폭 대비)를 더한다.
 
 **사진 원본** (`cardTexture.ts`의 `PhotoSource`)
-- 사진은 폭·높이와 `render(targetWidth)`를 가진다. 텍스처를 만들 때 필요한 해상도로 그려 받고, 결과는 들고 있지 않는다.
+- 사진은 폭·높이(레이아웃 비율에 쓰므로 미리 안다)와 `render(targetWidth, urgent)`를 가진다. 텍스처를 만들 때 필요한 해상도로 그려 받고, 결과는 들고 있지 않는다(`ImageBitmap`이면 그린 뒤 `releasePhoto`로 닫는다).
+- `render`는 그림을 바로 주거나(가짜 사진) 디코딩이 끝나면 오는 `Promise`를 준다(실데이터). 바로 오면 그 자리에서 그린다. `Promise`면 사진 칸을 비운 채 텍스처를 만들고, 사진이 오면 같은 캔버스에 다시 그려 올린다.
+- 떠 있는 텍스처와 단순한 텍스처는 사진 한 장(떠 있는 텍스처의 사진 칸 폭)을 함께 쓴다. 단순한 텍스처는 그 사진을 `card.simple.photoBlocks`칸 폭으로 줄여 모자이크로 그린다.
 
 **크기와 텍스처** (`cardLayout.ts`, `NoteCard.ts`)
 - 틀(제목 줄·상태 줄 높이, 여백, 선 굵기)과 글자 크기는 텍스처 기준 폭(`unit`) 대비(`card.window`, `card.memo`)라, 메모처럼 카드 폭이 달라도 같은 월드 크기로 보인다. 사진은 사진 비율을 지키고 폭이 `card.width`, 문서는 `1 : √2`에 폭 `card.width × card.doc.widthScale`이다. 텍스처 해상도를 바꿔도 월드 크기와 칸 비율은 같다.
-- 떠 있는 카드는 단순한 텍스처와 `card.textureWidth` 텍스처를 쓴다. 펼치기 시작하면 `card.detailTextureWidth` 텍스처를 따로 만들어 바꿔 끼우고, 다 닫히면 버린다.
+- 떠 있는 카드는 단순한 텍스처와 `card.textureWidth` 텍스처를 쓴다. 펼치기 시작하면 `card.detailTextureWidth` 텍스처를 따로 만들어 바꿔 끼우고, 다 닫히면 버린다. 사진을 디코딩해야 하면 급한 작업으로 요청하고, 사진이 올 때까지 떠 있는 텍스처를 그대로 보여 준다. 그 사이 닫았다 다시 펼치면 앞의 요청은 버린다.
 
 **움직임** (`cardMotion.ts`의 `CardMotion`)
 - 배치(필드·시간축)가 매 프레임 기본 자세(위치·회전·배율)를 넘긴다. 떠 있는 카드는 기본 자세에 흔들림을 더한 자세를 지연 없이 따라간다.

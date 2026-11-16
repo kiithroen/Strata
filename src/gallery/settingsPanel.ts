@@ -34,12 +34,15 @@ function optionLabel(key: QualityKey, v: number | boolean | 'off'): string {
 
 /**
  * 오른쪽 위 설정 버튼과 설정 화면. 성능 표시는 바로 켜고 끄고, 품질은 고른 뒤 적용하면 저장하고 다시 불러온다
- * (렌더러·텍스처·형상을 처음부터 다시 만들어야 해서).
+ * (렌더러·텍스처·형상을 처음부터 다시 만들어야 해서). 실데이터는 고른 파일을 onImport 에 넘기고 그 결과 글을 보여 준다.
  */
 export class SettingsPanel {
   private readonly button: HTMLButtonElement;
   private readonly panel: HTMLDivElement;
   private draft: QualityValues;
+  /** 실데이터 불러오기 상태 글. 다시 그려도 남는다 */
+  private importStatus = '';
+  private importing = false;
   private readonly onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') this.close();
   };
@@ -49,6 +52,7 @@ export class SettingsPanel {
     /** 지금 적용된 품질 값 */
     private readonly current: QualityValues,
     private readonly onPerfChange: (on: boolean) => void,
+    private readonly onImport: (files: File[], progress: (text: string) => void) => Promise<string>,
   ) {
     this.draft = { ...current };
     this.button = document.createElement('button');
@@ -101,6 +105,18 @@ export class SettingsPanel {
       ]),
     );
 
+    const pickFiles = choice('파일', false, () => this.pick(false));
+    const pickFolder = choice('폴더', false, () => this.pick(true));
+    pickFiles.disabled = pickFolder.disabled = this.importing;
+    p.append(row('실데이터', [pickFiles, pickFolder]));
+    p.append(
+      el(
+        'p',
+        'settings-note',
+        this.importStatus || '사진(EXIF 촬영 시각)과 구글 킵 테이크아웃 JSON 을 은하에 띄운다. 다시 불러오면 가짜 노트로 돌아간다.',
+      ),
+    );
+
     const active = matchPreset(this.draft);
     const presets = qualityPresets.map((name) =>
       choice(PRESET_LABEL[name], active === name, () => {
@@ -134,6 +150,35 @@ export class SettingsPanel {
     apply.className = 'settings-apply';
     apply.disabled = !changed;
     p.append(apply);
+  }
+
+  private pick(folder: boolean): void {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    if (folder) input.webkitdirectory = true;
+    else input.accept = 'image/*,.json,application/json';
+    input.addEventListener('change', () => {
+      const files = Array.from(input.files ?? []);
+      if (files.length > 0) void this.runImport(files);
+    });
+    input.click();
+  }
+
+  private async runImport(files: File[]): Promise<void> {
+    this.importing = true;
+    const show = (text: string) => {
+      this.importStatus = text;
+      if (!this.panel.hidden) this.render();
+    };
+    try {
+      show(await this.onImport(files, show));
+    } catch (e) {
+      show(`불러오지 못했다: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      this.importing = false;
+      if (!this.panel.hidden) this.render();
+    }
   }
 
   private setPerf(on: boolean): void {
