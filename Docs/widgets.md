@@ -132,6 +132,7 @@
 **배경** (`Universe.ts`)
 - 먼지: `dust.count`개 점이 과거(`-s`)와 미래(`+s`) 두 갈래 3D 구면 나선팔(반지름 퍼짐 `dust.spread`, 각도 퍼짐 `dust.angleSpread`, 최대 진행도 `dust.maxArc`)을 따라 원점 주위에 모이고, `dust.halo` 비율은 구 전체에 흩어진다. 시간축이 움직인 거리만큼 흘러가 비행하는 느낌을 준다.
 - 별(`stars.count`, 반지름 `stars.radius`)과 성운 셰이더는 매 프레임 카메라 위치를 따라 이동해 어느 궤도 거리에서도 잘리지 않는다.
+- 성운(`nebula`)은 `bakeSize`가 0이면 매 프레임 화면 해상도로 계산하고, 양수면 원점의 큐브 카메라로 그 크기 큐브맵에 구워 두고 `refreshSeconds`(게임 시간)마다 다시 굽는다. 큐브맵은 sRGB로 저장해 어두운 그러데이션이 띠지지 않게 한다.
 - 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·종이는 카메라에서 잰 거리(`distanceTo(cameraPosition)`) 기준으로 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
 
 **탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)

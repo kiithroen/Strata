@@ -3,6 +3,13 @@
  * 시간 단위는 초, 거리 단위는 월드 단위, 각도는 라디안이다.
  */
 export const tuning = {
+  render: {
+    /** 렌더러 픽셀 비율 상한. 기기의 devicePixelRatio 와 비교해 작은 쪽을 쓴다 */
+    maxPixelRatio: 2,
+    /** 다중 표본 계단 제거(MSAA) */
+    antialias: true,
+  },
+
   camera: {
     fovDeg: 50,
     near: 0.1,
@@ -280,6 +287,11 @@ export const tuning = {
      */
     dust: { count: 9000, armRadiusFloor: 0.35, haloRadius: [0.35, 1.2], haloElevation: 1.4, coreRadius: 0.3, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
     stars: { count: 2600, radius: 55, size: 1.8 },
+    /**
+     * 성운 배경. bakeSize 가 0 이면 매 프레임 화면 해상도로 계산하고, 양수면 그 크기(px)의 큐브맵에 구워 두고
+     * refreshSeconds(게임 시간)마다 다시 굽는다
+     */
+    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2 },
   },
 
   dev: {
@@ -327,6 +339,25 @@ export const tuning = {
     wheelZoomSpeed: 0.18,
     pinchZoomScale: 1.0,
     maxPitch: 1.35,
+  },
+
+  /** 성능 표시(?perf): 통계를 내는 최근 프레임 수, 글자를 고치는 간격(초), 중앙값 대비 이 배율을 넘는 프레임 간격을 끊김으로 센다 */
+  perf: {
+    window: 240,
+    refreshSeconds: 0.5,
+    dropRatio: 1.5,
+  },
+
+  /**
+   * 품질 프리셋(?q=). 키는 주소 덮어쓰기 키와 같다(src/core/quality.ts).
+   * 빠진 키는 위 기본값을 그대로 쓴다
+   */
+  quality: {
+    presets: {
+      low: { pr: 1, aa: 0, dust: 3000, stars: 1200, nebula: 128, seg: 6, tex: 224 },
+      mid: { pr: 1.5, aa: 1, dust: 5500, stars: 1800, nebula: 256, seg: 8, tex: 288 },
+      high: {},
+    },
   },
 
   loop: {

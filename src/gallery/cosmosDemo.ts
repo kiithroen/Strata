@@ -108,7 +108,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   look.uShade.value = c.paperShade;
   look.uBend.value = 1;
   const labels = new LabelCache();
-  const universe = new Universe(stage.renderer.getPixelRatio());
+  const universe = new Universe(stage.renderer);
   stage.scene.add(universe.group);
 
   const newest = new Date(2026, 10, 15, 21, 30).getTime();

@@ -1,6 +1,8 @@
 import './style.css';
 import { tuning } from './config';
+import { applyQuality, parseQuality } from './core/quality';
 import { pickDemo, widgetDemos } from './gallery/registry';
+import { PerfOverlay } from './gallery/perfOverlay';
 import { Stage, type WidgetDemo } from './gallery/stage';
 
 declare global {
@@ -21,6 +23,10 @@ const tabsEl = document.getElementById('widget-tabs');
 const hintEl = document.getElementById('hint');
 if (!container || !tabsEl || !hintEl) throw new Error('index.html 구조가 맞지 않는다');
 
+// 주소의 품질 덮어쓰기(?q=, ?dust= 등)는 위젯이 튜닝 값을 읽기 전에 적용한다
+applyQuality(parseQuality(location.search));
+const params = new URLSearchParams(location.search);
+
 const stage = new Stage(container);
 const { id, factory } = pickDemo(location.search);
 const demo = factory(stage);
@@ -35,15 +41,27 @@ for (const widgetId of Object.keys(widgetDemos)) {
   tabsEl.appendChild(a);
 }
 
+const perf = params.has('perf') ? new PerfOverlay(stage.renderer) : null;
+
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다
 let time = 0;
 let last: number | null = null;
 stage.renderer.setAnimationLoop((now: number) => {
-  const dt = last === null ? 0 : Math.min((now - last) / 1000, tuning.loop.maxStep);
+  const frameMs = last === null ? 0 : now - last;
+  const dt = Math.min(frameMs / 1000, tuning.loop.maxStep);
   last = now;
   time += dt;
+  if (!perf) {
+    demo.update(dt, time);
+    stage.render();
+    return;
+  }
+  const t0 = performance.now();
   demo.update(dt, time);
+  const t1 = performance.now();
   stage.render();
+  const t2 = performance.now();
+  if (frameMs > 0) perf.record(frameMs, t1 - t0, t2 - t1);
 });
 
 if (import.meta.env.DEV) {

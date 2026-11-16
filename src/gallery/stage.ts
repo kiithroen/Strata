@@ -14,8 +14,9 @@ export class Stage {
   constructor(readonly container: HTMLElement) {
     const c = tuning.camera;
     const l = tuning.look;
-    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const r = tuning.render;
+    this.renderer = new WebGLRenderer({ antialias: r.antialias, powerPreference: 'high-performance' });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, r.maxPixelRatio));
     container.appendChild(this.renderer.domElement);
 
     this.camera = new PerspectiveCamera(c.fovDeg, 1, c.near, c.far);

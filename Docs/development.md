@@ -16,6 +16,29 @@ npm run dev
 - **USB(권장)**: 폰을 USB 디버깅으로 연결하고 `adb reverse tcp:5173 tcp:5173`을 실행한 뒤 폰 브라우저에서 `http://localhost:5173/`을 연다. 주소가 localhost라 보안 컨텍스트가 필요한 API(저장소 영구화 등)도 쓸 수 있다. PC 크롬의 `chrome://inspect`로 폰 화면의 콘솔을 볼 수 있다.
 - **같은 와이파이**: `npm run dev:lan`으로 띄우고 출력에 나온 Network 주소를 폰에서 연다. 주소가 localhost가 아니라서 보안 컨텍스트가 필요한 API는 막힌다.
 
+## 성능 표시와 품질 덮어쓰기
+
+주소에 `perf`를 붙이면(`?w=cosmos&perf`) 왼쪽 위에 성능 표시가 뜬다(`src/gallery/perfOverlay.ts`). 개발 서버와 배포본 모두에서 동작한다.
+
+- 최근 `perf.window` 프레임의 FPS, 프레임 간격 중앙값·p95·최대, 끊김 비율(중앙값 × `perf.dropRatio`를 넘는 간격)
+- CPU 시간: 위젯 갱신과 그리기 명령 각각의 평균(최대). GPU가 실제로 그리는 시간은 프레임 간격에만 드러난다
+- 그리기 호출·삼각형·점·선 수, 텍스처·형상 수, 캔버스 크기와 적용된 픽셀 비율, MSAA, 지금 품질 값, GPU 이름
+- 아래 링크로 품질 프리셋(`quality.presets`)을 바로 오간다
+
+품질은 주소로 덮어쓴다(`src/core/quality.ts`). 시작할 때 한 번 `tuning`에 적용하므로 바꾸면 페이지를 다시 연다. `q`로 프리셋을 깔고 개별 키가 그 위에 덮어쓴다.
+
+| 키 | 덮어쓰는 값 |
+|---|---|
+| `q` | 프리셋 이름(`quality.presets`) |
+| `pr` | 픽셀 비율 상한(`render.maxPixelRatio`) |
+| `aa` | `0`이면 MSAA를 끈다(`render.antialias`) |
+| `dust`, `stars` | 먼지·별 개수(`cosmos.dust.count`, `cosmos.stars.count`) |
+| `nebula` | `off`면 끄고, `0`이면 매 프레임 계산, 양수면 그 크기 큐브맵에 굽는다(`cosmos.nebula`) |
+| `seg` | 종이 휨 격자 칸 수(`card.segments`) |
+| `tex` | 떠 있는 카드 텍스처 폭(`card.textureWidth`) |
+
+맞는 값을 찾으면 `src/config.ts`의 기본값을 고친다.
+
 ## 배포
 
 `main`에 푸시하면 `.github/workflows/pages.yml`이 `npm ci`, `npm test`, `npm run build`를 돌리고 `dist`를 GitHub Pages에 올린다. 주소는 <https://kiithroen.github.io/Strata/>다. 테스트나 빌드가 실패하면 올라가지 않는다.
@@ -28,11 +51,11 @@ npm run dev
 | 경로 | 내용 |
 |---|---|
 | `src/config.ts` | 튜닝 값(`tuning`) |
-| `src/core/` | 위젯이 함께 쓰는 순수 로직: 지수 접근(`motion.ts`), 달력 단위(`calendar.ts`), 시드 난수, 날짜 표기 |
+| `src/core/` | 위젯이 함께 쓰는 순수 로직: 지수 접근(`motion.ts`), 달력 단위(`calendar.ts`), 시드 난수, 날짜 표기, 프레임 통계(`frameStats.ts`), 주소 품질 덮어쓰기(`quality.ts`) |
 | `src/widgets/<위젯>/` | 위젯 하나. 움직임·배치는 순수 로직, 텍스처·재질·메시는 뷰 |
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
-| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 등록표 |
+| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 등록표 |
 | `src/dev/` | 개발용 가짜 데이터 |
 | `test/` | vitest 단위 테스트(노드 환경) |
 

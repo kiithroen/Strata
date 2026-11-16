@@ -147,3 +147,42 @@ body {
 .time-scrubber.active .time-scrubber-marker {
   width: 18px;
 }
+
+/* 실기기 성능 표시(?perf) */
+.perf {
+  position: fixed;
+  left: 16px;
+  /* 시점 표시 아래, 오른쪽 시간 띠를 피한다 */
+  top: calc(env(safe-area-inset-top) + 64px);
+  max-width: calc(100vw - 72px);
+  padding: 6px 8px;
+  background: rgba(10, 10, 14, 0.78);
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1.45;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.perf pre {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+}
+
+.perf nav {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  pointer-events: auto;
+}
+
+.perf nav a {
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 4px 0;
+}
+
+.perf nav a.active {
+  color: var(--accent);
+}
