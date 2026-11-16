@@ -159,9 +159,36 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const flights = notes.map((n) => flightParams(n.id));
   const pins = notes.map((n) => paperPin(n.id));
   const homes = notes.map(createPose);
-  let clusters: Cluster[] = [];
-  let hubs: Hub[] = [];
-  let nodes: CosmosNode[] = [];
+
+  // 시계열 공간이 고정돼 있어 묶음·허브·관련도·글자는 한 번만 구하고, 노드 위치 벡터도 재사용한다
+  const unit = choosePlanetUnit(spiralState);
+  const parent = parentUnit(unit);
+  const capacity = swarmCapacity(unit);
+  const clusters: Cluster[] = clusterNotes(notes, unit);
+  const hubs: Hub[] = buildHubs(clusters, parent);
+  const planets = clusters.map((cluster) => {
+    const n = cluster.members.length;
+    const affinities = clusterAffinities(notes, cluster.members, unit);
+    return {
+      cluster,
+      offsetS: timeOffsetDepth(spiralState, cluster.anchorTime),
+      radius: planetRadius(n),
+      size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
+      glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
+      label: planetLabel(unit, floorTo(unit, cluster.anchorTime), n),
+      affinities,
+      /** 관련도 높은 순서의 묶음 안 번호 */
+      order: Array.from({ length: n }, (_, i) => i).sort((a, b) => affinities[b] - affinities[a]),
+      node: { kind: 'planet', key: cluster.key, anchorTime: cluster.anchorTime, position: new Vector3() } as CosmosNode,
+    };
+  });
+  const hubViews = hubs.map((hub) => ({
+    hub,
+    childOffsets: hub.children.map((ci) => planets[ci].offsetS),
+    label: planetLabel(parent ?? unit, hub.bucket, hub.notes),
+    node: { kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: new Vector3() } as CosmosNode,
+  }));
+  const nodes: CosmosNode[] = [...planets.map((p) => p.node), ...hubViews.map((h) => h.node)];
   let pinnedTime: number | null = newest;
   /** 먼지 흐름을 재는 지난 프레임의 시점 */
   let lastFocusTime = controller.current.focusTime;
@@ -345,23 +372,16 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       lastFocusTime = focusNow;
       universe.update(orbitClock, scrollS, cameraPosition);
 
-      const unit = choosePlanetUnit(spiralState);
-      clusters = clusterNotes(notes, unit);
-      const parent = parentUnit(unit);
-      hubs = buildHubs(clusters, parent);
-      const capacity = swarmCapacity(unit);
       const tau = gustTime(orbitClock);
       const gustNow = gust(orbitClock);
       const spin = g.burst.spin * orbitClock;
       const pose = focus.pose();
-      nodes = [];
       graph.begin();
 
       for (const st of nodeStates.values()) st.present = false;
-      const planetPositions: Vector3[] = [];
-      const planetOffsets: number[] = [];
 
-      clusters.forEach((cluster) => {
+      for (const planet of planets) {
+        const { cluster, affinities, order } = planet;
         let st = nodeStates.get(cluster.key);
         if (!st) {
           st = { jitter: planetJitter(cluster.key), fade: 0, present: true, position: new Vector3(), color: new Color(), size: 0 };
@@ -369,27 +389,21 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         }
         st.present = true;
         st.fade = damp(st.fade, 1, c.planetFadeRate, dt);
-        const n = cluster.members.length;
-        const offsetS = timeOffsetDepth(spiralState, cluster.anchorTime);
-        spiralPoint(offsetS, orbitClock, st.jitter, st.position);
+        spiralPoint(planet.offsetS, orbitClock, st.jitter, st.position);
+        planet.node.position.copy(st.position);
         const dist = st.position.distanceTo(cameraPosition);
         st.color.copy(noteColors[cluster.members[0]]);
-        st.size = g.nodeSize * (1 + 0.15 * Math.sqrt(n));
-        planetPositions.push(st.position);
-        planetOffsets.push(offsetS);
-        nodes.push({ kind: 'planet', key: cluster.key, anchorTime: cluster.anchorTime, position: st.position.clone() });
+        st.size = planet.size;
 
         const alpha = st.fade * cosmosFade(dist);
         graph.dot(st.position, hubColor, st.size, alpha);
-        graph.glow(st.position, st.color, g.glowSize * (0.6 + 0.12 * Math.sqrt(n)), g.glowAlpha * alpha);
+        graph.glow(st.position, st.color, planet.glowSize, g.glowAlpha * alpha);
         labelPos.copy(st.position);
         labelPos.y -= st.size + c.planetLabelHeight * 0.9;
-        graph.label(labelPos, planetLabel(unit, floorTo(unit, cluster.anchorTime), n), c.planetLabelHeight, alpha * 0.85, cameraPosition);
+        graph.label(labelPos, planet.label, c.planetLabelHeight, alpha * 0.85, cameraPosition);
 
         facingQuaternion(st.position, cameraPosition, burstQuat);
-        const r = planetRadius(n);
-        const affinities = clusterAffinities(notes, cluster.members, unit);
-        const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => affinities[b] - affinities[a]);
+        const r = planet.radius;
         order.forEach((idx, rank) => {
           const m = cluster.members[idx];
           const affinity = affinities[idx];
@@ -435,20 +449,18 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
             cosmosFade(pinWorld.distanceTo(cameraPosition)) * st.fade * tied,
           );
         });
-      });
+      }
 
       // 허브: 안쪽 구면 껍질에 놓이고 자식 행성으로 가지를 뻗는다. 허브끼리는 시간 순서로 잇는다
       let prevHub: Vector3 | null = null;
-      for (const hub of hubs) {
-        const hp = hubPoint(
-          hub.children.map((ci) => planetOffsets[ci]),
-          orbitClock,
-          new Vector3(),
-        );
+      for (const view of hubViews) {
+        const { hub } = view;
+        const hp = hubPoint(view.childOffsets, orbitClock, view.node.position);
         const hubAlpha = cosmosFade(hp.distanceTo(cameraPosition));
         for (const ci of hub.children) {
-          const childAlpha = Math.min(hubAlpha, cosmosFade(planetPositions[ci].distanceTo(cameraPosition)));
-          graph.branch(hp, planetPositions[ci], branchColor, g.branchAlpha * childAlpha);
+          const child = planets[ci].node.position;
+          const childAlpha = Math.min(hubAlpha, cosmosFade(child.distanceTo(cameraPosition)));
+          graph.branch(hp, child, branchColor, g.branchAlpha * childAlpha);
         }
         if (prevHub) {
           graph.branch(prevHub, hp, branchColor, g.branchAlpha * Math.min(hubAlpha, cosmosFade(prevHub.distanceTo(cameraPosition))));
@@ -457,15 +469,14 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         graph.glow(hp, branchColor, g.hubGlowSize, g.glowAlpha * hubAlpha);
         labelPos.copy(hp);
         labelPos.y += g.hubSize + g.hubLabelHeight * 0.6;
-        graph.label(labelPos, planetLabel(parent ?? unit, hub.bucket, hub.notes), g.hubLabelHeight, hubAlpha, cameraPosition);
-        nodes.push({ kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: hp });
+        graph.label(labelPos, view.label, g.hubLabelHeight, hubAlpha, cameraPosition);
         prevHub = hp;
       }
       // 허브가 없으면(가장 큰 단위) 행성끼리 시간 순서로 잇는다
       if (hubs.length === 0) {
-        for (let i = 1; i < planetPositions.length; i++) {
-          const a = planetPositions[i - 1];
-          const b = planetPositions[i];
+        for (let i = 1; i < planets.length; i++) {
+          const a = planets[i - 1].node.position;
+          const b = planets[i].node.position;
           const linkAlpha = Math.min(cosmosFade(a.distanceTo(cameraPosition)), cosmosFade(b.distanceTo(cameraPosition)));
           graph.branch(a, b, branchColor, g.branchAlpha * linkAlpha);
         }
