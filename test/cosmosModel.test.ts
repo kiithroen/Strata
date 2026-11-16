@@ -215,9 +215,11 @@ describe('돌풍에 날리는 종이', () => {
     const q = new Quaternion();
     const front = new Vector3();
     const outward = new Vector3();
+    const inPlane = new Vector3();
     const bound = s.flutterAmp + s.flutterAmp2;
     for (const id of ids.slice(0, 30)) {
       const f = flightParams(id);
+      const normal = new Vector3(0, 1, 0).applyQuaternion(f.orbit);
       let moved = 0;
       let prev: Quaternion | null = null;
       for (let t = 0; t < 40; t += 0.37) {
@@ -225,13 +227,59 @@ describe('돌풍에 날리는 종이', () => {
         flightQuaternion(f, gustTime(t), outward, q);
         expect(q.length()).toBeCloseTo(1, 9);
         front.set(0, 0, 1).applyQuaternion(q);
-        expect(front.angleTo(outward)).toBeLessThanOrEqual(bound + 1e-6);
+        // 앞면 기준은 outward 를 궤도면에 투영한 방향이다
+        inPlane.copy(outward).addScaledVector(normal, -outward.dot(normal));
+        expect(front.angleTo(inPlane)).toBeLessThanOrEqual(bound + 1e-6);
         if (prev) moved = Math.max(moved, q.angleTo(prev));
         prev = q.clone();
       }
       // 제자리에 굳어 있지 않고 적당히 팔랑이되 제 면 안에서 크게 뒤집히지 않는다
       expect(moved).toBeGreaterThan(0);
       expect(Math.abs(f.roll)).toBeLessThanOrEqual(s.rollAmp + 1e-12);
+    }
+  });
+
+  /** 궤도 한 바퀴를 촘촘히 돌며 이웃한 두 자세 사이 회전각의 최댓값 */
+  function maxOrbitStep(f: ReturnType<typeof flightParams>, planetR: number, affinity: number, steps: number): number {
+    const r = flightRadius(planetR, affinity);
+    const period = (Math.PI * 2) / Math.abs(f.speed * orbitSpeed(r));
+    const outward = new Vector3();
+    const q = new Quaternion();
+    const prev = new Quaternion();
+    let maxStep = 0;
+    for (let i = 0; i <= steps; i++) {
+      const tau = (period * i) / steps;
+      flightOffset(f, planetR, affinity, tau, 0, outward);
+      flightQuaternion(f, tau, outward, q);
+      if (i > 0) maxStep = Math.max(maxStep, q.angleTo(prev));
+      prev.copy(q);
+    }
+    return maxStep;
+  }
+
+  it('노드 위·아래(극)를 지나는 궤도에서도 종이 자세가 끊기지 않고 이어진다', () => {
+    // 궤도면이 Y축을 품어 종이가 극을 정면으로 지나는 경우
+    const base = flightParams('0007');
+    const poleOrbit = { ...base, orbit: new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), new Vector3(0, 0, 1)) };
+    expect(maxOrbitStep(poleOrbit, 2, 1, 20000)).toBeLessThan(0.05);
+    // 무작위 궤도면 전체
+    for (const id of ids.slice(0, 40)) {
+      expect(maxOrbitStep(flightParams(id), 0.3, 0.5, 5000)).toBeLessThan(0.05);
+    }
+  });
+
+  it('outward 가 정확히 위·아래를 향해도 정상 회전을 낸다', () => {
+    const q = new Quaternion();
+    const front = new Vector3();
+    for (const id of ids.slice(0, 10)) {
+      const f = flightParams(id);
+      for (const dir of [new Vector3(0, 1, 0), new Vector3(0, -1, 0)]) {
+        flightQuaternion(f, 0, dir, q);
+        expect(Number.isFinite(q.x + q.y + q.z + q.w)).toBe(true);
+        expect(q.length()).toBeCloseTo(1, 9);
+        front.set(0, 0, 1).applyQuaternion(q);
+        expect(front.angleTo(dir)).toBeLessThanOrEqual(Math.PI / 2);
+      }
     }
   });
 
