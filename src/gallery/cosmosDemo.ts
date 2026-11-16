@@ -54,6 +54,8 @@ import {
 import { createTimeReadout } from './timeReadout';
 import { createTimeScrubber } from './timeScrubber';
 import { CardFocus } from './cardFocus';
+import { StrataMode } from './strataMode';
+import type { StrataLayerInput } from '../widgets/strata/strataLayout';
 import type { Stage, WidgetDemo } from './stage';
 
 export interface CosmosNode {
@@ -75,6 +77,13 @@ export interface CosmosDemo extends WidgetDemo {
   focusedId(): string | null;
   /** 월드 위치의 화면 좌표(CSS px). 브라우저 확인 스크립트가 탭할 자리를 구할 때 쓴다 */
   screenOf(position: Vector3): { x: number; y: number };
+  /** 노드가 속한 위 묶음을 지층 보기로 펼친다 */
+  enterStrata(node: CosmosNode): void;
+  exitStrata(): void;
+  /** 지층 보기 상태: 들어간 정도, 층 수, 바라보는 층 */
+  strataState(): { active: boolean; mix: number; layers: number; focus: number };
+  /** 화면 좌표(CSS px)에서 처음 닿는 층 판 번호. 없으면 -1 */
+  pickStrataLayer(x: number, y: number): number;
 }
 
 /** 행성 노드가 나타나고 사라지는 상태. 묶음에서 빠진 노드는 마지막 자리에서 옅어진다 */
@@ -91,7 +100,7 @@ interface NodeState {
  * 우주 보기 데모. 시간 묶음은 나선팔 위의 빛나는 노드이고, 노드에서 노트 점이 방사형 선으로 뻗는다.
  * 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다.
  * 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
- * 노드를 탭하면 그 시점으로 다가가고, 종이를 탭하면 펼친다.
+ * 노드를 탭하면 그 노드가 속한 위 묶음을 지층 보기로 펼치고(strataMode.ts), 종이를 탭하면 펼친다.
  */
 export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const c = tuning.cosmos;
@@ -233,6 +242,43 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     initialDistance: c.initialDistance,
   });
 
+  const strata = new StrataMode(stage, cameraRig, labels);
+  let strataWasActive = false;
+
+  /** 노드가 속한 위 묶음(허브)의 아래 묶음들을 층으로 쌓는다. 허브가 없으면 그 행성 하나가 층이다 */
+  const enterStrata = (node: CosmosNode) => {
+    focus.set(null);
+    let children: number[];
+    let focusIndex = 0;
+    if (node.kind === 'hub') {
+      children = hubViews.find((h) => h.node === node)?.hub.children ?? [];
+    } else {
+      const pi = planets.findIndex((p) => p.node === node);
+      const hub = hubs.find((h) => h.children.includes(pi));
+      children = hub ? hub.children : [pi];
+      focusIndex = Math.max(0, children.indexOf(pi));
+    }
+    const layers: StrataLayerInput[] = children.map((ci) => {
+      const planet = planets[ci];
+      return {
+        key: planet.cluster.key,
+        label: planet.label,
+        anchorTime: planet.cluster.anchorTime,
+        tiles: planet.cluster.members.map((m, k) => ({
+          index: m,
+          id: notes[m].id,
+          width: cards[m].layout.worldWidth,
+          height: cards[m].layout.worldHeight,
+          affinity: planet.affinities[k],
+        })),
+      };
+    });
+    if (layers.length === 0) return;
+    const origin = node.kind === 'hub' ? planets[children[focusIndex]].node.position : node.position;
+    strata.enter(layers, focusIndex, origin);
+    pinnedTime = strata.focusTime;
+  };
+
   const stopGestures = listenGestures(canvas, {
     onTouchCountChange: (count) => {
       touchCount = count;
@@ -291,7 +337,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         focus.set(cardHit.card);
         return;
       }
-      // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다
+      // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다. 지층 보기에서는 노드를 고르지 않는다
       const rect = canvas.getBoundingClientRect();
       const pxPerUnit = rect.height / (2 * Math.tan((stage.camera.fov * Math.PI) / 360));
       const targets: TapTarget[] = [];
@@ -305,7 +351,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.paperTapRadius, (half * pxPerUnit) / depth) });
         picks.push({ card });
       }
-      for (const node of nodes) {
+      for (const node of strata.active ? [] : nodes) {
         if (cameraDepth(node.position) < c.nearDepth) continue;
         if (cosmosFade(node.position.distanceTo(cameraPosition)) <= 0.05) continue;
         const sp = screenOf(node.position);
@@ -313,16 +359,23 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         picks.push({ node });
       }
       const i = pickNearest(targets, x, y);
-      if (i < 0) return;
+      if (i < 0) {
+        // 지층 보기에서 빈 곳을 탭하면 그 자리의 층을 바라본다
+        if (strata.active) {
+          const li = strata.pickLayer(x, y);
+          if (li >= 0) {
+            strata.focusLayer(li);
+            pinnedTime = strata.focusTime;
+          }
+        }
+        return;
+      }
       const chosen = picks[i];
       if ('card' in chosen) {
         focus.set(chosen.card);
         return;
       }
-      const node = chosen.node;
-      pinnedTime = node.anchorTime;
-      controller.focusOn(node.anchorTime, 'month');
-      cameraRig.focusPoint(node.position, node.kind === 'planet' ? c.planetFocusDistance : c.hubFocusDistance);
+      enterStrata(chosen.node);
     },
   });
 
@@ -333,6 +386,11 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     maxTime: newest,
     noteTimes: notes.map((n) => n.time),
     onScrub: (t) => {
+      if (strata.active) {
+        strata.focusNearestTime(t);
+        pinnedTime = strata.focusTime;
+        return;
+      }
       pinnedTime = t;
       controller.current.focusTime = t;
       controller.target.focusTime = t;
@@ -356,9 +414,26 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     focus: (card) => focus.set(card),
     focusedId: () => focus.focused?.id ?? null,
     screenOf,
+    enterStrata,
+    exitStrata: () => strata.exit(),
+    pickStrataLayer: (x, y) => strata.pickLayer(x, y),
+    strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
       look.uTime.value = time;
-      orbitPace = damp(orbitPace, touchCount > 0 || scrubbing || panning ? 0 : 1, c.holdRate, dt);
+      // 지층 보기 동안에는 은하가 멈춰 있어 돌아왔을 때 보던 자리 그대로다
+      strata.update(dt);
+      const mix = strata.mix;
+      graph.alphaScale = 1 - mix * (1 - tuning.strata.galaxyDim);
+      look.uBend.value = 1 - mix * (1 - tuning.strata.bend);
+      if (strata.active) {
+        pinnedTime = strata.focusTime;
+        if (pinnedTime !== null) controller.target.focusTime = pinnedTime;
+      } else if (strataWasActive) {
+        // 은하로 돌아오면 다시 궤도 중심과 가장 가까운 노드의 시각을 따른다
+        pinnedTime = null;
+      }
+      strataWasActive = strata.active;
+      orbitPace = damp(orbitPace, touchCount > 0 || scrubbing || panning || strata.active ? 0 : 1, c.holdRate, dt);
       const clockStep = dt * orbitPace;
       orbitClock += clockStep;
       // 은하가 도는 만큼 피벗도 함께 돌아 포커스한 노드·시점이 화면 가운데에 머문다
@@ -418,7 +493,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           home.scale = c.satelliteScale;
           const card = cards[m];
           const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * st.fade * paperFade[m];
-          card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, baseFade));
+          const fade = strata.blendCard(m, home, baseFade);
+          card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
@@ -439,14 +515,15 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
             pinWorld,
           );
           spokeEnd.copy(dotP).lerp(pinWorld, tied);
-          const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition));
+          // 지층 보기 동안에는 창이 은하 노드에서 멀리 옮겨 가므로 실을 걷는다
+          const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition)) * (1 - strata.mix);
           graph.spoke(st.position, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
           graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(dotP.distanceTo(cameraPosition)) * (1 - tied));
           graph.dot(
             pinWorld,
             noteColors[m],
             (g.pinSize * card.mesh.scale.x) / c.satelliteScale,
-            cosmosFade(pinWorld.distanceTo(cameraPosition)) * st.fade * tied,
+            cosmosFade(pinWorld.distanceTo(cameraPosition)) * st.fade * tied * (1 - strata.mix),
           );
         });
       }
@@ -515,6 +592,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       scrubber.update();
     },
     dispose() {
+      strata.dispose();
       stopGestures();
       stopResize();
       scrubber.dispose();

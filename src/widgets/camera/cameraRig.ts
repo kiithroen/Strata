@@ -48,6 +48,9 @@ export class CameraRig {
   private isDragging = false;
   private yawVel = 0;
   private pitchVel = 0;
+  /** orbitTo 로 정한 목표 시선 각도. 손가락으로 돌리기 시작하면 버린다 */
+  private goalYaw: number | null = null;
+  private goalPitch: number | null = null;
 
   constructor(private readonly options: CameraRigOptions) {
     this.yaw = wrapAngle(options.initialYaw ?? 0);
@@ -87,6 +90,18 @@ export class CameraRig {
     this.goalTarget.applyAxisAngle(WORLD_Y, angle);
   }
 
+  /** 시선 각도를 목표 각도로 부드럽게 돌린다(focusRate). yaw 를 생략하면 좌우는 그대로 둔다 */
+  orbitTo(pitch: number, yaw?: number): void {
+    this.cancelInertia();
+    this.goalPitch = clampPitch(pitch);
+    this.goalYaw = yaw === undefined ? null : wrapAngle(yaw);
+  }
+
+  /** 목표 거리를 그대로 정한다(focusPoint 는 줄이기만 한다) */
+  setGoalDistance(distance: number): void {
+    this.goalDistance = clampDistance(distance);
+  }
+
   /** 현재 목표 거리에 배율을 곱해 연속 줌한다 */
   zoomByFactor(factor: number): void {
     if (!Number.isFinite(factor) || factor <= 0) return;
@@ -119,6 +134,8 @@ export class CameraRig {
   onDragStart(): void {
     this.isDragging = true;
     this.cancelInertia();
+    this.goalYaw = null;
+    this.goalPitch = null;
   }
 
   onDragMove(dx: number, dy: number): void {
@@ -151,6 +168,16 @@ export class CameraRig {
     this.target.lerp(this.goalTarget, fFocus);
 
     if (this.isDragging) return;
+
+    if (this.goalPitch !== null) {
+      this.pitch += (this.goalPitch - this.pitch) * fFocus;
+      if (Math.abs(this.goalPitch - this.pitch) < 1e-5) this.goalPitch = null;
+    }
+    if (this.goalYaw !== null) {
+      const diff = shortestAngleDiff(this.yaw, this.goalYaw);
+      this.yaw = wrapAngle(this.yaw + diff * fFocus);
+      if (Math.abs(diff) < 1e-5) this.goalYaw = null;
+    }
 
     if (this.yawVel === 0 && this.pitchVel === 0) return;
     const r = g.lookInertiaDecay;

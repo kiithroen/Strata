@@ -33,6 +33,8 @@ export class GraphView {
   private readonly labelGeometry = new PlaneGeometry(1, 1);
   private readonly labelPool: Mesh<PlaneGeometry, MeshBasicMaterial>[] = [];
   private labelCount = 0;
+  /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
+  alphaScale = 1;
 
   constructor(
     private readonly labels: LabelCache,
@@ -65,22 +67,23 @@ export class GraphView {
   }
 
   branch(a: Vector3, b: Vector3, color: Color, alpha: number): void {
-    this.branches.add(a, b, color, alpha);
+    this.branches.add(a, b, color, alpha * this.alphaScale);
   }
 
   spoke(a: Vector3, b: Vector3, color: Color, alpha: number): void {
-    this.spokes.add(a, b, color, alpha);
+    this.spokes.add(a, b, color, alpha * this.alphaScale);
   }
 
   dot(p: Vector3, color: Color, size: number, alpha: number): void {
-    this.dots.add(p, color, size, alpha);
+    this.dots.add(p, color, size, alpha * this.alphaScale);
   }
 
   glow(p: Vector3, color: Color, size: number, alpha: number): void {
-    this.glows.add(p, color, size, alpha);
+    this.glows.add(p, color, size, alpha * this.alphaScale);
   }
 
-  label(p: Vector3, text: string, height: number, alpha: number, cameraPosition: Vector3): void {
+  label(p: Vector3, text: string, height: number, rawAlpha: number, cameraPosition: Vector3): void {
+    const alpha = rawAlpha * this.alphaScale;
     if (alpha < 0.01) return;
     let mesh = this.labelPool[this.labelCount];
     if (!mesh) {

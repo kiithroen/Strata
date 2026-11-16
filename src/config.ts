@@ -181,12 +181,10 @@ export const tuning = {
     twist: 2.2,
     elevationAmp: 0.72,
     elevationFreq: 1.25,
-    /** 궤도 카메라 거리 범위·기본 거리·노드 탭 포커스 거리·초기 각도(라디안) */
+    /** 궤도 카메라 거리 범위·기본 거리·초기 각도(라디안) */
     initialDistance: 11.0,
     minDistance: 1.6,
     maxDistance: 36,
-    planetFocusDistance: 4.2,
-    hubFocusDistance: 7.8,
     initialOrbit: { yaw: 0.35, pitch: 0.28 },
     /**
      * 노트가 행성에 끌리는 관련도: timeScale 은 시간 점수가 1/e 로 줄어드는 거리(행성 단위 길이 대비),
@@ -284,6 +282,38 @@ export const tuning = {
      * refreshSeconds(게임 시간)마다 다시 굽는다
      */
     nebula: { visible: true, bakeSize: 0, refreshSeconds: 2 },
+  },
+
+  /**
+   * 지층 보기: 은하에서 노드를 고르면 그 노드가 속한 위 묶음(예: 달)을 아래 묶음(예: 날)별 수평 층으로 쌓아 내려다본다.
+   * 최근 층이 위다. 층 안에서는 노트 창이 바닥에 눕혀 깔린다.
+   */
+  strata: {
+    /** 층 사이 높이(월드) */
+    layerGap: 1.4,
+    /** 노트 창 배율(card.width 기준 크기 대비). 관련도가 낮은 노트부터 높은 노트까지 */
+    cardScale: [0.42, 0.62],
+    /** 칸 사이 여백(가장 큰 창 대각선 대비)과 칸 안에서 비트는 요의 최대각(라디안) */
+    cellGap: 0.16,
+    yawJitter: 0.2,
+    /** 층 판이 창 무리보다 넓게 두르는 여백(월드)과 판 안 격자 간격(월드) */
+    margin: 0.3,
+    gridStep: 0.45,
+    /** 판 바탕·테두리·격자의 불투명도, 날짜 글자 높이(월드) */
+    fillAlpha: 0.035,
+    frameAlpha: 0.55,
+    gridAlpha: 0.1,
+    labelHeight: 0.14,
+    /** 바라보는 층이 아닌 층의 밝기 배율 */
+    otherLayerAlpha: 0.45,
+    /** 들어가고 나오는 전환 속도(1/초) */
+    transitionRate: 3.2,
+    /** 카메라가 층을 내려다보는 각(라디안)과 거리 */
+    pitch: 0.8,
+    distance: 5.2,
+    /** 지층 보기 동안 은하 그래프의 밝기 배율과 종이 휨 배율 */
+    galaxyDim: 0.03,
+    bend: 0.2,
   },
 
   dev: {

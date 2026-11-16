@@ -53,7 +53,7 @@ npm run dev
 | `src/widgets/<위젯>/` | 위젯 하나. 움직임·배치는 순수 로직, 텍스처·재질·메시는 뷰 |
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
-| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
+| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
 | `src/dev/` | 개발용 가짜 데이터 |
 | `test/` | vitest 단위 테스트(노드 환경) |
 
@@ -84,10 +84,12 @@ npm run build
 - `demo`: 위젯 데모 객체
   - 노트 카드: `cards`, `focus(card | null)`, `focusedId()`
   - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
-  - 우주 보기: 시간축에 더해 `hubs()`, `nodes()`(지난 프레임의 행성·허브 노드), `screenOf(월드 위치)`(탭할 화면 좌표)
+  - 우주 보기: 시간축에 더해 `hubs()`, `nodes()`(지난 프레임의 행성·허브 노드), `screenOf(월드 위치)`(탭할 화면 좌표, CSS px), `enterStrata(노드)`·`exitStrata()`, `strataState()`, `pickStrataLayer(x, y)`
 - `time()`: 지금 게임 시간(초)
 - `advance(seconds, hz = 60)`: 게임 시간을 고정 간격으로 진행하고 한 번 그린다
 
 브라우저 창이 숨어 있으면 프레임이 멈추거나 느려져 게임 시간이 흐르지 않는다. 화면 확인 스크립트는 기다리지 말고 `advance`로 시간을 진행한 뒤 캡처한다.
+
+확인 도구의 캡처는 실제 화면 크기와 다를 수 있다. 캔버스에 보내는 좌표는 `getBoundingClientRect` 기준 CSS px로 구한다.
 
 움직이는 종이의 탭을 확인할 때는 화면 좌표를 구한 같은 스크립트 안에서 캔버스에 `pointerdown`·`pointerup`을 보낸다. 확인 도구의 클릭은 그 사이에 프레임이 지나 종이가 이미 날아가 있을 수 있다.

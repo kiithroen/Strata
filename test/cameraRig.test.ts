@@ -15,6 +15,39 @@ function makeRig(opts?: { yaw?: number; pitch?: number; distance?: number }) {
 }
 
 describe('CameraRig', () => {
+  it('orbitTo 는 같은 게임 시간이면 주사율과 상관없이 같은 각도에 닿고, 짧은 쪽으로 돈다', () => {
+    const goal = { pitch: 0.8, yaw: -2.9 };
+    const run = (hz: number) => {
+      const rig = makeRig({ yaw: 2.9, pitch: 0.1 });
+      rig.orbitTo(goal.pitch, goal.yaw);
+      for (let i = 0; i < Math.round(0.4 * hz); i++) rig.step(1 / hz);
+      return { yaw: rig.yaw, pitch: rig.pitch };
+    };
+    const ref = run(60);
+    for (const hz of [30, 90, 120, 150]) {
+      const r = run(hz);
+      expect(r.yaw).toBeCloseTo(ref.yaw, 9);
+      expect(r.pitch).toBeCloseTo(ref.pitch, 9);
+    }
+    // 2.9 → -2.9 는 π 를 넘어가는 짧은 길(약 0.48 rad)로 돌아 그 사이에 머문다
+    expect(Math.abs(ref.yaw)).toBeGreaterThan(2.9 - 1e-9);
+    const rig = makeRig({ pitch: 0.1 });
+    rig.orbitTo(goal.pitch);
+    for (let i = 0; i < 600; i++) rig.step(1 / 60);
+    expect(rig.pitch).toBeCloseTo(goal.pitch, 4);
+    expect(rig.yaw).toBe(0);
+  });
+
+  it('손가락으로 돌리기 시작하면 orbitTo 목표를 버린다', () => {
+    const rig = makeRig({ pitch: 0.1 });
+    rig.orbitTo(0.9, 1.0);
+    rig.onDragStart();
+    rig.onDragEnd(0, 0);
+    for (let i = 0; i < 120; i++) rig.step(1 / 60);
+    expect(rig.pitch).toBeCloseTo(0.1, 12);
+    expect(rig.yaw).toBeCloseTo(0, 12);
+  });
+
   it('한 손가락 끌기로 360° 좌우 회전하고 상하 각도는 maxPitch 안으로 제한된다', () => {
     const rig = makeRig();
     rig.onDragStart();

@@ -4,7 +4,7 @@
 
 | 위젯 | 갤러리 이름 | 상태 |
 |---|---|---|
-| 우주 보기 | `cosmos` | 구현됨. 앱의 주 화면이다 |
+| 우주 보기 | `cosmos` | 구현됨. 앱의 주 화면이다. 노드를 고르면 지층 보기로 바뀐다 |
 | 시간축 | `time-axis` | 구현됨. 우주 보기가 쓰는 시간 모델을 레일로 보여 주는 확인용 화면이다 |
 | 노트 카드 | `note-card` | 구현됨 |
 | 카메라·제스처 | | 구현됨. 우주 보기와 시간축에 붙어 동작한다 |
@@ -144,8 +144,36 @@
 - 손가락이 화면에 닿아 있거나 팬 중에는 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
 - 은하가 도는 만큼(`galaxySpinAngle`) 피벗(`target`, `goalTarget`)도 원점 Y축 둘레로 함께 돈다(`rotateTargetsAroundY`). 포커스한 노드·시점은 화면 가운데에 머물고, 시선 각도는 그대로라 주변 은하가 피벗 둘레로 도는 것처럼 보인다.
 - 한 손가락·마우스 왼쪽 끌기로 중심 피벗(`target`) 둘레를 궤도 회전(`CameraRig`)하고, 두 손가락 이동·마우스 오른쪽·가운데·`Shift` 끌기로 화면 평면을 따라 팬(`pan`)하며, 핀치·마우스 휠·트랙패드 핀치로 스냅 없이 연속 거리 줌(`zoomByFactor`)한다. 오른쪽 시간 띠(`src/gallery/timeScrubber.ts`)를 끌거나 누르면 해당 시각의 나선 좌표로 피벗을 부드럽게 옮긴다.
-- 탭 광선이 종이에 정확히 맞으면 지금 카메라 정면으로 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 노드를 탭하면 3D 피벗이 그 노드 좌표로 부드럽게 옮겨 가며 행성은 `cosmos.planetFocusDistance`, 허브는 `cosmos.hubFocusDistance` 안쪽으로 다가간다.
+- 탭 광선이 종이에 정확히 맞으면 지금 카메라 정면으로 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 노드를 탭하면 지층 보기로 들어간다(아래 "지층 보기").
 - 펼친 상태에서 아무 데나 탭하면 닫는다. 왼쪽 위 시점 표시(`src/gallery/timeReadout.ts`)와 시간 띠 빨간 눈금은 선택한 노드·시간 띠 시각이나 수동 팬 중 피벗에 가장 가까운 노드 시각을 따른다.
+
+## 지층 보기
+
+파일: `src/widgets/strata/` (배치 `strataLayout.ts`, 층 판 `StrataView.ts`), 전환 `src/gallery/strataMode.ts`
+
+은하(우주 보기)에서 크게 탐색하다가 노드를 고르면, 그 노드가 속한 위 묶음(허브, 예: 달)의 아래 묶음(행성, 예: 날)을 수평 층으로 쌓아 내려다보는 두 번째 단계다. 뒤로 가면 은하로 돌아온다.
+
+**들어가고 나오기**
+- 행성 노드를 탭하면 그 행성이 속한 허브의 행성들이 층이 되고, 고른 행성의 층을 바라본다. 허브 노드를 탭하면 그 허브의 가장 최근 층을 바라본다. 허브가 없으면(가장 큰 단위) 그 행성 하나가 층이다.
+- 고른 층 판의 중심은 고른 노드 자리이고, 판은 들어갈 때의 카메라 요만큼 돌아 앞에서 보면 창의 글이 바로 읽힌다. 카메라는 그 자리로 피벗을 옮기며 `strata.distance` 거리, `strata.pitch` 각도로 내려다본다.
+- 나올 때는 들어가기 전 피벗·거리·각도로 돌아간다. 지층 보기 동안 은하는 멈춰 있어(공전 시계 정지) 돌아오면 보던 자리 그대로다.
+- 왼쪽 아래 `← 은하로` 단추, 브라우저·안드로이드 뒤로, `Esc`로 나온다. 들어갈 때 방문 기록을 하나 쌓고, 단추·`Esc`로 나올 때는 그 기록을 되돌린다.
+- 들어간 정도(`mix`, 0~1)는 `strata.transitionRate`로 지수 접근한다. 층에 깔리는 노트 창은 은하 자세와 지층 자세를 `mix`로 섞어 날아가 눕고 또렷해진다. 나머지 창은 옅어진다. 은하 그래프는 `strata.galaxyDim` 배로 옅어지고 노드에서 창으로 가는 실은 걷힌다. 종이 휨은 `strata.bend` 배로 줄어든다.
+
+**배치** (`layoutStrata`, `strataPose`)
+- 최근 층이 위다. 고른 층이 높이 0이고 층마다 `strata.layerGap`씩 차이 난다.
+- 창 크기는 관련도(우주 보기의 행성 관련도)에 따라 `strata.cardScale` 범위다. 칸 크기는 그 층에서 가장 큰 창의 대각선 × (1 + `strata.cellGap`)이고, 칸 수는 √n 열의 격자다. 관련도가 높은 창일수록 판 가운데 칸에 놓인다.
+- 창은 칸 안에서 노트 번호로 정한 만큼 흔들리고 `strata.yawJitter`까지 비틀린다. 비튼 창이 차지하는 원이 칸을 넘지 않아 창끼리 겹치지 않는다.
+- 창은 앞면이 위를 보도록 눕고, 창의 위쪽이 판 안쪽(보는 쪽 반대)을 향한다.
+
+**층 판** (`StrataView`)
+- 층마다 아주 옅은 바탕(`strata.fillAlpha`), 흐린 격자(`strata.gridStep`, `strata.gridAlpha`), 테두리와 모서리 꺾쇠(`strata.frameAlpha`), 앞 왼쪽 모서리 밖의 날짜(`strata.labelHeight`)를 그린다. 판은 창 무리보다 `strata.margin`만큼 넓다.
+- 바라보는 층은 밝고 나머지 층은 `strata.otherLayerAlpha` 배로 옅다.
+
+**조작**
+- 끌기·핀치·팬은 은하와 같은 궤도 카메라 조작이다.
+- 창을 탭하면 펼친다. 빈 곳을 탭하면 탭 광선이 처음 닿는 층 판을 바라본다(`pickLayer`). 노드는 고르지 않는다.
+- 시간 띠를 끌면 그 시각에 가장 가까운 층을 바라본다(`nearestLayer`). 시점 표시는 바라보는 층의 시각이다.
 
 ## 카메라·제스처
 
@@ -162,7 +190,8 @@
 - 화면 높이 대비 세로 시야각(`fovDeg`)과 `gesture.lookDragScale` 비율로 px 이동량을 궤도 각도(`yaw`·`pitch`)로 바꾸고, `pitch`는 `gesture.maxPitch` 안에서 제한한다. 한 손가락 릴리스 속도가 `gesture.lookStopSpeed` 이상이면 `gesture.lookInertiaDecay`로 감쇠하는 관성 회전이 이어진다.
 - `pan`은 현재 거리와 시야각 비율로 화면 이동량을 카메라 오른쪽·위쪽 벡터 이동으로 바꿔 `target`을 평행 이동한다.
 - `zoomByFactor`는 `goalDistance`를 `cosmos.minDistance`~`cosmos.maxDistance` 범위에서 스냅 없이 연속 조절하고 `gesture.zoomRate`로 수렴한다.
-- `focusPoint`는 `goalTarget`과 최대 거리를 설정해 `gesture.focusRate`로 부드럽게 이동한다.
+- `focusPoint`는 `goalTarget`과 최대 거리를 설정해 `gesture.focusRate`로 부드럽게 이동한다. `setGoalDistance`는 목표 거리를 그대로 정한다.
+- `orbitTo(pitch, yaw?)`는 시선 각도를 목표 각도로 `gesture.focusRate` 지수 접근시킨다. 좌우는 짧은 쪽으로 돌고, 손가락으로 돌리기 시작하면 목표를 버린다.
 
 **시간축 탐색** (`AxisNavigation`, `time-axis` 데모)
 - `time-axis` 데모(`dragTime: true`)에서는 세로 끌기(`gesture.dragDepthPerScreen`)와 관성(`gesture.inertiaDecay`, `gesture.inertiaStopSpeed`)으로 이동하고, 핀치(`gesture.pinchScale`)와 마우스 휠(`gesture.wheelScalePer100`, `gesture.wheelSnapDelay`)로 축척을 바꾸고 놓으면 `nearestLevel` 단계로 스냅한다.
