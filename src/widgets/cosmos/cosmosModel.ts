@@ -107,6 +107,14 @@ export function spiralAngle(s: number, time: number): number {
   return c.twist * spiralArc(s) + c.spin * time;
 }
 
+/**
+ * 공전 시계가 dClock 만큼 흐르는 동안 은하 회전(cosmos.spin)이 나선 위 점을 원점 Y축 둘레로 돌리는 각도.
+ * three 의 오른손 Y축 회전 각도라 Vector3.applyAxisAngle(+Y, 각도)에 그대로 넣는다.
+ */
+export function galaxySpinAngle(dClock: number): number {
+  return -tuning.cosmos.spin * dClock;
+}
+
 /** 구면 나선 고도각(라디안. s=0 에서 0 이고 위아래로 감아 돈다) */
 export function spiralElevation(s: number): number {
   const c = tuning.cosmos;

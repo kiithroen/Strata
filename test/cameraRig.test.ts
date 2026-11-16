@@ -2,6 +2,7 @@ import { PerspectiveCamera, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { CameraRig, shortestAngleDiff } from '../src/widgets/camera/cameraRig';
+import { galaxySpinAngle, hubPoint, planetJitter, spiralPoint } from '../src/widgets/cosmos/cosmosModel';
 
 function makeRig(opts?: { yaw?: number; pitch?: number; distance?: number }) {
   return new CameraRig({
@@ -101,5 +102,31 @@ describe('CameraRig', () => {
     expect(rig.distance).toBeCloseTo(5, 2);
     rig.applyTo(cam);
     expect(cam.position.distanceTo(rig.target)).toBeCloseTo(rig.distance, 5);
+  });
+
+  it('은하 회전만큼 피벗을 돌리면 포커스한 노드·허브 자리를 계속 따라간다', () => {
+    const jitter = planetJitter('month:test');
+    const t0 = 3;
+    const seconds = 40;
+    const node = spiralPoint(18, t0, jitter, new Vector3());
+    const hub = hubPoint([12, 18, 26], t0, new Vector3());
+    for (const [start, at] of [
+      [node, (t: number) => spiralPoint(18, t, jitter, new Vector3())],
+      [hub, (t: number) => hubPoint([12, 18, 26], t, new Vector3())],
+    ] as const) {
+      const rig = makeRig();
+      rig.target.copy(start);
+      rig.goalTarget.copy(start);
+      const dt = 1 / 60;
+      for (let i = 0; i < seconds * 60; i++) {
+        rig.rotateTargetsAroundY(galaxySpinAngle(dt));
+        rig.step(dt);
+      }
+      const expected = at(t0 + seconds);
+      // 회전이 실제로 일어나 자리가 바뀌었는지와, 그 자리를 따라갔는지를 함께 본다
+      expect(expected.distanceTo(start)).toBeGreaterThan(0.1);
+      expect(rig.target.distanceTo(expected)).toBeLessThan(1e-6);
+      expect(rig.goalTarget.distanceTo(expected)).toBeLessThan(1e-6);
+    }
   });
 });

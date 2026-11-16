@@ -136,6 +136,7 @@
 
 **탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)
 - 손가락이 화면에 닿아 있거나 팬 중에는 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
+- 은하가 도는 만큼(`galaxySpinAngle`) 피벗(`target`, `goalTarget`)도 원점 Y축 둘레로 함께 돈다(`rotateTargetsAroundY`). 포커스한 노드·시점은 화면 가운데에 머물고, 시선 각도는 그대로라 주변 은하가 피벗 둘레로 도는 것처럼 보인다.
 - 한 손가락·마우스 왼쪽 끌기로 중심 피벗(`target`) 둘레를 궤도 회전(`CameraRig`)하고, 두 손가락 이동·마우스 오른쪽·가운데·`Shift` 끌기로 화면 평면을 따라 팬(`pan`)하며, 핀치·마우스 휠·트랙패드 핀치로 스냅 없이 연속 거리 줌(`zoomByFactor`)한다. 오른쪽 시간 띠(`src/gallery/timeScrubber.ts`)를 끌거나 누르면 해당 시각의 나선 좌표로 피벗을 부드럽게 옮긴다.
 - 탭 광선이 종이에 정확히 맞으면 지금 카메라 정면으로 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 노드를 탭하면 3D 피벗이 그 노드 좌표로 부드럽게 옮겨 가며 행성은 `cosmos.planetFocusDistance`, 허브는 `cosmos.hubFocusDistance` 안쪽으로 다가간다.
 - 펼친 상태에서 아무 데나 탭하면 닫는다. 왼쪽 위 시점 표시(`src/gallery/timeReadout.ts`)와 시간 띠 빨간 눈금은 선택한 노드·시간 띠 시각이나 수동 팬 중 피벗에 가장 가까운 노드 시각을 따른다.

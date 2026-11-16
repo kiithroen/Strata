@@ -11,6 +11,8 @@ export interface CameraRigOptions {
   initialTarget?: Vector3;
 }
 
+const WORLD_Y = new Vector3(0, 1, 0);
+
 export function wrapAngle(a: number): number {
   let r = (a + Math.PI) % (Math.PI * 2);
   if (r < 0) r += Math.PI * 2;
@@ -86,6 +88,16 @@ export class CameraRig {
     if (maxDistance !== undefined) {
       this.goalDistance = clampDistance(Math.min(this.goalDistance, maxDistance));
     }
+  }
+
+  /**
+   * 궤도 중심(target)과 목표 중심(goalTarget)을 원점 Y축 둘레로 angle 만큼 돌린다.
+   * 장면이 원점 둘레로 돌 때 피벗이 보던 자리를 따라가게 한다. 시선 각도(yaw·pitch)는 그대로 둔다.
+   */
+  rotateTargetsAroundY(angle: number): void {
+    if (angle === 0) return;
+    this.target.applyAxisAngle(WORLD_Y, angle);
+    this.goalTarget.applyAxisAngle(WORLD_Y, angle);
   }
 
   /** 현재 목표 거리에 배율을 곱해 연속 줌한다 */

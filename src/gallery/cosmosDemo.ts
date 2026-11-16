@@ -28,6 +28,7 @@ import {
   planetJitter,
   planetLabel,
   planetRadius,
+  galaxySpinAngle,
   spiralPoint,
   swarmCapacity,
   timeOffsetDepth,
@@ -328,7 +329,10 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     update(dt, time) {
       look.uTime.value = time;
       orbitPace = damp(orbitPace, touchCount > 0 || scrubbing || panning ? 0 : 1, c.holdRate, dt);
-      orbitClock += dt * orbitPace;
+      const clockStep = dt * orbitPace;
+      orbitClock += clockStep;
+      // 은하가 도는 만큼 피벗도 함께 돌아 포커스한 노드·시점이 화면 가운데에 머문다
+      cameraRig.rotateTargetsAroundY(galaxySpinAngle(clockStep));
       cameraRig.step(dt);
       cameraRig.applyTo(stage.camera);
       stage.camera.getWorldPosition(cameraPosition);
