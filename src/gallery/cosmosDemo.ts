@@ -100,7 +100,7 @@ interface NodeState {
  * 우주 보기 데모. 시간 묶음은 나선팔 위의 빛나는 노드이고, 노드에서 노트 점이 방사형 선으로 뻗는다.
  * 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다.
  * 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
- * 노드를 탭하면 그 노드가 속한 위 묶음을 지층 보기로 펼치고(strataMode.ts), 종이를 탭하면 펼친다.
+ * 은하에서는 노드든 종이든 탭하면 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 종이는 지층 보기에서 탭해야 펼친다.
  */
 export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const c = tuning.cosmos;
@@ -217,7 +217,6 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const camSpace = new Vector3();
   const offset = new Vector3();
   const target = new Vector3();
-  const labelPos = new Vector3();
   const pinWorld = new Vector3();
   const spokeEnd = new Vector3();
   const scrubPoint = new Vector3();
@@ -279,6 +278,16 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     pinnedTime = strata.focusTime;
   };
 
+  /** 노트가 속한 행성 번호 */
+  const planetOfNote = new Int32Array(notes.length).fill(-1);
+  planets.forEach((p, pi) => {
+    for (const m of p.cluster.members) planetOfNote[m] = pi;
+  });
+  const enterStrataOfCard = (card: NoteCard) => {
+    const pi = planetOfNote[cards.indexOf(card)];
+    if (pi >= 0) enterStrata(planets[pi].node);
+  };
+
   const stopGestures = listenGestures(canvas, {
     onTouchCountChange: (count) => {
       touchCount = count;
@@ -331,10 +340,11 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         focus.set(null);
         return;
       }
-      // 광선이 종이에 정확히 맞으면 그 종이다
+      // 광선이 종이에 정확히 맞으면 그 종이다. 은하에서는 펼치지 않고 그 종이의 묶음으로 지층 보기에 들어간다
       const cardHit = focus.pickHit(x, y);
       if (cardHit) {
-        focus.set(cardHit.card);
+        if (strata.active) focus.set(cardHit.card);
+        else enterStrataOfCard(cardHit.card);
         return;
       }
       // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다. 지층 보기에서는 노드를 고르지 않는다
@@ -372,7 +382,8 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       }
       const chosen = picks[i];
       if ('card' in chosen) {
-        focus.set(chosen.card);
+        if (strata.active) focus.set(chosen.card);
+        else enterStrataOfCard(chosen.card);
         return;
       }
       enterStrata(chosen.node);
@@ -473,9 +484,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         const alpha = st.fade * cosmosFade(dist);
         graph.dot(st.position, hubColor, st.size, alpha);
         graph.glow(st.position, st.color, planet.glowSize, g.glowAlpha * alpha);
-        labelPos.copy(st.position);
-        labelPos.y -= st.size + c.planetLabelHeight * 0.9;
-        graph.label(labelPos, planet.label, c.planetLabelHeight, alpha * 0.85, cameraPosition);
+        graph.label(st.position, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
 
         facingQuaternion(st.position, cameraPosition, burstQuat);
         const r = planet.radius;
@@ -544,9 +553,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         }
         graph.dot(hp, hubColor, g.hubSize, hubAlpha);
         graph.glow(hp, branchColor, g.hubGlowSize, g.glowAlpha * hubAlpha);
-        labelPos.copy(hp);
-        labelPos.y += g.hubSize + g.hubLabelHeight * 0.6;
-        graph.label(labelPos, view.label, g.hubLabelHeight, hubAlpha, cameraPosition);
+        graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, g.hubLabelPx * 1.1);
         prevHub = hp;
       }
       // 허브가 없으면(가장 큰 단위) 행성끼리 시간 순서로 잇는다

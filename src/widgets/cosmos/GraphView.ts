@@ -35,6 +35,9 @@ export class GraphView {
   private labelCount = 0;
   /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
   alphaScale = 1;
+  /** 카메라에서 거리 1 인 곳에서 화면 1 CSS px 이 차지하는 월드 길이. 글자를 화면 크기로 맞출 때 쓴다 */
+  private worldPerPx = 0.001;
+  private readonly labelUp = new Vector3();
 
   constructor(
     private readonly labels: LabelCache,
@@ -56,6 +59,7 @@ export class GraphView {
     const scale = (height * pixelRatio) / (2 * Math.tan((fovDeg * Math.PI) / 360));
     this.dots.setScale(scale);
     this.glows.setScale(scale);
+    this.worldPerPx = (2 * Math.tan((fovDeg * Math.PI) / 360)) / Math.max(1, height);
   }
 
   begin(): void {
@@ -82,9 +86,13 @@ export class GraphView {
     this.glows.add(p, color, size, alpha * this.alphaScale);
   }
 
-  label(p: Vector3, text: string, height: number, rawAlpha: number, cameraPosition: Vector3): void {
+  /**
+   * 카메라를 향한 글자. 거리와 상관없이 화면에서 heightPx(CSS px) 높이로 보이고, 화면 위쪽으로 offsetPx 만큼 옮겨 놓는다(음수면 아래)
+   */
+  label(p: Vector3, text: string, heightPx: number, rawAlpha: number, cameraPosition: Vector3, offsetPx = 0): void {
     const alpha = rawAlpha * this.alphaScale;
     if (alpha < 0.01) return;
+    const k = p.distanceTo(cameraPosition) * this.worldPerPx;
     let mesh = this.labelPool[this.labelCount];
     if (!mesh) {
       mesh = new Mesh(this.labelGeometry, new MeshBasicMaterial({ transparent: true, depthWrite: false, fog: true }));
@@ -97,9 +105,11 @@ export class GraphView {
       mesh.material.map = l.texture;
       mesh.material.needsUpdate = true;
     }
+    const height = heightPx * k;
     mesh.scale.set(height * l.aspect, height, 1);
-    mesh.position.copy(p);
     facingQuaternion(p, cameraPosition, mesh.quaternion);
+    this.labelUp.set(0, 1, 0).applyQuaternion(mesh.quaternion);
+    mesh.position.copy(p).addScaledVector(this.labelUp, offsetPx * k);
     mesh.material.opacity = alpha;
     mesh.visible = true;
   }

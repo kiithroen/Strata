@@ -223,7 +223,8 @@ export const tuning = {
     planetRadius: 0.16,
     planetGrowth: 0.05,
     planetMaxRadius: 0.34,
-    planetLabelHeight: 0.11,
+    /** 행성 글자 높이(CSS px). 화면에 늘 같은 크기로 보인다 */
+    planetLabelPx: 12,
     /**
      * 선 그래프. 선 굵기는 CSS px, 점·빛 크기는 월드 단위 지름이다.
      * burst: 노드에서 노트 점이 방사형으로 퍼지는 원판(안쪽 반지름, 간격, 앞뒤 흔들림, 회전 속도).
@@ -242,7 +243,8 @@ export const tuning = {
       glowSize: 1.3,
       hubGlowSize: 2.4,
       glowAlpha: 0.16,
-      hubLabelHeight: 0.15,
+      /** 허브 글자 높이(CSS px) */
+      hubLabelPx: 15,
       /** 종이에 꽂힌 압정 머리 크기 */
       pinSize: 0.05,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
