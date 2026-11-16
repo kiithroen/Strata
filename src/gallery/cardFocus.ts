@@ -4,6 +4,8 @@ import { computeFocusPose, createPose, type Pose } from '../widgets/noteCard/car
 import type { NoteCard } from '../widgets/noteCard/NoteCard';
 import type { Stage } from './stage';
 
+const MIN_TAP_FADE = 0.3;
+
 /** 카드 데모들이 함께 쓰는 펼치기 상태: 펼친 카드 하나, 나머지 어둡게, 탭 위치의 카드 찾기. */
 export class CardFocus {
   focused: NoteCard | null = null;
@@ -24,14 +26,16 @@ export class CardFocus {
   }
 
   /** 화면 좌표에 보이는 가장 가까운 카드 */
-  pick(clientX: number, clientY: number): NoteCard | null {
-    return this.pickHit(clientX, clientY)?.card ?? null;
+  pick(clientX: number, clientY: number, accept?: (card: NoteCard) => boolean): NoteCard | null {
+    return this.pickHit(clientX, clientY, accept)?.card ?? null;
   }
 
-  /** 가장 가까운 카드와 카메라에서의 거리. 다른 물체와 누가 앞인지 견줄 때 쓴다 */
-  pickHit(clientX: number, clientY: number): { card: NoteCard; distance: number } | null {
+  /** 가장 가까운 카드와 카메라에서의 거리. 거의 투명한 카드는 건너뛴다 */
+  pickHit(clientX: number, clientY: number, accept?: (card: NoteCard) => boolean): { card: NoteCard; distance: number } | null {
     this.aim(clientX, clientY);
-    const visible = this.cards.filter((c) => c.visible).map((c) => c.mesh);
+    const visible = this.cards
+      .filter((c) => c.visible && c.mesh.material.uniforms.uFade.value >= MIN_TAP_FADE && (!accept || accept(c)))
+      .map((c) => c.mesh);
     const hit = this.raycaster.intersectObjects(visible, false)[0];
     return hit ? { card: hit.object.userData.card as NoteCard, distance: hit.distance } : null;
   }

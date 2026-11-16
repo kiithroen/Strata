@@ -27,7 +27,17 @@ interface Saved {
   distance: number;
 }
 
+export interface StrataModeHooks {
+  /** Esc 를 눌렀을 때 지층을 나가기 전에 먼저 닫을 것(펼친 카드 등)이 있으면 true 를 낸다 */
+  onEscape?: () => boolean;
+  onLeave?: () => void;
+}
+
 const AXIS_Y = new Vector3(0, 1, 0);
+
+function isStrataHistoryState(state: unknown): boolean {
+  return typeof state === 'object' && state !== null && (state as { strata?: unknown }).strata === true;
+}
 
 /**
  * 은하 ↔ 지층 두 단계 탐색. 은하에서 고른 묶음을 층으로 쌓아 내려다보고, 뒤로 가면 은하로 돌아온다.
@@ -47,30 +57,33 @@ export class StrataMode {
   private readonly center = new Vector3();
   private saved: Saved | null = null;
   private pushed = false;
-  /** 화면 단추·Esc 로 나가며 되돌린 방문 기록의 popstate 는 이미 처리했으니 한 번 건너뛴다 */
-  private skipPop = false;
   private readonly view: StrataView;
   private readonly back: HTMLButtonElement;
   private readonly pose = createPose();
   private readonly raycaster = new Raycaster();
   private readonly ndc = new Vector2();
   private readonly hit = new Vector3();
-  private readonly onPop = () => {
-    if (this.skipPop) {
-      this.skipPop = false;
+  private readonly onPop = (e: PopStateEvent) => {
+    if (!this.active) return;
+    // 빠른 exit → enter 직후 지난 history.back() 의 popstate 가 뒤늦게 도착해도 현재 상태가 지층이면 유지한다
+    if (isStrataHistoryState(e.state)) {
+      this.pushed = true;
       return;
     }
     this.pushed = false;
-    if (this.active) this.leave();
+    this.leave();
   };
   private readonly onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && this.active) this.exit();
+    if (e.key !== 'Escape' || !this.active) return;
+    if (this.hooks?.onEscape?.()) return;
+    this.exit();
   };
 
   constructor(
     private readonly stage: Stage,
     private readonly rig: CameraRig,
     labels: LabelCache,
+    private readonly hooks?: StrataModeHooks,
   ) {
     this.view = new StrataView(labels);
     stage.scene.add(this.view.group);
@@ -104,7 +117,7 @@ export class StrataMode {
     this.rig.orbitTo(s.pitch, this.frame.yaw);
     this.back.hidden = false;
     if (!this.pushed) {
-      history.pushState({ strata: true }, '');
+      if (!isStrataHistoryState(history.state)) history.pushState({ strata: true }, '');
       this.pushed = true;
     }
   }
@@ -112,12 +125,15 @@ export class StrataMode {
   /** 은하로 바로 돌아가고, 들어갈 때 쌓은 방문 기록도 되돌린다 */
   exit(): void {
     if (!this.active) return;
+    this.leave();
     if (this.pushed) {
       this.pushed = false;
-      this.skipPop = true;
       history.back();
     }
-    this.leave();
+  }
+
+  hasCard(index: number): boolean {
+    return this.placed.has(index);
   }
 
   get focusTime(): number | null {
@@ -224,6 +240,7 @@ export class StrataMode {
   private leave(): void {
     this.active = false;
     this.back.hidden = true;
+    this.hooks?.onLeave?.();
     const saved = this.saved;
     if (saved) {
       this.rig.focusPoint(saved.target);

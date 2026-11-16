@@ -36,8 +36,8 @@ import {
   swarmCapacity,
   timeOffsetDepth,
   type Hub,
-  type TapTarget,
   type PlanetJitter,
+  type TapTarget,
 } from '../widgets/cosmos/cosmosModel';
 import { GraphView } from '../widgets/cosmos/GraphView';
 import { Universe } from '../widgets/cosmos/Universe';
@@ -87,16 +87,6 @@ export interface CosmosDemo extends WidgetDemo {
   strataState(): { active: boolean; mix: number; layers: number; focus: number };
   /** 화면 좌표(CSS px)에서 처음 닿는 층 판 번호. 없으면 -1 */
   pickStrataLayer(x: number, y: number): number;
-}
-
-/** 행성 노드가 나타나고 사라지는 상태. 묶음에서 빠진 노드는 마지막 자리에서 옅어진다 */
-interface NodeState {
-  jitter: PlanetJitter;
-  fade: number;
-  present: boolean;
-  position: Vector3;
-  color: Color;
-  size: number;
 }
 
 /**
@@ -168,7 +158,6 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   /** 3차원 구면 나선의 기준 시계열 공간(줌·이동 중에도 노드 배치와 묶음이 흔들리지 않도록 고정한다) */
   const spiralState: AxisState = { focusTime: newest, logScale: levelLogScale('month') };
   const controller = new AxisController({ focusTime: newest, logScale: spiralState.logScale });
-  const nodeStates = new Map<string, NodeState>();
   const paperBlends = notes.map(() => new RegroupBlend());
   const dotBlends = notes.map(() => new RegroupBlend());
   const paperFade = new Float64Array(notes.length);
@@ -188,6 +177,9 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     return {
       cluster,
       offsetS: timeOffsetDepth(spiralState, cluster.anchorTime),
+      jitter: planetJitter(cluster.key),
+      fade: 0,
+      color: noteColors[cluster.members[0]],
       radius: planetRadius(n),
       size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
       glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
@@ -250,7 +242,14 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     initialDistance: c.initialDistance,
   });
 
-  const strata = new StrataMode(stage, cameraRig, labels);
+  const strata = new StrataMode(stage, cameraRig, labels, {
+    onEscape: () => {
+      if (!focus.focused) return false;
+      focus.set(null);
+      return true;
+    },
+    onLeave: () => focus.set(null),
+  });
   let strataWasActive = false;
 
   /** 노드가 속한 위 묶음(허브)의 아래 묶음들을 층으로 쌓는다. 허브가 없으면 그 행성 하나가 층이다 */
@@ -288,13 +287,15 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     pinnedTime = strata.focusTime;
   };
 
-  /** 노트가 속한 행성 번호 */
+  /** 노트가 속한 행성 번호와 카드 번호 */
+  const cardIndex = new Map(cards.map((card, i) => [card, i]));
   const planetOfNote = new Int32Array(notes.length).fill(-1);
   planets.forEach((p, pi) => {
     for (const m of p.cluster.members) planetOfNote[m] = pi;
   });
   const enterStrataOfCard = (card: NoteCard) => {
-    const pi = planetOfNote[cards.indexOf(card)];
+    const ci = cardIndex.get(card);
+    const pi = ci === undefined ? -1 : planetOfNote[ci];
     if (pi >= 0) enterStrata(planets[pi].node);
   };
 
@@ -350,14 +351,27 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         focus.set(null);
         return;
       }
-      // 광선이 종이에 정확히 맞으면 그 종이다. 은하에서는 펼치지 않고 그 종이의 묶음으로 지층 보기에 들어간다
-      const cardHit = focus.pickHit(x, y);
+      // 광선이 종이에 정확히 맞으면 그 종이다. 지층 보기에서는 현재 지층 카드만, 은하에서는 그 종이의 묶음으로 지층 보기에 들어간다
+      const cardHit = focus.pickHit(
+        x,
+        y,
+        strata.active ? (card) => strata.hasCard(cardIndex.get(card) ?? -1) : undefined,
+      );
       if (cardHit) {
         if (strata.active) focus.set(cardHit.card);
         else enterStrataOfCard(cardHit.card);
         return;
       }
-      // 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다. 지층 보기에서는 노드를 고르지 않는다
+      // 지층 보기에서 카드를 빗나간 탭은 빈 곳 층 판 선택으로만 넘긴다(종이 여유 반경이 층 전환을 가로채지 않게)
+      if (strata.active) {
+        const li = strata.pickLayer(x, y);
+        if (li >= 0) {
+          strata.focusLayer(li);
+          pinnedTime = strata.focusTime;
+        }
+        return;
+      }
+      // 은하에서는 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다
       const rect = canvas.getBoundingClientRect();
       const pxPerUnit = rect.height / (2 * Math.tan((stage.camera.fov * Math.PI) / 360));
       const targets: TapTarget[] = [];
@@ -371,7 +385,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.paperTapRadius, (half * pxPerUnit) / depth) });
         picks.push({ card });
       }
-      for (const node of strata.active ? [] : nodes) {
+      for (const node of nodes) {
         if (cameraDepth(node.position) < c.nearDepth) continue;
         if (cosmosFade(node.position.distanceTo(cameraPosition)) <= 0.05) continue;
         const sp = screenOf(node.position);
@@ -379,24 +393,10 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         picks.push({ node });
       }
       const i = pickNearest(targets, x, y);
-      if (i < 0) {
-        // 지층 보기에서 빈 곳을 탭하면 그 자리의 층을 바라본다
-        if (strata.active) {
-          const li = strata.pickLayer(x, y);
-          if (li >= 0) {
-            strata.focusLayer(li);
-            pinnedTime = strata.focusTime;
-          }
-        }
-        return;
-      }
+      if (i < 0) return;
       const chosen = picks[i];
-      if ('card' in chosen) {
-        if (strata.active) focus.set(chosen.card);
-        else enterStrataOfCard(chosen.card);
-        return;
-      }
-      enterStrata(chosen.node);
+      if ('card' in chosen) enterStrataOfCard(chosen.card);
+      else enterStrata(chosen.node);
     },
   });
 
@@ -479,31 +479,21 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       const pose = focus.pose();
       graph.begin();
 
-      for (const st of nodeStates.values()) st.present = false;
-
       for (const planet of planets) {
         const { cluster, affinities, order } = planet;
-        let st = nodeStates.get(cluster.key);
-        if (!st) {
-          st = { jitter: planetJitter(cluster.key), fade: 0, present: true, position: new Vector3(), color: new Color(), size: 0 };
-          nodeStates.set(cluster.key, st);
-        }
-        st.present = true;
-        st.fade = damp(st.fade, 1, c.planetFadeRate, dt);
-        spiralPoint(planet.offsetS, orbitClock, st.jitter, st.position);
-        planet.node.position.copy(st.position);
-        const dist = st.position.distanceTo(cameraPosition);
-        st.color.copy(noteColors[cluster.members[0]]);
-        st.size = planet.size;
+        planet.fade = damp(planet.fade, 1, c.planetFadeRate, dt);
+        const pos = planet.node.position;
+        spiralPoint(planet.offsetS, orbitClock, planet.jitter, pos);
+        const dist = pos.distanceTo(cameraPosition);
 
-        const alpha = st.fade * cosmosFade(dist);
-        graph.dot(st.position, hubColor, st.size, alpha);
-        graph.glow(st.position, st.color, planet.glowSize, g.glowAlpha * alpha);
-        graph.label(st.position, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
+        const alpha = planet.fade * cosmosFade(dist);
+        graph.dot(pos, hubColor, planet.size, alpha);
+        graph.glow(pos, planet.color, planet.glowSize, g.glowAlpha * alpha);
+        graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
         const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
-        drawCloud(cloudLabels, st.position, planet.words, far.words * alpha * (1 - mix), cameraPosition);
+        drawCloud(cloudLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition);
 
-        facingQuaternion(st.position, cameraPosition, burstQuat);
+        facingQuaternion(pos, cameraPosition, burstQuat);
         const r = planet.radius;
         order.forEach((idx, rank) => {
           const m = cluster.members[idx];
@@ -511,21 +501,21 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           // 종이: 행성 단위별 큰 카드 수까지만 관련도 순으로 날린다
           paperFade[m] = damp(paperFade[m], rank < capacity ? 1 : 0, c.regroupRate, dt);
           flightOffset(flights[m], r, affinity, tau, gustNow, offset);
-          target.copy(st.position).add(offset);
+          target.copy(pos).add(offset);
           const p = paperBlends[m].step(dt, cluster.key, target);
           const home = homes[m];
           home.position.copy(p);
           flightQuaternion(flights[m], tau, offset, home.quaternion);
           home.scale = c.satelliteScale;
           const card = cards[m];
-          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * st.fade * paperFade[m] * (1 - far.cards);
+          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * paperFade[m] * (1 - far.cards);
           const fade = strata.blendCard(m, home, baseFade);
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
           burstOffset(rank, spin, offset, affinity).applyQuaternion(burstQuat);
-          target.copy(st.position).add(offset);
+          target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = paperFade[m] * (1 - card.motion.focus);
           const pin = pins[m];
@@ -543,13 +533,13 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           spokeEnd.copy(dotP).lerp(pinWorld, tied);
           // 지층 보기 동안에는 창이 은하 노드에서 멀리 옮겨 가므로 실을 걷는다
           const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition)) * (1 - strata.mix);
-          graph.spoke(st.position, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
+          graph.spoke(pos, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
           graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(dotP.distanceTo(cameraPosition)) * (1 - tied));
           graph.dot(
             pinWorld,
             noteColors[m],
             (g.pinSize * card.mesh.scale.x) / c.satelliteScale,
-            cosmosFade(pinWorld.distanceTo(cameraPosition)) * st.fade * tied * (1 - strata.mix),
+            cosmosFade(pinWorld.distanceTo(cameraPosition)) * planet.fade * tied * (1 - strata.mix),
           );
         });
       }
@@ -581,19 +571,6 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
           const linkAlpha = Math.min(cosmosFade(a.distanceTo(cameraPosition)), cosmosFade(b.distanceTo(cameraPosition)));
           graph.branch(a, b, branchColor, g.branchAlpha * linkAlpha);
         }
-      }
-
-      // 묶음에서 빠진 노드는 마지막 자리에서 옅어진다
-      for (const [key, st] of nodeStates) {
-        if (st.present) continue;
-        st.fade = damp(st.fade, 0, c.planetFadeRate, dt);
-        if (st.fade < 0.002) {
-          nodeStates.delete(key);
-          continue;
-        }
-        const alpha = st.fade * cosmosFade(st.position.distanceTo(cameraPosition));
-        graph.dot(st.position, hubColor, st.size, alpha);
-        graph.glow(st.position, st.color, g.glowSize * 0.6, g.glowAlpha * alpha);
       }
 
       // 수동 팬 중에는 궤도 중심과 가장 가까운 노드의 시각을 시점 표시·시간 띠에 반영한다
