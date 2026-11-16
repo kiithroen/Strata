@@ -1,12 +1,11 @@
 import { Color, Quaternion, Vector3, type Fog } from 'three';
 import { tuning } from '../config';
-import { DAY_MS, floorTo } from '../core/calendar';
+import { floorTo } from '../core/calendar';
 import { damp } from '../core/motion';
 import { createRng, range } from '../core/random';
 import { createFakeNotes } from '../dev/fakeNotes';
 import { createPlaceholderPhotos } from '../dev/placeholderPhotos';
 import { listenGestures } from '../input/gesture';
-import { AxisNavigation } from '../widgets/camera/axisNavigation';
 import { CameraRig } from '../widgets/camera/cameraRig';
 import { LabelCache } from '../widgets/common/labelCache';
 import {
@@ -25,7 +24,6 @@ import {
   gust,
   gustTime,
   hourColorIndex,
-  orbitDistanceForScale,
   parentUnit,
   planetJitter,
   planetLabel,
@@ -47,9 +45,8 @@ import { paperPin, pinPoint } from '../widgets/noteCard/paperPin';
 import {
   AxisController,
   clusterNotes,
-  depthPerDay,
-  finerLevel,
   levelLogScale,
+  type AxisState,
   type Cluster,
 } from '../widgets/timeAxis/axisModel';
 import { createTimeReadout } from './timeReadout';
@@ -150,7 +147,9 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const branchColor = new Color(g.branchColor);
   const hubColor = new Color('#ffffff');
 
-  const controller = new AxisController({ focusTime: newest, logScale: levelLogScale('month') });
+  /** 3차원 구면 나선의 기준 시계열 공간(줌·이동 중에도 노드 배치와 묶음이 흔들리지 않도록 고정한다) */
+  const spiralState: AxisState = { focusTime: newest, logScale: levelLogScale('month') };
+  const controller = new AxisController({ focusTime: newest, logScale: spiralState.logScale });
   const nodeStates = new Map<string, NodeState>();
   const paperBlends = notes.map(() => new RegroupBlend());
   const dotBlends = notes.map(() => new RegroupBlend());
@@ -161,13 +160,17 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   let clusters: Cluster[] = [];
   let hubs: Hub[] = [];
   let nodes: CosmosNode[] = [];
-  let lastFocusTime = controller.current.focusTime;
+  let pinnedTime: number | null = newest;
 
   // 공전 시계: 손가락이 닿아 있으면 멈추고 떼면 다시 흐른다
   let orbitClock = 0;
   let orbitPace = 1;
   let touchCount = 0;
   let scrubbing = false;
+  let panning = false;
+  let lastPinchX = 0;
+  let lastPinchY = 0;
+  const zeroJitter: PlanetJitter = { radiusScale: 1, angleOffset: 0, elevationOffset: 0 };
   const canvas = stage.renderer.domElement;
 
   const cameraPosition = new Vector3();
@@ -177,6 +180,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
   const labelPos = new Vector3();
   const pinWorld = new Vector3();
   const spokeEnd = new Vector3();
+  const scrubPoint = new Vector3();
   const burstQuat = new Quaternion();
 
   const cameraDepth = (position: Vector3) =>
@@ -195,24 +199,13 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     viewportHeight: () => canvas.clientHeight,
     initialYaw: c.initialOrbit.yaw,
     initialPitch: c.initialOrbit.pitch,
-    initialDistance: orbitDistanceForScale(controller.current.logScale),
+    initialDistance: c.orbitDistance.month,
   });
 
-  const navigation = new AxisNavigation({
-    controller,
-    minTime: oldest,
-    maxTime: newest,
-    viewportHeight: () => canvas.clientHeight,
-    dragTime: false,
-    isBlocked: () => focus.focused !== null,
-  });
-
-  const axisHandlers = navigation.handlers();
   const stopGestures = listenGestures(canvas, {
     onTouchCountChange: (count) => {
       touchCount = count;
       if (count > 0) cameraRig.cancelInertia();
-      axisHandlers.onTouchCountChange?.(count);
     },
     onDragStart: () => {
       if (focus.focused) return;
@@ -226,10 +219,36 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
       if (focus.focused) return;
       cameraRig.onDragEnd(e.vx, e.vy);
     },
-    onPinchStart: axisHandlers.onPinchStart,
-    onPinchMove: axisHandlers.onPinchMove,
-    onPinchEnd: axisHandlers.onPinchEnd,
-    onWheel: axisHandlers.onWheel,
+    onPanStart: () => {
+      if (focus.focused) return;
+      panning = true;
+      pinnedTime = null;
+      cameraRig.cancelInertia();
+    },
+    onPanMove: (e) => {
+      if (focus.focused) return;
+      cameraRig.pan(e.dx, e.dy);
+    },
+    onPanEnd: () => {
+      panning = false;
+    },
+    onPinchStart: (e) => {
+      if (focus.focused) return;
+      pinnedTime = null;
+      lastPinchX = e.x;
+      lastPinchY = e.y;
+    },
+    onPinchMove: (e) => {
+      if (focus.focused) return;
+      cameraRig.zoomByFactor(Math.pow(1 / e.ratio, tuning.gesture.pinchZoomScale));
+      cameraRig.pan(e.x - lastPinchX, e.y - lastPinchY);
+      lastPinchX = e.x;
+      lastPinchY = e.y;
+    },
+    onWheel: (e) => {
+      if (focus.focused) return;
+      cameraRig.zoomByFactor(Math.exp((e.deltaY / 100) * tuning.gesture.wheelZoomSpeed));
+    },
     onTap: ({ x, y }) => {
       if (focus.focused) {
         focus.set(null);
@@ -270,12 +289,9 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         return;
       }
       const node = chosen.node;
-      if (node.kind === 'planet') {
-        navigation.focusOn(node.anchorTime, finerLevel(controller.level));
-      } else {
-        const offCenter = Math.abs(timeOffsetDepth(controller.current, node.anchorTime)) > 0.6;
-        navigation.focusOn(node.anchorTime, offCenter ? controller.level : finerLevel(controller.level));
-      }
+      pinnedTime = node.anchorTime;
+      controller.focusOn(node.anchorTime, 'month');
+      cameraRig.focusPoint(node.position, node.kind === 'planet' ? c.planetFocusDistance : c.hubFocusDistance);
     },
   });
 
@@ -285,7 +301,13 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     minTime: oldest,
     maxTime: newest,
     noteTimes: notes.map((n) => n.time),
-    onScrub: (t) => navigation.scrubTo(t),
+    onScrub: (t) => {
+      pinnedTime = t;
+      controller.current.focusTime = t;
+      controller.target.focusTime = t;
+      spiralPoint(timeOffsetDepth(spiralState, t), orbitClock, zeroJitter, scrubPoint);
+      cameraRig.focusPoint(scrubPoint);
+    },
     onTouchingChange: (t) => {
       scrubbing = t;
     },
@@ -293,7 +315,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
 
   return {
     title: 'COSMOS',
-    hint: '끌기: 3D 둘러보기 · 핀치/휠: 줌 · 오른쪽 띠: 시간 이동 · 탭: 노드 이동/종이',
+    hint: '끌기: 회전 · 핀치/휠: 줌 · 우클릭/두손가락: 이동 · 탭: 노드/종이',
     controller,
     cameraRig,
     cards,
@@ -305,21 +327,14 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
     screenOf,
     update(dt, time) {
       look.uTime.value = time;
-      orbitPace = damp(orbitPace, touchCount > 0 || scrubbing ? 0 : 1, c.holdRate, dt);
+      orbitPace = damp(orbitPace, touchCount > 0 || scrubbing || panning ? 0 : 1, c.holdRate, dt);
       orbitClock += dt * orbitPace;
-      navigation.step(dt);
-      const state = controller.current;
-      cameraRig.distance = orbitDistanceForScale(state.logScale);
       cameraRig.step(dt);
       cameraRig.applyTo(stage.camera);
       stage.camera.getWorldPosition(cameraPosition);
+      universe.update(orbitClock, 0, cameraPosition);
 
-      // 시간축이 움직인 만큼 먼지를 흘려 보낸다
-      const scroll = ((state.focusTime - lastFocusTime) / DAY_MS) * depthPerDay(state);
-      lastFocusTime = state.focusTime;
-      universe.update(orbitClock, scroll, cameraPosition);
-
-      const unit = choosePlanetUnit(state);
+      const unit = choosePlanetUnit(spiralState);
       clusters = clusterNotes(notes, unit);
       const parent = parentUnit(unit);
       hubs = buildHubs(clusters, parent);
@@ -344,7 +359,7 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         st.present = true;
         st.fade = damp(st.fade, 1, c.planetFadeRate, dt);
         const n = cluster.members.length;
-        const offsetS = timeOffsetDepth(state, cluster.anchorTime);
+        const offsetS = timeOffsetDepth(spiralState, cluster.anchorTime);
         spiralPoint(offsetS, orbitClock, st.jitter, st.position);
         const dist = st.position.distanceTo(cameraPosition);
         st.color.copy(noteColors[cluster.members[0]]);
@@ -457,6 +472,21 @@ export function mountCosmosDemo(stage: Stage): CosmosDemo {
         graph.dot(st.position, hubColor, st.size, alpha);
         graph.glow(st.position, st.color, g.glowSize * 0.6, g.glowAlpha * alpha);
       }
+
+      // 수동 팬 중에는 궤도 중심과 가장 가까운 노드의 시각을 시점 표시·시간 띠에 반영한다
+      if (pinnedTime === null && nodes.length > 0) {
+        let bestTime = controller.target.focusTime;
+        let bestDist = Infinity;
+        for (const node of nodes) {
+          const d = node.position.distanceToSquared(cameraRig.target);
+          if (d < bestDist) {
+            bestDist = d;
+            bestTime = node.anchorTime;
+          }
+        }
+        controller.target.focusTime = bestTime;
+      }
+      controller.step(dt);
 
       graph.end();
       readout.update();

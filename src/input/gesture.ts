@@ -32,6 +32,12 @@ export interface WheelEventData {
   deltaY: number;
 }
 
+export interface PanHandlers {
+  onPanStart?: (e: { x: number; y: number }) => void;
+  onPanMove?: (e: { x: number; y: number; dx: number; dy: number }) => void;
+  onPanEnd?: () => void;
+}
+
 export type GestureMode = 'idle' | 'pending' | 'drag' | 'pinch';
 
 interface ActivePointer {
@@ -300,12 +306,15 @@ export class GestureRecognizer {
   }
 }
 
-/** DOM 요소의 Pointer Events(와 선택적 휠 이벤트)를 GestureRecognizer 에 잇는다 */
+/** DOM 요소의 Pointer Events(와 선택적 휠·보조 버튼 팬 이벤트)를 GestureRecognizer 에 잇는다 */
 export function listenGestures(
   el: HTMLElement,
-  handlers: GestureHandlers & { onWheel?: (e: WheelEventData) => void },
+  handlers: GestureHandlers & PanHandlers & { onWheel?: (e: WheelEventData) => void },
 ): () => void {
   const recognizer = new GestureRecognizer(handlers);
+  let panPointerId: number | null = null;
+  let panLastX = 0;
+  let panLastY = 0;
 
   const toInput = (e: PointerEvent): PointerInput => ({
     id: e.pointerId,
@@ -317,6 +326,23 @@ export function listenGestures(
   });
 
   const down = (e: PointerEvent) => {
+    const isPanTrigger =
+      handlers.onPanMove !== undefined &&
+      e.pointerType === 'mouse' &&
+      (e.button === 1 || e.button === 2 || (e.button === 0 && e.shiftKey));
+    if (isPanTrigger) {
+      if (panPointerId !== null) return;
+      panPointerId = e.pointerId;
+      panLastX = e.clientX;
+      panLastY = e.clientY;
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        // 합성 이벤트 등 활성 포인터가 없을 때는 캡처를 건너뛴다
+      }
+      handlers.onPanStart?.({ x: e.clientX, y: e.clientY });
+      return;
+    }
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     try {
       el.setPointerCapture(e.pointerId);
@@ -325,9 +351,34 @@ export function listenGestures(
     }
     recognizer.down(toInput(e));
   };
-  const move = (e: PointerEvent) => recognizer.move(toInput(e));
-  const up = (e: PointerEvent) => recognizer.up(toInput(e));
-  const cancel = (e: PointerEvent) => recognizer.cancel(toInput(e));
+  const move = (e: PointerEvent) => {
+    if (e.pointerId === panPointerId) {
+      const dx = e.clientX - panLastX;
+      const dy = e.clientY - panLastY;
+      panLastX = e.clientX;
+      panLastY = e.clientY;
+      if (dx !== 0 || dy !== 0) handlers.onPanMove?.({ x: e.clientX, y: e.clientY, dx, dy });
+      return;
+    }
+    recognizer.move(toInput(e));
+  };
+  const endPan = (e: PointerEvent) => {
+    if (e.pointerId !== panPointerId) return false;
+    panPointerId = null;
+    handlers.onPanEnd?.();
+    return true;
+  };
+  const up = (e: PointerEvent) => {
+    if (endPan(e)) return;
+    recognizer.up(toInput(e));
+  };
+  const cancel = (e: PointerEvent) => {
+    if (endPan(e)) return;
+    recognizer.cancel(toInput(e));
+  };
+  const contextMenu = (e: MouseEvent) => {
+    if (handlers.onPanMove) e.preventDefault();
+  };
   const wheel = (e: WheelEvent) => {
     if (!handlers.onWheel) return;
     e.preventDefault();
@@ -340,6 +391,7 @@ export function listenGestures(
   el.addEventListener('pointermove', move);
   el.addEventListener('pointerup', up);
   el.addEventListener('pointercancel', cancel);
+  if (handlers.onPanMove) el.addEventListener('contextmenu', contextMenu);
   if (handlers.onWheel) el.addEventListener('wheel', wheel, { passive: false });
 
   return () => {
@@ -348,6 +400,7 @@ export function listenGestures(
     el.removeEventListener('pointermove', move);
     el.removeEventListener('pointerup', up);
     el.removeEventListener('pointercancel', cancel);
+    if (handlers.onPanMove) el.removeEventListener('contextmenu', contextMenu);
     if (handlers.onWheel) el.removeEventListener('wheel', wheel);
   };
 }

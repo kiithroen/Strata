@@ -73,4 +73,33 @@ describe('CameraRig', () => {
     expect(forward.x).toBeCloseTo(-1, 6);
     expect(forward.z).toBeCloseTo(0, 6);
   });
+
+  it('zoomByFactor 는 goalDistance 를 min~max 안에서 연속 조절하고 스냅백하지 않는다', () => {
+    const rig = makeRig({ distance: 12 });
+    rig.zoomByFactor(0.5);
+    expect(rig.goalDistance).toBeCloseTo(6, 6);
+    for (let i = 0; i < 60; i++) rig.step(1 / 60);
+    expect(rig.distance).toBeCloseTo(6, 2);
+
+    rig.zoomByFactor(0.01);
+    expect(rig.goalDistance).toBe(tuning.cosmos.minDistance);
+    rig.zoomByFactor(100);
+    expect(rig.goalDistance).toBe(tuning.cosmos.maxDistance);
+  });
+
+  it('pan 과 focusPoint 는 궤도 중심(target)을 이동하고 applyTo 시선이 함께 따라간다', () => {
+    const cam = new PerspectiveCamera(tuning.camera.fovDeg, 1, 0.1, 60);
+    const rig = makeRig({ yaw: 0, pitch: 0, distance: 10 });
+    rig.pan(80, -40);
+    expect(rig.target.x).toBeLessThan(0);
+    expect(rig.target.y).toBeLessThan(0);
+
+    const dest = new Vector3(4, -2, -5);
+    rig.focusPoint(dest, 5);
+    for (let i = 0; i < 90; i++) rig.step(1 / 60);
+    expect(rig.target.distanceTo(dest)).toBeLessThan(1e-2);
+    expect(rig.distance).toBeCloseTo(5, 2);
+    rig.applyTo(cam);
+    expect(cam.position.distanceTo(rig.target)).toBeCloseTo(rig.distance, 5);
+  });
 });

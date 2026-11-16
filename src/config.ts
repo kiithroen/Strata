@@ -6,7 +6,7 @@ export const tuning = {
   camera: {
     fovDeg: 50,
     near: 0.1,
-    far: 60,
+    far: 150,
   },
 
   look: {
@@ -164,24 +164,28 @@ export const tuning = {
 
   cosmos: {
     /** 우주는 깊이 끝까지 보여야 해서 안개를 따로 둔다 */
-    fogNear: 14,
-    fogFar: 44,
+    fogNear: 24,
+    fogFar: 75,
     nearDepth: 1.0,
-    fadeNearStart: 2.6,
-    farDepth: 52,
+    fadeNearStart: 2.2,
+    farDepth: 90,
     /** 행성 단위는 간격이 이 깊이 이상인 가장 작은 단위(연·월·일·시)다. 다 넘으면 시 단위다 */
     planetMinSpacing: 0.6,
     /**
-     * 구면 나선: 중심 시점(s=0)이 원점(0,0,0)에 놓이고, 과거·미래로 멀어질수록 로그 곡선으로
+     * 구면 나선: 가장 최근 시점(s=0)이 원점(0,0,0)에 놓이고, 과거·미래로 갈수록 로그 곡선으로
      * 3차원 사방으로 감겨 퍼진다(radialScale, spiralKnee). twist 는 방위각 감김, elevationAmp·Freq 는 상하 물결.
      */
-    radialScale: 3.4,
-    spiralKnee: 0.45,
-    twist: 1.65,
+    radialScale: 4.5,
+    spiralKnee: 0.25,
+    twist: 2.2,
     elevationAmp: 0.72,
-    elevationFreq: 1.15,
-    /** 단계별 궤도 카메라 거리와 초기 시선 각도(라디안) */
+    elevationFreq: 1.25,
+    /** 궤도 카메라 거리 범위·기본 거리·노드 탭 포커스 거리·초기 각도(라디안) */
     orbitDistance: { year: 16.5, month: 11.0, day: 6.8, note: 4.0 },
+    minDistance: 1.6,
+    maxDistance: 36,
+    planetFocusDistance: 4.2,
+    hubFocusDistance: 7.8,
     initialOrbit: { yaw: 0.35, pitch: 0.28 },
     /** 행성마다 구면 나선에서 벗어나는 정도: 반지름 비율, 방위각, 고도각 */
     radiusJitter: 0.16,
@@ -257,7 +261,7 @@ export const tuning = {
     /** 손가락이 닿아 있는 동안 공전·은하 회전이 멈추고, 떼면 다시 도는 속도. 움직이는 위성을 탭하기 쉽게 한다 */
     holdRate: 30,
     /** 먼지: 구면 나선팔 둘레 반지름 퍼짐, 각도 퍼짐, 구 전체에 흩어지는 비율 */
-    dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 3.6, size: 3.2, opacity: 0.68 },
+    dust: { count: 9000, arms: 2, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
     stars: { count: 2600, radius: 55, size: 1.8 },
     coreSize: 9,
   },
@@ -298,11 +302,15 @@ export const tuning = {
     /** 휠 한 눈금(100px)당 로그 축척 변화량과 손 놓음 스냅 대기 시간(초) */
     wheelScalePer100: 1.15,
     wheelSnapDelay: 0.26,
-    /** 궤도 카메라 회전: 화면 각도 대비 회전 배율, 관성 감쇠(1/초), 멈춤 속도(라디안/초), 시선 복귀 속도, 최대 상하 각도 */
+    /** 궤도 카메라 회전·줌·포커스 속도(1/초), 휠·핀치 줌 감도, 최대 상하 각도 */
     lookDragScale: 2.2,
     lookInertiaDecay: 4.2,
     lookStopSpeed: 0.015,
     lookTurnRate: 6.5,
+    zoomRate: 14,
+    focusRate: 7,
+    wheelZoomSpeed: 0.18,
+    pinchZoomScale: 1.0,
     maxPitch: 1.35,
   },
 

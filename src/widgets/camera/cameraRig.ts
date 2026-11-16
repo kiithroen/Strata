@@ -1,6 +1,6 @@
-import type { PerspectiveCamera } from 'three';
+import { Vector3, type PerspectiveCamera } from 'three';
 import { tuning } from '../../config';
-import { approachFactor } from '../../core/motion';
+import { approachFactor, damp } from '../../core/motion';
 
 export interface CameraRigOptions {
   fovDeg: () => number;
@@ -8,6 +8,7 @@ export interface CameraRigOptions {
   initialYaw?: number;
   initialPitch?: number;
   initialDistance?: number;
+  initialTarget?: Vector3;
 }
 
 export function wrapAngle(a: number): number {
@@ -25,14 +26,23 @@ export function clampPitch(pitch: number): number {
   return Math.max(-max, Math.min(max, pitch));
 }
 
+export function clampDistance(d: number): number {
+  const c = tuning.cosmos;
+  return Math.max(c.minDistance, Math.min(c.maxDistance, d));
+}
+
 /**
- * 원점(0,0,0) 중심 궤도 카메라(yaw·pitch·distance) 제어기.
- * 한 손가락 끌기로 중심 성단 둘레를 회전·기울이고 관성으로 흐른다.
+ * 표준 3D 궤도 카메라(yaw·pitch·distance·target) 제어기.
+ * 한 손가락 끌기로 회전, 핀치·휠로 연속 거리 줌, 보조 드래그·두 손가락 이동으로 화면 팬,
+ * 노드 탭 시 그 위치로 부드럽게 포커스 이동한다.
  */
 export class CameraRig {
   yaw: number;
   pitch: number;
   distance: number;
+  goalDistance: number;
+  readonly target = new Vector3();
+  readonly goalTarget = new Vector3();
   private targetYaw: number;
   private targetPitch: number;
   private turning = false;
@@ -43,7 +53,12 @@ export class CameraRig {
   constructor(private readonly options: CameraRigOptions) {
     this.yaw = wrapAngle(options.initialYaw ?? 0);
     this.pitch = clampPitch(options.initialPitch ?? 0);
-    this.distance = Math.max(1, options.initialDistance ?? 10);
+    this.distance = clampDistance(options.initialDistance ?? tuning.cosmos.orbitDistance.month);
+    this.goalDistance = this.distance;
+    if (options.initialTarget) {
+      this.target.copy(options.initialTarget);
+      this.goalTarget.copy(options.initialTarget);
+    }
     this.targetYaw = this.yaw;
     this.targetPitch = this.pitch;
   }
@@ -57,12 +72,49 @@ export class CameraRig {
     this.pitchVel = 0;
   }
 
-  /** 시선을 목표 각도(기본 정면 0, 0)로 부드럽게 돌린다 */
+  /** 시선 각도를 목표(기본 정면)로 부드럽게 돌린다 */
   faceDirection(yaw = 0, pitch = 0): void {
     this.targetYaw = wrapAngle(yaw);
     this.targetPitch = clampPitch(pitch);
     this.turning = true;
     this.cancelInertia();
+  }
+
+  /** 궤도 중심(target)을 지정 3D 좌표로 부드럽게 옮기고 필요하면 거리를 좁힌다 */
+  focusPoint(point: Vector3, maxDistance?: number): void {
+    this.goalTarget.copy(point);
+    if (maxDistance !== undefined) {
+      this.goalDistance = clampDistance(Math.min(this.goalDistance, maxDistance));
+    }
+  }
+
+  /** 현재 목표 거리에 배율을 곱해 연속 줌한다 */
+  zoomByFactor(factor: number): void {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    this.goalDistance = clampDistance(this.goalDistance * factor);
+  }
+
+  /** 화면 좌표 이동량(CSS px)만큼 카메라 평면 위에서 피벗을 평행 이동한다 */
+  pan(dx: number, dy: number): void {
+    const h = Math.max(1, this.options.viewportHeight());
+    const fovRad = (this.options.fovDeg() * Math.PI) / 180;
+    const worldPerPx = (2 * this.distance * Math.tan(fovRad / 2)) / h;
+    const cosY = Math.cos(this.yaw);
+    const sinY = Math.sin(this.yaw);
+    const cosP = Math.cos(this.pitch);
+    const sinP = Math.sin(this.pitch);
+
+    // 카메라 오른쪽 벡터 = (cosY, 0, -sinY), 위쪽 벡터 = (-sinP*sinY, cosP, -sinP*cosY)
+    const sx = -dx * worldPerPx;
+    const sy = dy * worldPerPx;
+    const ox = cosY * sx + -sinP * sinY * sy;
+    const oy = cosP * sy;
+    const oz = -sinY * sx + -sinP * cosY * sy;
+
+    this.target.x += ox;
+    this.target.y += oy;
+    this.target.z += oz;
+    this.goalTarget.copy(this.target);
   }
 
   onDragStart(): void {
@@ -93,10 +145,17 @@ export class CameraRig {
   }
 
   step(dt: number): void {
-    if (dt <= 0 || this.isDragging) return;
+    if (dt <= 0) return;
+
+    const g = tuning.gesture;
+    this.distance = damp(this.distance, this.goalDistance, g.zoomRate, dt);
+    const fFocus = approachFactor(g.focusRate, dt);
+    this.target.lerp(this.goalTarget, fFocus);
+
+    if (this.isDragging) return;
 
     if (this.turning) {
-      const f = approachFactor(tuning.gesture.lookTurnRate, dt);
+      const f = approachFactor(g.lookTurnRate, dt);
       const dyaw = shortestAngleDiff(this.yaw, this.targetYaw);
       const dpitch = this.targetPitch - this.pitch;
       this.yaw = wrapAngle(this.yaw + dyaw * f);
@@ -110,7 +169,7 @@ export class CameraRig {
     }
 
     if (this.yawVel === 0 && this.pitchVel === 0) return;
-    const r = tuning.gesture.lookInertiaDecay;
+    const r = g.lookInertiaDecay;
     const decay = Math.exp(-r * dt);
     const k = (1 - decay) / r;
     this.yaw = wrapAngle(this.yaw + this.yawVel * k);
@@ -119,7 +178,7 @@ export class CameraRig {
     this.pitch = clamped;
     this.yawVel *= decay;
     this.pitchVel = clamped !== rawPitch ? 0 : this.pitchVel * decay;
-    if (Math.hypot(this.yawVel, this.pitchVel) < tuning.gesture.lookStopSpeed) {
+    if (Math.hypot(this.yawVel, this.pitchVel) < g.lookStopSpeed) {
       this.cancelInertia();
     }
   }
@@ -127,11 +186,11 @@ export class CameraRig {
   applyTo(camera: PerspectiveCamera): void {
     const cosP = Math.cos(this.pitch);
     camera.position.set(
-      this.distance * cosP * Math.sin(this.yaw),
-      this.distance * Math.sin(this.pitch),
-      this.distance * cosP * Math.cos(this.yaw),
+      this.target.x + this.distance * cosP * Math.sin(this.yaw),
+      this.target.y + this.distance * Math.sin(this.pitch),
+      this.target.z + this.distance * cosP * Math.cos(this.yaw),
     );
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(this.target);
     camera.updateMatrixWorld();
   }
 

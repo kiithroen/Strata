@@ -99,13 +99,13 @@
 
 파일: `src/widgets/cosmos/`. 시간 ↔ 깊이, 단계, 묶음, 조종은 시간축(`timeAxis/axisModel.ts`)을 그대로 쓴다.
 
-시간 묶음은 빛나는 노드(행성)이고, 노드에서 노트 점이 방사형 선으로 뻗는다. 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다. 노드들은 지금 시점을 원점(`s = 0`)으로 두고 3차원 사방에 감겨 퍼지는 로그 구면 나선 위에 흩어져 있으며, 어느 시점으로 옮기면 그 시점이 다시 원점이 되어 주변 시간대가 사방에 재배치된다. 카메라는 원점 성단 둘레를 도는 궤도 시점으로 바라본다. 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
+시간 묶음은 빛나는 노드(행성)이고, 노드에서 노트 점이 방사형 선으로 뻗는다. 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다. 노드들은 가장 최근 시점을 원점(`s = 0`)에 두고 3차원 사방에 감겨 퍼지는 로그 구면 나선 위에 안정적으로 자리하며, 카메라는 표준 3D 궤도 조작(회전·팬·연속 줌·노드 포커스)으로 이 시계열 공간을 탐색한다. 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
 
 **행성 노드** (`cosmosModel.ts`)
-- 행성 단위는 연·월·일·시 가운데 간격이 `cosmos.planetMinSpacing` 이상인 가장 작은 단위다(다 넘으면 시). 같은 단위 칸의 노트가 한 행성이고, 행성은 그 칸에서 가장 최근 노트의 시각(시간 오프셋 `s = 깊이 − axis.focusDepth`)에 놓인다.
-- 로그 나선 진행도는 `spiralArc(s) = sign(s) × ln(1 + cosmos.spiralKnee × |s|)`다. 반지름 `cosmos.radialScale × |spiralArc(s)|`, 방위각 `cosmos.twist × spiralArc(s) + cosmos.spin × 공전 시계`, 고도각 `cosmos.elevationAmp × sin(cosmos.elevationFreq × spiralArc(s))`(수직 상한 클램프)로 3차원 구면 나선 위에 놓는다. `s = 0`인 중심 노드는 원점 `(0, 0, 0)`에 놓이고, 과거·미래로 멀어질수록 로그 곡선으로 완만히 퍼져 확대해도 멀리 튕겨 나가지 않는다.
+- 행성 단위는 `month` 기준 고정 시계열 축척(`choosePlanetUnit`)으로 정하고, 같은 단위 칸의 노트가 한 행성이 되어 그 칸에서 가장 최근 노트의 시각에 놓인다. 줌·이동 중에도 노드 배치와 묶음은 흔들리지 않는다.
+- 로그 나선 진행도는 `spiralArc(s) = sign(s) × ln(1 + cosmos.spiralKnee × |s|)`다. 반지름 `cosmos.radialScale × |spiralArc(s)|`, 방위각 `cosmos.twist × spiralArc(s) + cosmos.spin × 공전 시계`, 고도각 `cosmos.elevationAmp × sin(cosmos.elevationFreq × spiralArc(s))`(수직 상한 클램프)로 3차원 구면 나선 위에 놓는다.
 - 나선 위 자리는 묶음 키로 정한 난수 편차(`cosmos.radiusJitter`, `cosmos.angleJitter`, `cosmos.elevationJitter`)만큼 벗어난다. 같은 묶음은 늘 같은 자리다.
-- `orbitDistanceForScale`이 현재 로그 축척을 `cosmos.orbitDistance` 단계 사이에서 연속 보간해 궤도 카메라 거리를 정한다. 확대할수록 카메라가 중심 쪽으로 다가간다.
+- `orbitDistanceForScale`은 단계별 거리 표(`cosmos.orbitDistance`)를 연속 보간하는 보조 함수다.
 - 노드는 흰 점(`graph.nodeSize`, 노트 수에 따라 조금 커짐)과 가장 최근 노트 색의 빛 무리(`graph.glowSize`, `graph.glowAlpha`), 아래쪽 `날짜 · 노트 수` 글자(`cosmos.planetLabelHeight`)로 그린다. 묶음이 바뀌면 빠진 노드는 마지막 자리에서 옅어지고 새 노드는 나타난다(`cosmos.planetFadeRate`).
 
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
@@ -135,29 +135,28 @@
 - 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·종이는 카메라에서 잰 거리(`distanceTo(cameraPosition)`) 기준으로 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
 
 **탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)
-- 손가락이 화면에 닿아 있는 동안(탭·끌기·핀치 모두) 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
-- 한 손가락 끌기로 중심 성단 둘레를 궤도 회전(`CameraRig`)하고, 오른쪽 시간 띠(`src/gallery/timeScrubber.ts`)를 끌거나 눌러 시간축을 이동한다.
-- 탭 광선이 종이에 정확히 맞으면 지금 카메라 정면으로 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 행성 노드는 그 시각을 중심으로 가져오며 한 단계 들어가고, 허브는 멀리 있으면 중심으로 데려오고 이미 중심이면 한 단계 들어간다. 현재 궤도 각도는 유지해 탭한 노드가 화면 중심으로 다가오며 줌인되는 흐름을 살린다.
-- 펼친 상태에서 아무 데나 탭하면 닫는다. 데이터와 시점 표시는 시간축 데모와 같다(`src/gallery/timeReadout.ts`).
+- 손가락이 화면에 닿아 있거나 팬 중에는 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
+- 한 손가락·마우스 왼쪽 끌기로 중심 피벗(`target`) 둘레를 궤도 회전(`CameraRig`)하고, 두 손가락 이동·마우스 오른쪽·가운데·`Shift` 끌기로 화면 평면을 따라 팬(`pan`)하며, 핀치·마우스 휠·트랙패드 핀치로 스냅 없이 연속 거리 줌(`zoomByFactor`)한다. 오른쪽 시간 띠(`src/gallery/timeScrubber.ts`)를 끌거나 누르면 해당 시각의 나선 좌표로 피벗을 부드럽게 옮긴다.
+- 탭 광선이 종이에 정확히 맞으면 지금 카메라 정면으로 그 종이를 펼친다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 노드를 탭하면 3D 피벗이 그 노드 좌표로 부드럽게 옮겨 가며 행성은 `cosmos.planetFocusDistance`, 허브는 `cosmos.hubFocusDistance` 안쪽으로 다가간다.
+- 펼친 상태에서 아무 데나 탭하면 닫는다. 왼쪽 위 시점 표시(`src/gallery/timeReadout.ts`)와 시간 띠 빨간 눈금은 선택한 노드·시간 띠 시각이나 수동 팬 중 피벗에 가장 가까운 노드 시각을 따른다.
 
 ## 카메라·제스처
 
 파일: `src/input/gesture.ts`, `src/widgets/camera/axisNavigation.ts`, `src/widgets/camera/cameraRig.ts`, `src/gallery/timeScrubber.ts`
 
 **제스처 해석** (`GestureRecognizer`, `listenGestures`)
-- 포인터 이벤트 열을 탭, 한 손가락 끌기, 두 손가락 핀치, 마우스 휠·트랙패드 핀치(`ctrlKey` 배율 적용)로 나눈다.
+- 포인터 이벤트 열을 탭, 한 손가락 끌기, 두 손가락 핀치, 마우스 휠·트랙패드 핀치(`ctrlKey` 배율 적용), `listenGestures`의 보조 버튼·`Shift` 팬으로 나눈다.
 - 한 손가락을 `input.tapMaxSeconds`와 `input.tapSlop` 안에서 떼면 탭이다. 두 손가락 이상이 닿았던 조작은 탭이 되지 않는다.
 - `input.tapSlop`을 넘게 움직이면 끌기다. 최근 `input.velocityWindowSeconds` 창에서 릴리스 속도를 계산하며, `input.velocityStopSeconds` 이상 멈춘 뒤 떼면 관성 속도는 0이다.
 - 두 손가락이 닿으면 끌기를 관성 없이 끝내고 핀치로 전환한다. 두 손가락 거리는 `input.pinchMinDistance` 이상으로 잡아 비율이 튀지 않게 한다.
 
-**궤도 시선 제어** (`CameraRig`)
-- 원점 `(0, 0, 0)`에서 `distance` 만큼 떨어진 구면 위 좌표로 카메라를 배치하고 원점을 바라본다(`lookAt(0, 0, 0)`).
-- 화면 높이 대비 세로 시야각(`fovDeg`)과 `gesture.lookDragScale` 비율로 px 이동량을 궤도 각도(`yaw`·`pitch`)로 바꾸고, `pitch`는 `gesture.maxPitch` 안에서 제한한다.
-- 한 손가락 릴리스 속도가 `gesture.lookStopSpeed` 이상이면 `gesture.lookInertiaDecay`로 감쇠하는 관성 회전이 이어진다.
+**표준 3D 궤도 제어** (`CameraRig`)
+- 궤도 중심(`target`)에서 `distance` 만큼 떨어진 구면 위 좌표로 카메라를 배치하고 중심을 바라본다(`lookAt(target)`).
+- 화면 높이 대비 세로 시야각(`fovDeg`)과 `gesture.lookDragScale` 비율로 px 이동량을 궤도 각도(`yaw`·`pitch`)로 바꾸고, `pitch`는 `gesture.maxPitch` 안에서 제한한다. 한 손가락 릴리스 속도가 `gesture.lookStopSpeed` 이상이면 `gesture.lookInertiaDecay`로 감쇠하는 관성 회전이 이어진다.
+- `pan`은 현재 거리와 시야각 비율로 화면 이동량을 카메라 오른쪽·위쪽 벡터 이동으로 바꿔 `target`을 평행 이동한다.
+- `zoomByFactor`는 `goalDistance`를 `cosmos.minDistance`~`cosmos.maxDistance` 범위에서 스냅 없이 연속 조절하고 `gesture.zoomRate`로 수렴한다.
+- `focusPoint`는 `goalTarget`과 최대 거리를 설정해 `gesture.focusRate`로 부드럽게 이동한다.
 
-**시간축 탐색 · 시간 띠** (`AxisNavigation`, `timeScrubber.ts`)
-- `dragTime`이 꺼진 상태(우주 보기)에서는 한 손가락 끌기를 시간 이동으로 쓰지 않고 오른쪽 시간 띠의 `scrubTo`로 시간축을 연속 탐색한다. `dragTime`이 켜진 상태(시간축 데모)에서는 세로 끌기(`gesture.dragDepthPerScreen`)와 관성(`gesture.inertiaDecay`, `gesture.inertiaStopSpeed`)으로 이동한다.
-- 핀치는 `gesture.pinchScale × ln(거리 비율)`만큼 로그 축척을 바꾸되 양끝 단계에서 `gesture.scaleOvershoot` 안으로 제한한다. `pickAnchorTime`이 있으면 핀치 시작 중심 노드의 깊이를 유지하도록 `focusTime`을 옮기고, 우주 보기처럼 `pickAnchorTime`이 없으면 현재 `focusTime`(원점)을 고정한 채 궤도 거리와 축척만 바꾼다.
-- 핀치를 놓으면 `nearestLevel`로 스냅 목표를 잡고 목표로 부드럽게 수렴한다.
-- 마우스 휠(`gesture.wheelScalePer100`)도 같은 규칙으로 축척을 바꾸며, `gesture.wheelSnapDelay` 동안 멈추면 `nearestLevel`로 스냅한다.
-- 펼쳐진 카드가 있을 때(`isBlocked`)는 끌기·핀치·휠과 시간 띠 조작을 막고 탭 닫기만 허용한다.
+**시간축 탐색** (`AxisNavigation`, `time-axis` 데모)
+- `time-axis` 데모(`dragTime: true`)에서는 세로 끌기(`gesture.dragDepthPerScreen`)와 관성(`gesture.inertiaDecay`, `gesture.inertiaStopSpeed`)으로 이동하고, 핀치(`gesture.pinchScale`, `gesture.pinchAnchorRadius`)와 마우스 휠(`gesture.wheelScalePer100`, `gesture.wheelSnapDelay`)로 시점을 고정한 채 `nearestLevel` 단계로 스냅한다.
+- 우주 보기는 `AxisNavigation` 대신 `CameraRig`와 `timeScrubber.ts`로 3D 탐색을 처리하며, 펼쳐진 카드가 있을 때(`isBlocked`)는 조작을 막고 탭 닫기만 허용한다.
