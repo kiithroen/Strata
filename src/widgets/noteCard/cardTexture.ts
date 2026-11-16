@@ -265,31 +265,44 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
   return `${text.slice(0, end)}…`;
 }
 
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+/** 글자 단위로 줄을 나눈다. maxLines 를 넘는 글이 남으면 마지막 줄 끝을 말줄임표로 바꾼다. */
+export function wrapLines(
+  ctx: Pick<CanvasRenderingContext2D, 'measureText'>,
+  text: string,
+  maxWidth: number,
+  maxLines: number,
+): string[] {
   const lines: string[] = [];
-  for (const para of text.split('\n')) {
+  const paras = text.split('\n');
+  for (let p = 0; p < paras.length; p++) {
     let line = '';
-    for (const ch of para) {
+    for (const ch of paras[p]) {
       const next = line + ch;
       if (line && ctx.measureText(next).width > maxWidth) {
         lines.push(line);
-        if (lines.length >= maxLines) return appendEllipsis(lines);
+        if (lines.length >= maxLines) return appendEllipsis(ctx, lines, maxWidth);
         line = ch === ' ' ? '' : ch;
       } else {
         line = next;
       }
     }
-    if (line || lines.length < maxLines) {
-      lines.push(line);
-      if (lines.length >= maxLines) return lines;
+    lines.push(line);
+    if (lines.length >= maxLines) {
+      // 문단 끝에서 줄이 다 찼어도 뒤에 남은 글이 있으면 잘렸다고 알린다
+      const rest = paras.slice(p + 1).some((para) => para.trim() !== '');
+      return rest ? appendEllipsis(ctx, lines, maxWidth) : lines;
     }
   }
   return lines;
 }
 
-function appendEllipsis(lines: string[]): string[] {
+/** 마지막 줄 끝에 말줄임표를 붙이고, 폭을 넘으면 넘지 않을 때까지 글자를 덜어 낸다 */
+function appendEllipsis(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, lines: string[], maxWidth: number): string[] {
   const last = lines.length - 1;
-  if (last >= 0 && lines[last].length > 1) lines[last] = `${lines[last].slice(0, -1)}…`;
+  if (last < 0) return lines;
+  let line = lines[last];
+  while (line.length > 0 && ctx.measureText(`${line}…`).width > maxWidth) line = line.slice(0, -1);
+  lines[last] = `${line}…`;
   return lines;
 }
 
