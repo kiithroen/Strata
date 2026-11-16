@@ -231,7 +231,7 @@ export const tuning = {
      * capacityByUnit: 행성 단위별 큰 카드 수(넘친 위성은 overflowScale 크기 종잇조각).
      * gap·spread·pullCurve: 행성 표면에서 가장 강한 인력 거리와 관련도가 낮을수록 멀어지는 폭·곡선 지수.
      * speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 종이마다 배율 범위.
-     * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. rollAmp·rollFreq: 제 면 안에서 좌우로 흔들리는 최대 각도·빈도 범위.
+     * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. wobbleInward: 흔들림이 궤도 안쪽(노드 쪽)으로 파고드는 최대 깊이(궤도 반지름 대비). rollAmp·rollFreq: 제 면 안에서 좌우로 흔들리는 최대 각도·빈도 범위.
      * flutterAmp·flutterAmp2·flutterFreq: 앞면이 바깥 방향에서 두 축으로 기우는 최대 각도와 빈도 범위. 둘을 더한 각도를 넘지 않아 뒤집히지 않는다.
      * poleUpBias: 종이가 노드 위·아래(극)를 지날 때 위쪽을 궤도면 법선으로 기울이는 정도. 클수록 극을 지날 때 천천히 돌고, 극에서 먼 곳은 덜 바로 선다.
      * gust: 돌풍 사인 둘의 빈도·위상, boost 는 돌풍이 가장 셀 때 더해지는 시간 배율, gustWobble 은 흔들림이 커지는 배율
@@ -245,6 +245,7 @@ export const tuning = {
       speedJitter: [0.6, 1.4],
       wobble: 0.1,
       wobbleFreq: [0.35, 1.1],
+      wobbleInward: 0.5,
       rollAmp: 0.16,
       rollFreq: [0.35, 0.85],
       flutterAmp: 0.24,

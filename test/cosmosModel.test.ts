@@ -194,6 +194,27 @@ describe('돌풍에 날리는 종이', () => {
     });
   });
 
+  it('돌풍이 가장 세도 종이는 노드 중심 쪽으로 궤도 반지름의 wobbleInward 비율보다 깊이 파고들지 않는다', () => {
+    // 가장 작은 행성의 가장 안쪽 궤도라 흔들림이 궤도 반지름에 견줘 가장 크다
+    const planetR = planetRadius(1);
+    const r = flightRadius(planetR, 1);
+    const floor = r * (1 - s.wobbleInward);
+    const out = new Vector3();
+    let minD = Infinity;
+    let maxD = 0;
+    for (const id of ids) {
+      const f = flightParams(id);
+      for (let tau = 0; tau < 120; tau += 0.05) {
+        const d = flightOffset(f, planetR, 1, tau, 1, out).length();
+        minD = Math.min(minD, d);
+        maxD = Math.max(maxD, d);
+      }
+    }
+    expect(minD).toBeGreaterThanOrEqual(floor - 1e-9);
+    // 바깥쪽 흔들림은 그대로 남는다
+    expect(maxD).toBeGreaterThan(r + s.wobble * (1 + s.gustWobble));
+  });
+
   it('궤도면은 한쪽으로 쏠리지 않고 아무 방향으로나 기운다', () => {
     const normal = new Vector3();
     const sum = new Vector3();

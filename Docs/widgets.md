@@ -125,7 +125,7 @@
 - 행성 단위별로 `swarm.capacityByUnit`장까지(관련도 높은 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
 - 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 제 면 안에서 살짝 흔들리는 빈도(`swarm.rollFreq`), 팔랑이는 축 방향과 빈도(`swarm.flutterFreq`)가 정해진다.
 - 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × (1 − 관련도)^swarm.pullCurve`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)라 관련도가 높은 종이일수록 짧은 실로 노드 가까이에서 빠르게 돈다.
-- 은하 전체에 돌풍이 분다. 세기 `gust(t)`는 느린 사인 둘의 합(0~1, `swarm.gust.freq`, `swarm.gust.phase`)이고, 종이의 움직임은 `1 + gust.boost × gust`를 미리 적분한 돌풍 시계 `gustTime`으로 잰다. 돌풍이 셀수록 빨리 돌고 더 흔들리며, 난기류 흔들림도 `swarm.wobble × (1 + swarm.gustWobble × gust)`로 커진다.
+- 은하 전체에 돌풍이 분다. 세기 `gust(t)`는 느린 사인 둘의 합(0~1, `swarm.gust.freq`, `swarm.gust.phase`)이고, 종이의 움직임은 `1 + gust.boost × gust`를 미리 적분한 돌풍 시계 `gustTime`으로 잰다. 돌풍이 셀수록 빨리 돌고 더 흔들리며, 난기류 흔들림도 `swarm.wobble × (1 + swarm.gustWobble × gust)`로 커진다. 흔들림의 궤도 안쪽(노드 쪽) 성분은 `−한계 × tanh(깊이 / 한계)`로 눌러 궤도 반지름 × `swarm.wobbleInward`보다 깊이 들어가지 않는다. 종이가 노드 중심을 파고들어 바깥 방향이 사라지는 일을 막는다.
 - 종이 자세: 사진·테이프·압정이 있는 앞면이 노드 바깥쪽(노드에서 종이로 향하는 방향을 궤도면에 투영한 방향)을 향하고 위아래로 바로 선 채, 제 면 안의 작은 기울기(`swarm.rollAmp`)와 수직인 두 축 팔랑임(`swarm.flutterAmp`, `swarm.flutterAmp2`)으로 적당히 흔들린다. 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 카메라를 보지 않으므로 노드 뒤쪽 종이는 뒷면을 보인다. 크기는 `card.width × cosmos.satelliteScale`이다.
 - 위쪽은 월드 +Y를 앞면에 수직으로 투영한 벡터에 `swarm.poleUpBias × (앞면·Y)² ×` 궤도면 법선(+Y 쪽)을 더한 방향이다. 노드 위·아래(극)를 지나는 종이도 자세가 끊기지 않고 이어진다.
 - 다른 노드로 옮겨 갈 때만 `RegroupBlend`로 잇고, 그 밖에는 목표 위치를 지연 없이 따른다.

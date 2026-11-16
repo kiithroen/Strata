@@ -365,6 +365,8 @@ export function orbitSpeed(radius: number): number {
 /**
  * 행성 중심에서 본 종이 위치: 기운 궤도를 돌면서 난기류에 흔들린다.
  * tau 는 gustTime(공전 시계), g 는 그때의 돌풍 세기다. 흔들림 크기는 swarm.wobble × (1 + swarm.gustWobble × g)다.
+ * 흔들림의 궤도 안쪽 성분은 궤도 반지름 × swarm.wobbleInward 를 넘지 않게 부드럽게 눌러,
+ * 종이가 노드 중심을 파고들어 바깥 방향(자세 기준)이 사라지지 않게 한다.
  */
 export function flightOffset(
   f: Flight,
@@ -377,13 +379,24 @@ export function flightOffset(
   const s = tuning.cosmos.swarm;
   const r = flightRadius(planetR, affinity);
   const angle = f.phase + f.speed * orbitSpeed(r) * tau;
-  out.set(Math.cos(angle) * r, 0, Math.sin(angle) * r).applyQuaternion(f.orbit);
+  radialDir.set(Math.cos(angle), 0, Math.sin(angle)).applyQuaternion(f.orbit);
   const w = s.wobble * (1 + s.gustWobble * g);
-  out.x += w * Math.sin(f.wobbleFreq[0] * tau + f.wobblePhase[0]);
-  out.y += w * Math.sin(f.wobbleFreq[1] * tau + f.wobblePhase[1]);
-  out.z += w * Math.sin(f.wobbleFreq[2] * tau + f.wobblePhase[2]);
-  return out;
+  wobbleVec.set(
+    w * Math.sin(f.wobbleFreq[0] * tau + f.wobblePhase[0]),
+    w * Math.sin(f.wobbleFreq[1] * tau + f.wobblePhase[1]),
+    w * Math.sin(f.wobbleFreq[2] * tau + f.wobblePhase[2]),
+  );
+  const radial = wobbleVec.dot(radialDir);
+  if (radial < 0) {
+    // 안쪽 성분을 -limit × tanh(깊이 / limit) 로 바꾼다. 얕을 때는 거의 그대로, 깊어도 limit 을 넘지 않는다
+    const limit = r * s.wobbleInward;
+    wobbleVec.addScaledVector(radialDir, -radial - limit * Math.tanh(-radial / limit));
+  }
+  return out.copy(radialDir).multiplyScalar(r).add(wobbleVec);
 }
+
+const radialDir = new Vector3();
+const wobbleVec = new Vector3();
 
 const FRONT = new Vector3(0, 0, 1);
 const WORLD_UP = new Vector3(0, 1, 0);
