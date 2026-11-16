@@ -1,8 +1,10 @@
 import './style.css';
 import { tuning } from './config';
-import { applyQuality, parseQuality } from './core/quality';
+import { applyQuality, readQuality } from './core/quality';
 import { pickDemo, widgetDemos } from './gallery/registry';
 import { PerfOverlay } from './gallery/perfOverlay';
+import { loadSettings } from './gallery/settings';
+import { SettingsPanel } from './gallery/settingsPanel';
 import { Stage, type WidgetDemo } from './gallery/stage';
 
 declare global {
@@ -23,9 +25,9 @@ const tabsEl = document.getElementById('widget-tabs');
 const hintEl = document.getElementById('hint');
 if (!container || !tabsEl || !hintEl) throw new Error('index.html 구조가 맞지 않는다');
 
-// 주소의 품질 덮어쓰기(?q=, ?dust= 등)는 위젯이 튜닝 값을 읽기 전에 적용한다
-applyQuality(parseQuality(location.search));
-const params = new URLSearchParams(location.search);
+// 저장된 품질 설정은 위젯이 튜닝 값을 읽기 전에 적용한다
+const settings = loadSettings();
+applyQuality(settings.quality);
 
 const stage = new Stage(container);
 const { id, factory } = pickDemo(location.search);
@@ -41,7 +43,11 @@ for (const widgetId of Object.keys(widgetDemos)) {
   tabsEl.appendChild(a);
 }
 
-const perf = params.has('perf') ? new PerfOverlay(stage.renderer) : null;
+let perf: PerfOverlay | null = settings.perf ? new PerfOverlay(stage.renderer) : null;
+new SettingsPanel(settings, readQuality(), (on) => {
+  perf?.dispose();
+  perf = on ? new PerfOverlay(stage.renderer) : null;
+});
 
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다
 let time = 0;

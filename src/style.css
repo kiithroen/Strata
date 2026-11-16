@@ -148,7 +148,7 @@ body {
   width: 18px;
 }
 
-/* 실기기 성능 표시(?perf) */
+/* 실기기 성능 표시(설정 화면에서 켠다) */
 .perf {
   position: fixed;
   left: 16px;
@@ -170,19 +170,141 @@ body {
   white-space: pre-wrap;
 }
 
-.perf nav {
-  display: flex;
-  gap: 12px;
-  margin-top: 6px;
-  pointer-events: auto;
-}
-
-.perf nav a {
+/* 설정 버튼과 설정 화면 */
+/* 위젯 탭 줄은 좁은 폰에서 꽉 차서 그 아래 오른쪽(시점 표시 맞은편, 시간 띠 위)에 둔다 */
+.settings-button {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 36px);
+  right: 16px;
+  z-index: 20;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  border: 1px solid rgba(233, 230, 225, 0.35);
+  background: transparent;
   color: var(--text-dim);
-  text-decoration: none;
-  padding: 4px 0;
+  cursor: pointer;
 }
 
-.perf nav a.active {
-  color: var(--accent);
+.settings-button.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.settings-panel {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 68px);
+  right: 16px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 84px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px 14px 14px;
+  background: rgba(10, 10, 14, 0.92);
+  border: 1px solid rgba(233, 230, 225, 0.18);
+  color: var(--text);
+  font-size: 12px;
+  z-index: 20;
+  touch-action: pan-y;
+}
+
+.settings-panel[hidden] {
+  display: none;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.settings-title {
+  color: var(--bg);
+  background: var(--accent);
+  padding: 2px 6px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.settings-panel button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-close {
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  padding: 6px 0 6px 12px;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid rgba(233, 230, 225, 0.08);
+}
+
+.settings-row-preset {
+  padding-bottom: 10px;
+}
+
+.settings-label {
+  color: var(--text-dim);
+}
+
+.settings-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.settings-choice,
+.settings-custom {
+  min-width: 40px;
+  padding: 6px 8px;
+  border: 1px solid rgba(233, 230, 225, 0.2);
+  background: transparent;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.settings-custom {
+  box-sizing: border-box;
+  border-style: dashed;
+}
+
+.settings-choice.active,
+.settings-custom.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(209, 34, 43, 0.18);
+}
+
+.settings-note {
+  margin: 10px 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settings-apply {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.settings-apply:disabled {
+  border-color: rgba(233, 230, 225, 0.2);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: default;
 }

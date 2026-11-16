@@ -341,7 +341,7 @@ export const tuning = {
     maxPitch: 1.35,
   },
 
-  /** 성능 표시(?perf): 통계를 내는 최근 프레임 수, 글자를 고치는 간격(초), 앞뒤 이웃 간격 중 짧은 쪽 대비 이 배율을 넘는 프레임 간격을 끊김으로 센다 */
+  /** 성능 표시: 통계를 내는 최근 프레임 수, 글자를 고치는 간격(초), 앞뒤 이웃 간격 중 짧은 쪽 대비 이 배율을 넘는 프레임 간격을 끊김으로 센다 */
   perf: {
     window: 240,
     refreshSeconds: 0.5,
@@ -349,14 +349,23 @@ export const tuning = {
   },
 
   /**
-   * 품질 프리셋(?q=). 키는 주소 덮어쓰기 키와 같다(src/core/quality.ts).
-   * 빠진 키는 위 기본값을 그대로 쓴다
+   * 설정 화면의 품질. 키는 src/core/quality.ts 의 QualityValues 와 같다.
+   * presets: 빠진 키는 위 기본값을 쓴다. options: 설정 화면에서 고르는 값 목록으로, 기본값과 프리셋 값이 모두 들어 있어야 한다.
+   * nebula 의 'off' 는 끄기, 0 은 매 프레임 계산, 양수는 큐브맵 굽기 크기다
    */
   quality: {
     presets: {
-      low: { pr: 1, aa: 0, dust: 3000, stars: 1200, nebula: 128, seg: 6, tex: 224 },
-      mid: { pr: 1.5, aa: 1, dust: 5500, stars: 1800, nebula: 256, seg: 8, tex: 288 },
+      low: { pr: 1, aa: false, dust: 3000, stars: 1200, nebula: 128, seg: 6, tex: 224 },
+      mid: { pr: 1.5, aa: true, dust: 5500, stars: 1800, nebula: 256, seg: 8, tex: 288 },
       high: {},
+    },
+    options: {
+      pr: [1, 1.5, 2, 3],
+      dust: [0, 3000, 5500, 9000],
+      stars: [600, 1200, 1800, 2600],
+      nebula: ['off', 0, 128, 256, 512],
+      seg: [4, 6, 8, 10],
+      tex: [224, 288, 320],
     },
   },
 

@@ -1,0 +1,183 @@
+import {
+  matchPreset,
+  presetValues,
+  type QualityKey,
+  type QualityPreset,
+  type QualityValues,
+  qualityDiff,
+  qualityKeys,
+  qualityOptions,
+  qualityPresets,
+  sameQuality,
+} from '../core/quality';
+import { type AppSettings, saveSettings } from './settings';
+
+const KEY_LABEL: Record<QualityKey, string> = {
+  pr: '해상도 배율',
+  aa: '계단 제거',
+  dust: '먼지',
+  stars: '별',
+  nebula: '성운',
+  seg: '종이 격자',
+  tex: '카드 텍스처',
+};
+
+const PRESET_LABEL: Record<QualityPreset, string> = { low: '낮음', mid: '중간', high: '높음' };
+
+function optionLabel(key: QualityKey, v: number | boolean | 'off'): string {
+  if (v === false || v === 'off') return '끄기';
+  if (v === true) return '켜기';
+  if (key === 'nebula' && v === 0) return '실시간';
+  if (key === 'pr') return `${v}×`;
+  return String(v);
+}
+
+/**
+ * 오른쪽 위 설정 버튼과 설정 화면. 성능 표시는 바로 켜고 끄고, 품질은 고른 뒤 적용하면 저장하고 다시 불러온다
+ * (렌더러·텍스처·형상을 처음부터 다시 만들어야 해서).
+ */
+export class SettingsPanel {
+  private readonly button: HTMLButtonElement;
+  private readonly panel: HTMLDivElement;
+  private draft: QualityValues;
+  private readonly onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') this.close();
+  };
+
+  constructor(
+    private readonly settings: AppSettings,
+    /** 지금 적용된 품질 값 */
+    private readonly current: QualityValues,
+    private readonly onPerfChange: (on: boolean) => void,
+  ) {
+    this.draft = { ...current };
+    this.button = document.createElement('button');
+    this.button.type = 'button';
+    this.button.className = 'settings-button';
+    this.button.textContent = '설정';
+    this.button.addEventListener('click', () => (this.panel.hidden ? this.open() : this.close()));
+    document.body.appendChild(this.button);
+
+    this.panel = document.createElement('div');
+    this.panel.className = 'settings-panel';
+    this.panel.hidden = true;
+    document.body.appendChild(this.panel);
+    window.addEventListener('keydown', this.onKey);
+  }
+
+  open(): void {
+    this.draft = { ...this.current };
+    this.panel.hidden = false;
+    this.button.classList.add('active');
+    this.render();
+  }
+
+  close(): void {
+    this.panel.hidden = true;
+    this.button.classList.remove('active');
+  }
+
+  dispose(): void {
+    window.removeEventListener('keydown', this.onKey);
+    this.button.remove();
+    this.panel.remove();
+  }
+
+  private render(): void {
+    const p = this.panel;
+    p.replaceChildren();
+
+    const head = el('div', 'settings-head');
+    head.append(el('span', 'settings-title', '설정'));
+    const close = button('닫기', () => this.close());
+    close.className = 'settings-close';
+    head.append(close);
+    p.append(head);
+
+    p.append(
+      row('성능 표시', [
+        choice('끄기', !this.settings.perf, () => this.setPerf(false)),
+        choice('켜기', this.settings.perf, () => this.setPerf(true)),
+      ]),
+    );
+
+    const active = matchPreset(this.draft);
+    const presets = qualityPresets.map((name) =>
+      choice(PRESET_LABEL[name], active === name, () => {
+        this.draft = presetValues(name);
+        this.render();
+      }),
+    );
+    const custom = el('span', active === null ? 'settings-custom active' : 'settings-custom', '직접');
+    p.append(row('품질', [...presets, custom], 'settings-row-preset'));
+
+    for (const key of qualityKeys) {
+      const opts = qualityOptions(key);
+      const buttons = opts.map((v) =>
+        choice(optionLabel(key, v), this.draft[key] === v, () => {
+          this.draft = { ...this.draft, [key]: v };
+          this.render();
+        }),
+      );
+      p.append(row(KEY_LABEL[key], buttons));
+    }
+
+    const changed = !sameQuality(this.draft, this.current);
+    p.append(
+      el(
+        'p',
+        'settings-note',
+        `해상도 배율은 기기 배율(${window.devicePixelRatio.toFixed(2)}×)을 넘지 않는다. 품질은 적용하면 화면을 다시 불러온다.`,
+      ),
+    );
+    const apply = button(changed ? '적용하고 다시 불러오기' : '바뀐 품질 없음', () => this.apply());
+    apply.className = 'settings-apply';
+    apply.disabled = !changed;
+    p.append(apply);
+  }
+
+  private setPerf(on: boolean): void {
+    if (this.settings.perf === on) return;
+    this.settings.perf = on;
+    saveSettings(this.settings);
+    this.onPerfChange(on);
+    this.render();
+  }
+
+  private apply(): void {
+    this.settings.quality = qualityDiff(this.draft);
+    saveSettings(this.settings);
+    location.reload();
+  }
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
+  const e = document.createElement(tag);
+  e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+function button(text: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = text;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+function choice(text: string, active: boolean, onClick: () => void): HTMLButtonElement {
+  const b = button(text, onClick);
+  b.className = active ? 'settings-choice active' : 'settings-choice';
+  b.setAttribute('aria-pressed', String(active));
+  return b;
+}
+
+function row(label: string, items: HTMLElement[], extraClass = ''): HTMLElement {
+  const r = el('div', extraClass ? `settings-row ${extraClass}` : 'settings-row');
+  r.append(el('span', 'settings-label', label));
+  const group = el('div', 'settings-choices');
+  group.append(...items);
+  r.append(group);
+  return r;
+}
