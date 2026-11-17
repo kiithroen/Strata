@@ -16,10 +16,14 @@ import { tuning } from '../../config';
 import { damp } from '../../core/motion';
 import { glowTexture } from '../common/glowTexture';
 import type { LabelCache } from '../common/labelCache';
-import { strataPoint, type StrataFrame, type StrataLayer } from './strataLayout';
+import { paintOrder, strataPoint, type StrataFrame, type StrataLayer } from './strataLayout';
 
 /** 링 판이 반지름보다 넓게 차지하는 배율(바깥 호 조각과 눈금이 들어갈 자리) */
 const RING_EXTENT = 1.18;
+/** 날짜 글자를 놓는 반지름 배율(바깥 호 조각 바로 바깥) */
+const LABEL_RING = 1.12;
+/** 지층의 첫 그리는 차례. 은하 그래프·먼지(1 이하)보다 뒤다. 한 차례에 2 씩 써서 층 판 다음에 그 층 카드를 그린다 */
+const ORDER_BASE = 2;
 
 interface LayerMeshes {
   root: Group;
@@ -29,6 +33,9 @@ interface LayerMeshes {
   label: Mesh<PlaneGeometry, MeshBasicMaterial>;
   labelText: string;
   emphasis: number;
+  /** 층 높이(판 좌표)와 층 판·날짜의 그리는 차례(sortForCamera) */
+  y: number;
+  order: number;
 }
 
 /**
@@ -112,12 +119,13 @@ void main() {
  */
 const beamVertex = /* glsl */ `
 uniform float uHeight;
+uniform float uBase;
 varying float vH;
 varying float vAngle;
 varying vec3 vNormalV;
 varying vec3 vViewPos;
 void main() {
-  vH = position.y / uHeight + 0.5;
+  vH = (position.y + uBase) / uHeight;
   vAngle = atan(position.z, position.x);
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vViewPos = mv.xyz;
@@ -154,7 +162,10 @@ export class StrataView {
   private readonly ringGeometry = new PlaneGeometry(1, 1);
   private readonly color = new Color(tuning.look.accent);
   private readonly time = { value: 0 };
-  private beam: Mesh<CylinderGeometry, ShaderMaterial> | null = null;
+  /** 빛기둥 조각(발광부 → 층 → 층 → 꼭대기)과 각 조각 가운데 높이(판 좌표) */
+  private beams: { mesh: Mesh<CylinderGeometry, ShaderMaterial>; y: number }[] = [];
+  private readonly beamOpacity = { value: 0 };
+  private bottomY = 0;
   private base: Mesh<PlaneGeometry, ShaderMaterial> | null = null;
   private readonly glow: Sprite;
 
@@ -179,9 +190,8 @@ export class StrataView {
       const ring = new Mesh(this.ringGeometry, this.ringMaterial());
       ring.scale.set(r * 2 * RING_EXTENT, r * 2 * RING_EXTENT, 1);
       ring.rotation.x = -Math.PI / 2;
-      ring.renderOrder = -1;
 
-      // 날짜는 원판 앞쪽 바깥(앞에서 조금 왼쪽)에 눕힌다
+      // 날짜는 원판 앞쪽 바깥 가운데에 눕힌다
       const tex = this.labels.get(layer.label, 'major');
       const label = new Mesh(
         this.labelGeometry,
@@ -190,35 +200,43 @@ export class StrataView {
       const lh = s.labelHeight;
       label.scale.set(lh * tex.aspect, lh, 1);
       label.rotation.x = -Math.PI / 2;
-      const at = (Math.PI * 2) / 3;
-      const labelR = r * (RING_EXTENT + 0.08);
-      label.position.set(Math.cos(at) * labelR, 0, Math.sin(at) * labelR + lh);
+      label.position.set(0, 0, r * LABEL_RING + lh * 0.5);
 
       const table = new Group();
       table.add(ring);
       root.add(table, label);
       this.group.add(root);
-      this.layers.push({ root, table, ring, label, labelText: layer.label, emphasis: 0 });
+      this.layers.push({ root, table, ring, label, labelText: layer.label, emphasis: 0, y: layer.y, order: 0 });
     }
 
-    // 빛기둥: 가장 아래층 밑의 발광부에서 가장 위층 위까지
+    // 빛기둥: 가장 아래층 밑의 발광부에서 가장 위층 위까지. 층 사이마다 조각을 나눠 층 판과 번갈아 그린다
     const b = s.beam;
     const bottom = Math.min(...layers.map((l) => l.y)) - s.layerGap * b.emitterGap;
     const top = Math.max(...layers.map((l) => l.y)) + s.layerGap * b.topGap;
     const maxR = Math.max(...layers.map((l) => l.radius));
     const height = top - bottom;
-    const beamMaterial = new ShaderMaterial({
-      uniforms: { uColor: { value: this.color }, uOpacity: { value: 0 }, uTime: this.time, uHeight: { value: height } },
-      vertexShader: beamVertex,
-      fragmentShader: beamFragment,
-      transparent: true,
-      depthWrite: false,
-      side: DoubleSide,
-      blending: AdditiveBlending,
-    });
-    this.beam = new Mesh(new CylinderGeometry(maxR * b.spread, b.base, height, 64, 1, true), beamMaterial);
-    strataPoint(frame, 0, (top + bottom) / 2, 0, this.beam.position);
-    this.beam.renderOrder = -2;
+    const topR = maxR * b.spread;
+    const radiusAt = (y: number) => b.base + ((topR - b.base) * (y - bottom)) / height;
+    const levels = [bottom, ...layers.map((l) => l.y).sort((a, c) => a - c), top];
+    for (let i = 0; i + 1 < levels.length; i++) {
+      const y0 = levels[i];
+      const y1 = levels[i + 1];
+      const mid = (y0 + y1) / 2;
+      const material = new ShaderMaterial({
+        uniforms: { uColor: { value: this.color }, uOpacity: this.beamOpacity, uTime: this.time, uHeight: { value: height }, uBase: { value: mid - bottom } },
+        vertexShader: beamVertex,
+        fragmentShader: beamFragment,
+        transparent: true,
+        depthWrite: false,
+        side: DoubleSide,
+        blending: AdditiveBlending,
+      });
+      const mesh = new Mesh(new CylinderGeometry(radiusAt(y1), radiusAt(y0), y1 - y0, 64, 1, true), material);
+      strataPoint(frame, 0, mid, 0, mesh.position);
+      this.beams.push({ mesh, y: mid });
+      this.group.add(mesh);
+    }
+    this.bottomY = bottom;
 
     // 발광부: 작은 링 판과 빛 무리
     this.base = new Mesh(this.ringGeometry, this.ringMaterial());
@@ -230,7 +248,33 @@ export class StrataView {
     strataPoint(frame, 0, bottom, 0, this.glow.position);
     this.glow.scale.setScalar(b.glow);
     this.glow.visible = true;
-    this.group.add(this.beam, this.base);
+    this.group.add(this.base);
+    this.sortForCamera(top + s.distance);
+  }
+
+  /**
+   * 카메라 높이(eyeY, 고른 층을 0으로 한 판 좌표)에 맞춰 층 판·빛기둥 조각·발광부의 그리는 차례를 정한다.
+   * 카메라에서 먼 높이의 것부터 그려, 위에서 내려다보면 아래층과 그 카드가 먼저 깔리고 위층 판과 카드가 그 위를 덮는다
+   */
+  sortForCamera(eyeY: number): void {
+    const n = this.layers.length;
+    const heights = [...this.layers.map((l) => l.y), ...this.beams.map((b) => b.y), this.bottomY];
+    const rank = paintOrder(heights, eyeY);
+    this.layers.forEach((l, i) => {
+      l.order = ORDER_BASE + rank[i] * 2;
+      l.ring.renderOrder = l.order;
+      l.label.renderOrder = l.order;
+    });
+    this.beams.forEach((b, i) => (b.mesh.renderOrder = ORDER_BASE + rank[n + i] * 2));
+    const baseOrder = ORDER_BASE + rank[heights.length - 1] * 2;
+    if (this.base) this.base.renderOrder = baseOrder;
+    this.glow.renderOrder = baseOrder;
+  }
+
+  /** 층(번호)에 놓인 카드가 쓸 그리는 차례. 그 층 판 바로 다음이다 */
+  cardOrder(layer: number): number {
+    const l = this.layers[layer];
+    return l ? l.order + 1 : 0;
   }
 
   /** mix 는 지층 보기로 들어간 정도(0~1), focus 는 바라보는 층 번호, spin 은 원판이 돈 각도다 */
@@ -254,7 +298,7 @@ export class StrataView {
         }
       }
     });
-    if (this.beam) this.beam.material.uniforms.uOpacity.value = s.beam.alpha * mix;
+    this.beamOpacity.value = s.beam.alpha * mix;
     if (this.base) {
       this.base.material.uniforms.uOpacity.value = s.ring.alpha * mix;
       this.base.material.uniforms.uFocus.value = 1;
@@ -269,12 +313,12 @@ export class StrataView {
       this.group.remove(l.root);
     }
     this.layers = [];
-    if (this.beam) {
-      this.beam.geometry.dispose();
-      this.beam.material.dispose();
-      this.group.remove(this.beam);
-      this.beam = null;
+    for (const b of this.beams) {
+      b.mesh.geometry.dispose();
+      b.mesh.material.dispose();
+      this.group.remove(b.mesh);
     }
+    this.beams = [];
     if (this.base) {
       this.base.material.dispose();
       this.group.remove(this.base);

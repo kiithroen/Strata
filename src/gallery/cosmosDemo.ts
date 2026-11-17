@@ -689,6 +689,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           }
           // 지층에 눕힌 창은 흔들리지 않고, 카드 공간에서는 노트 카드처럼 다시 떠 흔들린다
           card.motion.floatScale = 1 - mix * (1 - fieldMix);
+          // 지층에 깔린 창은 층별 차례로 그려 위층 판과 카드가 아래층을 덮는다. 카드 공간에서는 거리 정렬로 돌아간다
+          card.layerOrder = mix > 0.5 && fieldMix < 0.5 ? strata.cardOrder(m) : 0;
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
           opened = Math.max(opened, card.motion.focus);
 

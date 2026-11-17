@@ -146,6 +146,17 @@ export function strataDistance(layers: readonly Pick<StrataLayer, 'radius'>[], f
   return Math.max(s.distance, need);
 }
 
+/**
+ * 수평으로 쌓인 것들(층 원판, 층 사이 빛기둥 조각)의 그리는 차례. heights 는 각각의 판 좌표 높이, eyeY 는 카메라 높이다.
+ * 카메라와 높이 차가 큰 것부터 0, 1, 2… 를 준다. 반투명한 층을 이 차례로 그리면 가까운 층이 먼 층을 덮는다
+ */
+export function paintOrder(heights: readonly number[], eyeY: number): number[] {
+  const order = heights.map((_, i) => i).sort((a, b) => Math.abs(eyeY - heights[b]) - Math.abs(eyeY - heights[a]) || a - b);
+  const rank = new Array<number>(heights.length);
+  order.forEach((i, k) => (rank[i] = k));
+  return rank;
+}
+
 const AXIS_X = new Vector3(1, 0, 0);
 const AXIS_Y = new Vector3(0, 1, 0);
 const lay = new Quaternion().setFromAxisAngle(AXIS_X, -Math.PI / 2);

@@ -5,6 +5,7 @@ import { createPose } from '../src/widgets/noteCard/cardMotion';
 import {
   layoutStrata,
   nearestLayer,
+  paintOrder,
   strataDistance,
   strataPose,
   type StrataLayerInput,
@@ -89,6 +90,26 @@ describe('nearestLayer', () => {
   it('시각이 가장 가까운 층을 고른다', () => {
     const out = layoutStrata(layers, 0);
     out.forEach((l, i) => expect(nearestLayer(out, l.anchorTime + 1000)).toBe(i));
+  });
+});
+
+describe('paintOrder', () => {
+  it('카메라와 높이 차가 큰 것부터 그린다: 위에서 보면 아래층부터, 층 사이에서 보면 먼 쪽부터', () => {
+    const out = layoutStrata(layers, 0);
+    const heights = out.map((l) => l.y);
+    const top = Math.max(...heights);
+    const bottom = Math.min(...heights);
+    const above = paintOrder(heights, top + 10);
+    const lowest = heights.indexOf(bottom);
+    const highest = heights.indexOf(top);
+    expect(above[lowest]).toBe(0);
+    expect(above[highest]).toBe(heights.length - 1);
+    expect([...above].sort((a, b) => a - b)).toEqual(heights.map((_, i) => i));
+
+    // 카메라가 맨 아래층 바로 위에 있으면 맨 위층이 가장 멀어 먼저, 맨 아래층이 가장 가까워 마지막이다
+    const near = paintOrder(heights, bottom + 1e-3);
+    expect(near[highest]).toBe(0);
+    expect(near[lowest]).toBe(heights.length - 1);
   });
 });
 

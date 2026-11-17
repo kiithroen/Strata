@@ -25,6 +25,8 @@ export interface NoteCardOptions {
 
 /** 이 아래로 옅어지면 그리지 않는다 */
 const HIDDEN = 0.002;
+/** 펼치는 카드의 그리는 차례. 지층 층별 차례보다 늘 뒤다 */
+const OPEN_ORDER = 1000;
 
 /**
  * 노트 카드 위젯: 양면 홀로그램 창. 배치가 넘기는 자리에 떠 있다가 펼치면 카메라 앞으로 나와 화면에 맞게 커진다.
@@ -40,6 +42,8 @@ export class NoteCard {
   readonly mesh: Mesh<PlaneGeometry, ShaderMaterial>;
   /** 종이마다 다르게 출렁이도록 어긋낸 휨 위상. 휜 높이를 셰이더 밖에서 구할 때(paperBend) 쓴다 */
   readonly bendPhase: number;
+  /** 펼치지 않았을 때의 그리는 차례. 지층에 깔리면 그 층 판 바로 다음 차례를 받는다 */
+  layerOrder = 0;
 
   private readonly baseTexture: CanvasTexture;
   private readonly simpleTexture: CanvasTexture;
@@ -131,7 +135,7 @@ export class NoteCard {
     this.mesh.visible = opacity > HIDDEN;
     // 펼치는 카드는 다른 카드보다 나중에, 깊이 검사 없이 그려 카메라에 더 가까운 카드에도 가려지지 않고 맨 위에 보인다
     const opening = m.focused || m.focus > HIDDEN;
-    this.mesh.renderOrder = opening ? (m.focused ? 11 : 10) : 0;
+    this.mesh.renderOrder = opening ? (m.focused ? OPEN_ORDER + 1 : OPEN_ORDER) : this.layerOrder;
     this.mesh.material.depthTest = !opening;
     this.updateDetail();
     if (this.badge) this.badge.material.opacity = opacity * (1 - m.focus);

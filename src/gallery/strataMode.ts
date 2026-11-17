@@ -61,7 +61,7 @@ export class StrataMode {
   private spinPace = 1;
   /** 원판이 돌아도 되는지. 데모가 펼친 카드·손가락·카드 보기를 보고 정한다 */
   spinning = true;
-  private readonly placed = new Map<number, { layer: StrataLayer; tile: StrataTile }>();
+  private readonly placed = new Map<number, { layer: StrataLayer; layerIndex: number; tile: StrataTile }>();
   /** 층마다 카드가 멀어 사라진 정도(0~1). measure 가 매 프레임 구한다 */
   private readonly hidden = new Map<StrataLayer, number>();
   private readonly center = new Vector3();
@@ -138,7 +138,9 @@ export class StrataMode {
     this.frame = { origin: origin.clone(), yaw: this.rig.yaw };
     this.layers = layoutStrata(layers, focusIndex);
     this.placed.clear();
-    for (const layer of this.layers) for (const tile of layer.tiles) this.placed.set(tile.index, { layer, tile });
+    this.layers.forEach((layer, layerIndex) => {
+      for (const tile of layer.tiles) this.placed.set(tile.index, { layer, layerIndex, tile });
+    });
     this.focus = focusIndex;
     this.view.build(this.layers, this.frame);
     this.rig.focusPoint(origin);
@@ -239,12 +241,19 @@ export class StrataMode {
     return fade * (1 - w) + shown * w;
   }
 
+  /** 지층에 깔린 노트 창의 그리는 차례(그 층 판 바로 다음). 지층에 없으면 0 이다 */
+  cardOrder(index: number): number {
+    const p = this.placed.get(index);
+    return p ? this.view.cardOrder(p.layerIndex) : 0;
+  }
+
   /**
-   * 층마다 카드가 화면에서 차지하는 크기를 재서, 멀면 층 위에 태그 워드 클라우드를 그리고 더 멀면 카드를 감춘다(blendCard).
+   * 카메라 높이에 맞춰 층별 그리는 차례를 정하고, 층마다 카드가 화면에서 차지하는 크기를 재서, 멀면 층 위에 태그 워드 클라우드를 그리고 더 멀면 카드를 감춘다(blendCard).
    * p11 은 투영 행렬의 [1][1] 이다
    */
   measure(cameraPosition: Vector3, p11: number, labels: ScreenLabels): void {
     if (this.mix <= 0) return;
+    this.view.sortForCamera(cameraPosition.y - this.frame.origin.y);
     const height = tuning.card.width * tuning.strata.cardScale[1];
     for (const layer of this.layers) {
       strataPoint(this.frame, 0, layer.y, 0, this.center);
