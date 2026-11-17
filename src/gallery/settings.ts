@@ -3,6 +3,8 @@ import { type QualityValues, sanitizeQuality } from '../core/quality';
 /** 기기마다 따로 남는 앱 설정. 품질은 기본값과 다른 항목만 저장한다 */
 export interface AppSettings {
   perf: boolean;
+  /** 사진 카드의 홀로그램 선 효과(card.photoFx). 기본은 켜짐 */
+  photoFx: boolean;
   quality: Partial<QualityValues>;
 }
 
@@ -12,11 +14,11 @@ const KEY = 'strata.settings';
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { perf: false, quality: {} };
+    if (!raw) return { perf: false, photoFx: true, quality: {} };
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return { perf: parsed.perf === true, quality: sanitizeQuality(parsed.quality) };
+    return { perf: parsed.perf === true, photoFx: parsed.photoFx !== false, quality: sanitizeQuality(parsed.quality) };
   } catch {
-    return { perf: false, quality: {} };
+    return { perf: false, photoFx: true, quality: {} };
   }
 }
 

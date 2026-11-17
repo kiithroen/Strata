@@ -33,6 +33,9 @@ export interface CardLook {
   uPhotoTone: { value: Vector4 };
 }
 
+/** 사진 홀로그램 효과를 켜고 끄는 스위치(1 이면 켬). 모든 카드 재질이 같은 객체를 써서 바꾸면 바로 모든 카드에 적용된다 */
+export const photoFxSwitch = { value: 1 };
+
 /** 화면(sRGB) 밝기를 셰이더가 다루는 선형 밝기로 바꾼다 */
 function linearOf(srgb: number): number {
   return new Color().setRGB(srgb, srgb, srgb, SRGBColorSpace).r;
@@ -121,6 +124,7 @@ uniform vec3 uRunner;
 uniform vec2 uHighlight;
 uniform vec4 uPhotoLines;
 uniform vec4 uPhotoTone;
+uniform float uPhotoOn;
 /** 사진 칸의 uv 사각형 [왼쪽, 아래, 오른쪽, 위]. 사진 카드가 아니면 오른쪽이 왼쪽보다 작다 */
 uniform vec4 uPhotoRect;
 /** 이 카드의 도는 빛 배율: 빠르기(부호가 방향), 꼬리, 밝기 */
@@ -178,7 +182,7 @@ void main() {
 
   // 사진 홀로그램: 사진 칸을 카드 색 가로 선으로 다시 그린다. 선은 흐린 사진 밝기만큼 휘고 굵어지며 천천히 흐른다.
   // 선이 화면에서 너무 촘촘하면(멀리 있는 카드) 물결무늬가 생기지 않게 선이 덮는 평균 밝기로 칠한다. 펼친 카드는 원래 사진이다
-  if (uPhotoRect.z > uPhotoRect.x && live > 0.0) {
+  if (uPhotoOn > 0.5 && uPhotoRect.z > uPhotoRect.x && live > 0.0) {
     vec2 lo = uPhotoRect.xy;
     vec2 hi = uPhotoRect.zw;
     float inside = step(lo.x, uv.x) * step(uv.x, hi.x) * step(lo.y, uv.y) * step(uv.y, hi.y);
@@ -289,6 +293,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uFocus: { value: 0 },
       uFade: { value: 1 },
       uPhotoRect: { value: o.photoRect ? new Vector4(...o.photoRect) : new Vector4(0, 0, -1, 0) },
+      uPhotoOn: photoFxSwitch,
     },
     vertexShader,
     fragmentShader,

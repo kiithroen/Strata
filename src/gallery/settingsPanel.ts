@@ -52,6 +52,8 @@ export class SettingsPanel {
     /** 지금 적용된 품질 값 */
     private readonly current: QualityValues,
     private readonly onPerfChange: (on: boolean) => void,
+    /** 사진 홀로그램을 켜고 끌 때 바로 부른다 */
+    private readonly onPhotoFxChange: (on: boolean) => void,
     private readonly onImport: (files: File[], progress: (text: string) => void) => Promise<string>,
   ) {
     this.draft = { ...current };
@@ -102,6 +104,13 @@ export class SettingsPanel {
       row('성능 표시', [
         choice('끄기', !this.settings.perf, () => this.setPerf(false)),
         choice('켜기', this.settings.perf, () => this.setPerf(true)),
+      ]),
+    );
+
+    p.append(
+      row('사진 홀로그램', [
+        choice('끄기', !this.settings.photoFx, () => this.setPhotoFx(false)),
+        choice('켜기', this.settings.photoFx, () => this.setPhotoFx(true)),
       ]),
     );
 
@@ -179,6 +188,14 @@ export class SettingsPanel {
       this.importing = false;
       if (!this.panel.hidden) this.render();
     }
+  }
+
+  private setPhotoFx(on: boolean): void {
+    if (this.settings.photoFx === on) return;
+    this.settings.photoFx = on;
+    saveSettings(this.settings);
+    this.onPhotoFxChange(on);
+    this.render();
   }
 
   private setPerf(on: boolean): void {
