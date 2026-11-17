@@ -367,9 +367,9 @@ export const tuning = {
     stars: { count: 2600, radius: 55, size: 1.8 },
     /**
      * 성운 배경. bakeSize 가 0 이면 매 프레임 화면 해상도로 계산하고, 양수면 그 크기(px)의 큐브맵에 구워 두고
-     * refreshSeconds(게임 시간)마다 다시 굽는다
+     * refreshSeconds(게임 시간)마다 다시 굽는다. intensity 는 성운 밝기 배율이다
      */
-    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, colors: ['#0d2b80', '#075c7a', '#1e1894'] },
+    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, intensity: 0.72, colors: ['#0d2b80', '#075c7a', '#1e1894'] },
   },
 
   /**

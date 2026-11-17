@@ -326,6 +326,7 @@ function createNebula(): Mesh<SphereGeometry, ShaderMaterial> {
       uColorA: { value: new Color(tuning.cosmos.nebula.colors[0]) },
       uColorB: { value: new Color(tuning.cosmos.nebula.colors[1]) },
       uColorC: { value: new Color(tuning.cosmos.nebula.colors[2]) },
+      uIntensity: { value: tuning.cosmos.nebula.intensity },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -339,6 +340,7 @@ function createNebula(): Mesh<SphereGeometry, ShaderMaterial> {
       uniform vec3 uColorA;
       uniform vec3 uColorB;
       uniform vec3 uColorC;
+      uniform float uIntensity;
       varying vec3 vDir;
       float hash31(vec3 p) {
         p = fract(p * 0.3183099 + 0.1);
@@ -370,7 +372,7 @@ function createNebula(): Mesh<SphereGeometry, ShaderMaterial> {
         float b = smoothstep(0.42, 0.88, fbm(p * 1.7 + 11.0));
         float c = smoothstep(0.48, 0.92, fbm(p * 1.3 + 23.0));
         vec3 col = uColorA * a + uColorB * b * 0.85 + uColorC * c * 0.75;
-        gl_FragColor = vec4(col * 0.72, 1.0);
+        gl_FragColor = vec4(col * uIntensity, 1.0);
         #include <colorspace_fragment>
       }
     `,
