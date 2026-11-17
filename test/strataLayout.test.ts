@@ -73,6 +73,16 @@ describe('layoutStrata', () => {
   it('같은 입력이면 같은 자리다', () => {
     expect(layoutStrata(layers, 2)).toEqual(layoutStrata(layers, 2));
   });
+
+  it('1장은 정중앙에, 2~4장은 같은 반지름 원 위에 대칭으로 놓인다', () => {
+    const one = layoutStrata([{ key: '1', label: '1', anchorTime: 0, tiles: tiles(1, 1) }], 0)[0].tiles;
+    expect(Math.hypot(one[0].x, one[0].z)).toBe(0);
+    for (const n of [2, 3, 4]) {
+      const group = layoutStrata([{ key: String(n), label: String(n), anchorTime: 0, tiles: tiles(n, n) }], 0)[0].tiles;
+      const radii = group.map((t) => Math.hypot(t.x, t.z));
+      for (const r of radii) expect(r).toBeCloseTo(radii[0], 9);
+    }
+  });
 });
 
 describe('nearestLayer', () => {
@@ -96,7 +106,8 @@ describe('strataPose 원판 회전', () => {
       expect(p.quaternion.angleTo(rest.quaternion)).toBeCloseTo(Math.abs(spin), 6);
       const before = rest.position.clone().sub(center);
       const after = p.position.clone().sub(center);
-      expect(Math.atan2(-after.z, after.x) - Math.atan2(-before.z, before.x)).toBeCloseTo(spin, 6);
+      const delta = Math.atan2(-after.z, after.x) - Math.atan2(-before.z, before.x);
+      expect(Math.atan2(Math.sin(delta), Math.cos(delta))).toBeCloseTo(spin, 6);
     }
     const full = strataPose(frame, layer, tile, createPose(), Math.PI * 2);
     expect(full.position.distanceTo(rest.position)).toBeLessThan(1e-9);

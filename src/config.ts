@@ -376,22 +376,22 @@ export const tuning = {
    */
   strata: {
     /** 층 사이 높이(월드) */
-    layerGap: 1.4,
+    layerGap: 1.65,
     /** 노트 창 배율(card.width 기준 크기 대비). 관련도가 낮은 노트부터 높은 노트까지 */
     cardScale: [0.42, 0.62],
     /** 칸 사이 여백(가장 큰 창 대각선 대비)과 칸 안에서 비트는 요의 최대각(라디안) */
     cellGap: 0.16,
-    yawJitter: 0.2,
+    yawJitter: 0,
     /** 층 원판이 가장 바깥 창보다 넓게 두르는 여백(월드)과 날짜 글자 높이(월드) */
-    margin: 0.3,
+    margin: 0.35,
     labelHeight: 0.14,
     /**
      * 층 원판의 HUD 링(반지름 1 기준). line 은 선 굵기, alpha 는 가장 밝을 때 불투명도, fillAlpha 는 가운데가 밝은 원판 바탕,
      * dashes 는 안쪽 점선 링의 점 수, dashSpeed·arcSpeed·dotSpeed 는 점선 링·바깥 호 조각·안쪽 점 링이 원판에 대해 더 도는 빠르기(초당 바퀴, 음수는 반대 방향)다
      */
-    ring: { line: 0.009, alpha: 0.6, fillAlpha: 0.07, dashes: 96, dashSpeed: 0, arcSpeed: -0.045, dotSpeed: 0 },
+    ring: { line: 0.009, alpha: 0.6, fillAlpha: 0.07, dashes: 96, dashSpeed: 0.012, arcSpeed: -0.045, dotSpeed: 0.024 },
     /** 원판(테이블)이 창을 얹은 채 도는 빠르기(라디안/초)와, 멈추고 다시 돌 때 빠르기가 따라가는 속도(1/초) */
-    spin: { speed: 0.08, rate: 2.5 },
+    spin: { speed: 0, rate: 2.5 },
     /**
      * 아래에서 올라오는 빛기둥. emitterGap 은 가장 아래층에서 발광부까지 거리(layerGap 배), topGap 은 가장 위층 위로 더 뻗는 거리(layerGap 배),
      * spread 는 위쪽 반지름(가장 큰 층 반지름 배), base 는 발광부 반지름(월드), alpha 는 빛기둥 밝기, glow·glowAlpha 는 발광부 빛 무리 크기(월드)·밝기다

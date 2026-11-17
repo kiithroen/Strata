@@ -49,22 +49,40 @@ export interface StrataFrame {
   yaw: number;
 }
 
-function hash01(id: string, salt: number): number {
-  let h = 0x811c9dc5 ^ salt;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
+/** n 개 창을 원판 중심 기준 동심원 고리 위에 겹치지 않게 배치한다 */
+function ringPositions(n: number, step: number): Array<{ x: number; z: number }> {
+  if (n <= 0) return [];
+  if (n === 1) return [{ x: 0, z: 0 }];
+  if (n <= 4) {
+    const r = step / (2 * Math.sin(Math.PI / n));
+    const start = n === 2 ? 0 : n === 3 ? -Math.PI / 2 : (-Math.PI * 3) / 4;
+    return Array.from({ length: n }, (_, k) => {
+      const a = start + (k * 2 * Math.PI) / n;
+      return { x: r * Math.cos(a), z: r * Math.sin(a) };
+    });
   }
-  h ^= h >>> 13;
-  h = Math.imul(h, 0x5bd1e995);
-  h ^= h >>> 15;
-  return (h >>> 0) / 4294967296;
+  const out: Array<{ x: number; z: number }> = [{ x: 0, z: 0 }];
+  let remaining = n - 1;
+  let ring = 1;
+  while (remaining > 0) {
+    const r = ring * step;
+    const cap = Math.max(1, Math.floor(Math.PI / Math.asin(Math.min(1, step / (2 * r)))));
+    const take = Math.min(remaining, cap);
+    const start = ring % 2 === 1 ? -Math.PI / 2 : -Math.PI / 2 + Math.PI / take;
+    for (let k = 0; k < take; k++) {
+      const a = start + (k * 2 * Math.PI) / take;
+      out.push({ x: r * Math.cos(a), z: r * Math.sin(a) });
+    }
+    remaining -= take;
+    ring++;
+  }
+  return out;
 }
 
 /**
- * 층들을 쌓고 층마다 노트 창을 칸에 깐다. layers 는 최근 것부터, focusIndex 는 고른 층이다.
- * 칸 크기는 그 층에서 가장 큰 창의 대각선에 여백을 더한 것이라, 칸 안에서 흔들고 비틀어도 창끼리 겹치지 않는다.
- * 관련도가 높은 창일수록 크고 판 가운데 칸에 놓인다.
+ * 층들을 쌓고 층마다 노트 창을 동심원 고리 위에 깐다. layers 는 최근 것부터, focusIndex 는 고른 층이다.
+ * 고리 간격·창 간격이 그 층에서 가장 큰 창의 대각선에 여백을 더한 것이라 창끼리 겹치지 않는다.
+ * 관련도가 높은 창일수록 크고 판 가운데에 놓인다.
  */
 export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: number): StrataLayer[] {
   const s = tuning.strata;
@@ -74,31 +92,17 @@ export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: nu
       return { t, scale, diag: Math.hypot(t.width, t.height) * scale };
     });
     const maxDiag = sized.reduce((m, v) => Math.max(m, v.diag), 0);
-    const cell = maxDiag * (1 + s.cellGap);
-    const n = sized.length;
-    const cols = Math.max(1, Math.ceil(Math.sqrt(n)));
-    const rows = Math.max(1, Math.ceil(n / cols));
-
-    // 칸 중심을 판 가운데에서 가까운 순서로, 창을 관련도 높은 순서로 짝짓는다
-    const cells: { x: number; z: number; d: number }[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = (c - (cols - 1) / 2) * cell;
-        const z = (r - (rows - 1) / 2) * cell;
-        cells.push({ x, z, d: Math.hypot(x, z) + r * 1e-6 + c * 1e-9 });
-      }
-    }
-    cells.sort((a, b) => a.d - b.d);
+    const step = maxDiag * (1 + s.cellGap);
+    const slots = ringPositions(sized.length, step);
     const order = sized.map((_, i) => i).sort((a, b) => sized[b].t.affinity - sized[a].t.affinity || a - b);
 
     const tiles: StrataTile[] = order.map((si, k) => {
       const { t, scale, diag } = sized[si];
-      const room = Math.max(0, (cell - diag) / 2);
       return {
         index: t.index,
-        x: cells[k].x + (hash01(t.id, 11) * 2 - 1) * room,
-        z: cells[k].z + (hash01(t.id, 12) * 2 - 1) * room,
-        yaw: (hash01(t.id, 13) * 2 - 1) * s.yawJitter,
+        x: slots[k].x,
+        z: slots[k].z,
+        yaw: 0,
         scale,
         radius: diag / 2,
       };

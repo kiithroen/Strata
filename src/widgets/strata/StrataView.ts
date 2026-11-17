@@ -191,7 +191,8 @@ export class StrataView {
       label.scale.set(lh * tex.aspect, lh, 1);
       label.rotation.x = -Math.PI / 2;
       const at = (Math.PI * 2) / 3;
-      label.position.set(Math.cos(at) * r * RING_EXTENT, 0, Math.sin(at) * r * RING_EXTENT + lh);
+      const labelR = r * (RING_EXTENT + 0.08);
+      label.position.set(Math.cos(at) * labelR, 0, Math.sin(at) * labelR + lh);
 
       const table = new Group();
       table.add(ring);
