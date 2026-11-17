@@ -1,6 +1,7 @@
 import { Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
 import type { PlacedWord } from '../cloud/wordCloud';
+import { hash01, hashString } from '../cosmos/cosmosModel';
 import type { Pose } from '../noteCard/cardMotion';
 
 /** 층에 깔 노트 창 하나: 기본 월드 크기(배율 1), 관련도(0~1), 자리를 정하는 번호 */
@@ -81,7 +82,8 @@ function ringPositions(n: number, step: number): Array<{ x: number; z: number }>
 /**
  * 층들을 쌓고 층마다 노트 창을 동심원 고리 위에 깐다. layers 는 최근 것부터, focusIndex 는 고른 층이다.
  * 고리 간격·창 간격이 그 층에서 가장 큰 창의 대각선에 여백을 더한 것이라 창끼리 겹치지 않는다.
- * 관련도가 높은 창일수록 크고 판 가운데에 놓인다.
+ * 관련도가 높은 창일수록 크고 판 가운데에 놓인다. 층마다 고리 배치를 층 키로 정한 각도만큼 돌려,
+ * 위에서 볼 때 여러 층의 창이 같은 자리에 겹쳐 기둥처럼 줄 서지 않게 한다(같은 층은 늘 같은 각도다).
  */
 export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: number): StrataLayer[] {
   const s = tuning.strata;
@@ -94,13 +96,16 @@ export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: nu
     const step = maxDiag * (1 + s.cellGap);
     const slots = ringPositions(sized.length, step);
     const order = sized.map((_, i) => i).sort((a, b) => sized[b].t.affinity - sized[a].t.affinity || a - b);
+    const turn = hash01(hashString(layer.key)) * Math.PI * 2;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
 
     const tiles: StrataTile[] = order.map((si, k) => {
       const { t, scale, diag } = sized[si];
       return {
         index: t.index,
-        x: slots[k].x,
-        z: slots[k].z,
+        x: slots[k].x * cos - slots[k].z * sin,
+        z: slots[k].x * sin + slots[k].z * cos,
         scale,
         radius: diag / 2,
       };

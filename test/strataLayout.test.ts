@@ -75,6 +75,26 @@ describe('layoutStrata', () => {
     expect(layoutStrata(layers, 2)).toEqual(layoutStrata(layers, 2));
   });
 
+  it('같은 창들이라도 층 키가 다르면 배치가 통째로 돌아 있어 위에서 볼 때 창 자리가 겹치지 않는다', () => {
+    const same = tiles(12, 1);
+    const [a, b] = layoutStrata(
+      [
+        { key: '2026-10-01', label: 'a', anchorTime: 0, tiles: same },
+        { key: '2026-10-02', label: 'b', anchorTime: 0, tiles: same },
+      ],
+      0,
+    );
+    // 돌리기만 했으니 중심 거리와 창끼리 거리는 같다
+    a.tiles.forEach((t, i) => expect(Math.hypot(t.x, t.z)).toBeCloseTo(Math.hypot(b.tiles[i].x, b.tiles[i].z), 9));
+    expect(Math.hypot(a.tiles[1].x - a.tiles[5].x, a.tiles[1].z - a.tiles[5].z)).toBeCloseTo(
+      Math.hypot(b.tiles[1].x - b.tiles[5].x, b.tiles[1].z - b.tiles[5].z),
+      9,
+    );
+    // 가운데 창을 뺀 창들은 다른 층의 같은 번째 창과 자리가 다르다
+    const moved = a.tiles.slice(1).filter((t, i) => Math.hypot(t.x - b.tiles[i + 1].x, t.z - b.tiles[i + 1].z) > t.radius * 0.5);
+    expect(moved.length).toBe(a.tiles.length - 1);
+  });
+
   it('1장은 정중앙에, 2~4장은 같은 반지름 원 위에 대칭으로 놓인다', () => {
     const one = layoutStrata([{ key: '1', label: '1', anchorTime: 0, tiles: tiles(1, 1) }], 0)[0].tiles;
     expect(Math.hypot(one[0].x, one[0].z)).toBe(0);
