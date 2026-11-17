@@ -10,6 +10,7 @@ import {
   qualityPresets,
   sameQuality,
 } from '../core/quality';
+import type { PhotoStyle } from '../widgets/noteCard/cardMaterial';
 import { type AppSettings, saveSettings } from './settings';
 
 const KEY_LABEL: Record<QualityKey, string> = {
@@ -21,6 +22,8 @@ const KEY_LABEL: Record<QualityKey, string> = {
   nebula: '성운',
   tex: '카드 텍스처',
 };
+
+const PHOTO_STYLE_LABEL: Record<PhotoStyle, string> = { off: '원본', lines: '홀로그램', sketch: '선화' };
 
 const PRESET_LABEL: Record<QualityPreset, string> = { low: '낮음', mid: '중간', high: '높음' };
 
@@ -52,8 +55,8 @@ export class SettingsPanel {
     /** 지금 적용된 품질 값 */
     private readonly current: QualityValues,
     private readonly onPerfChange: (on: boolean) => void,
-    /** 사진 홀로그램을 켜고 끌 때 바로 부른다 */
-    private readonly onPhotoFxChange: (on: boolean) => void,
+    /** 사진 표현을 바꿀 때 바로 부른다 */
+    private readonly onPhotoStyleChange: (style: PhotoStyle) => void,
     private readonly onImport: (files: File[], progress: (text: string) => void) => Promise<string>,
   ) {
     this.draft = { ...current };
@@ -108,10 +111,12 @@ export class SettingsPanel {
     );
 
     p.append(
-      row('사진 홀로그램', [
-        choice('끄기', !this.settings.photoFx, () => this.setPhotoFx(false)),
-        choice('켜기', this.settings.photoFx, () => this.setPhotoFx(true)),
-      ]),
+      row(
+        '사진 표현',
+        (Object.entries(PHOTO_STYLE_LABEL) as [PhotoStyle, string][]).map(([style, label]) =>
+          choice(label, this.settings.photoStyle === style, () => this.setPhotoStyle(style)),
+        ),
+      ),
     );
 
     const pickFiles = choice('파일', false, () => this.pick(false));
@@ -190,11 +195,11 @@ export class SettingsPanel {
     }
   }
 
-  private setPhotoFx(on: boolean): void {
-    if (this.settings.photoFx === on) return;
-    this.settings.photoFx = on;
+  private setPhotoStyle(style: PhotoStyle): void {
+    if (this.settings.photoStyle === style) return;
+    this.settings.photoStyle = style;
     saveSettings(this.settings);
-    this.onPhotoFxChange(on);
+    this.onPhotoStyleChange(style);
     this.render();
   }
 

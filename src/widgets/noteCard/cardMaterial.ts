@@ -31,10 +31,21 @@ export interface CardLook {
   /** 사진 홀로그램: 선 수, 휨, 어두운 곳·밝은 곳 굵기 / 바탕 비율, 밝기, 흐림, 흐르는 빠르기 */
   uPhotoLines: { value: Vector4 };
   uPhotoTone: { value: Vector4 };
+  /** 사진 선화: 윤곽 범위, 먹 범위 / 둘레 흐림, 이웃 거리, 바탕 불투명도, 밝기 */
+  uSketchRange: { value: Vector4 };
+  uSketchTone: { value: Vector4 };
 }
 
-/** 사진 홀로그램 효과를 켜고 끄는 스위치(1 이면 켬). 모든 카드 재질이 같은 객체를 써서 바꾸면 바로 모든 카드에 적용된다 */
-export const photoFxSwitch = { value: 1 };
+/** 사진 카드의 사진 칸을 그리는 방식: 원래 사진, 홀로그램 가로 선(card.photoFx), 선화(card.photoSketch) */
+export const PHOTO_STYLES = ['off', 'lines', 'sketch'] as const;
+export type PhotoStyle = (typeof PHOTO_STYLES)[number];
+
+/** 지금 사진 표현(PHOTO_STYLES 의 번호). 모든 카드 재질이 같은 객체를 써서 바꾸면 바로 모든 카드에 적용된다 */
+const photoStyleUniform = { value: 1 };
+
+export function setPhotoStyle(style: PhotoStyle): void {
+  photoStyleUniform.value = PHOTO_STYLES.indexOf(style);
+}
 
 /** 화면(sRGB) 밝기를 셰이더가 다루는 선형 밝기로 바꾼다 */
 function linearOf(srgb: number): number {
@@ -69,6 +80,10 @@ export function createCardLook(): CardLook {
     },
     uPhotoLines: { value: new Vector4(tuning.card.photoFx.lines, tuning.card.photoFx.warp, ...tuning.card.photoFx.width) },
     uPhotoTone: { value: new Vector4(tuning.card.photoFx.base, tuning.card.photoFx.gain, tuning.card.photoFx.blur, tuning.card.photoFx.speed) },
+    uSketchRange: { value: new Vector4(...tuning.card.photoSketch.edge, ...tuning.card.photoSketch.ink) },
+    uSketchTone: {
+      value: new Vector4(tuning.card.photoSketch.inkBlur, tuning.card.photoSketch.spread, tuning.card.photoSketch.bgAlpha, tuning.card.photoSketch.gain),
+    },
   };
 }
 
@@ -125,6 +140,8 @@ uniform vec2 uHighlight;
 uniform vec4 uPhotoLines;
 uniform vec4 uPhotoTone;
 uniform float uPhotoOn;
+uniform vec4 uSketchRange;
+uniform vec4 uSketchTone;
 /** 사진 칸의 uv 사각형 [왼쪽, 아래, 오른쪽, 위]. 사진 카드가 아니면 오른쪽이 왼쪽보다 작다 */
 uniform vec4 uPhotoRect;
 /** 이 카드의 도는 빛 배율: 빠르기(부호가 방향), 꼬리, 밝기 */
@@ -142,6 +159,11 @@ varying vec3 vNormalV;
 varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
+
+// 감마 밝기(사람 눈에 고르게). bias 는 밉맵 단계를 더 흐리게 고른다
+float gammaLum(vec2 p, float bias) {
+  return sqrt(max(dot(texture2D(map, p, bias).rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0));
+}
 
 // 카드 겉모양(둥근 사각형) 선까지의 거리(카드 높이 단위). 가로는 uAspect 를 곱해 네 변의 거리 단위를 맞춘다
 float outlineDistance(vec2 uv) {
@@ -182,7 +204,7 @@ void main() {
 
   // 사진 홀로그램: 사진 칸을 카드 색 가로 선으로 다시 그린다. 선은 흐린 사진 밝기만큼 휘고 굵어지며 천천히 흐른다.
   // 선이 화면에서 너무 촘촘하면(멀리 있는 카드) 물결무늬가 생기지 않게 선이 덮는 평균 밝기로 칠한다. 펼친 카드는 원래 사진이다
-  if (uPhotoOn > 0.5 && uPhotoRect.z > uPhotoRect.x && live > 0.0) {
+  if (uPhotoOn > 0.5 && uPhotoOn < 1.5 && uPhotoRect.z > uPhotoRect.x && live > 0.0) {
     vec2 lo = uPhotoRect.xy;
     vec2 hi = uPhotoRect.zw;
     float inside = step(lo.x, uv.x) * step(uv.x, hi.x) * step(lo.y, uv.y) * step(uv.y, hi.y);
@@ -196,6 +218,32 @@ void main() {
     line = mix(line, thick, smoothstep(0.25, 0.5, fwidth(ly)));
     vec3 holo = uHoloTint * (uPhotoTone.x * l + (1.0 - uPhotoTone.x) * line * (0.35 + 0.65 * l)) * uPhotoTone.y;
     color.rgb = mix(color.rgb, holo, inside * live);
+  }
+
+  // 사진 선화: 둘레 평균보다 어두운 획(흰 바탕의 글자)과 밝기가 갑자기 바뀌는 윤곽만 카드 색 선으로 남기고 나머지는 비운다.
+  // 이웃 거리를 화면 px 로 잡아(fwidth) 카드가 멀어도 가까워도 선 굵기가 비슷하다. 펼친 카드는 원래 사진이다
+  if (uPhotoOn > 1.5 && uPhotoRect.z > uPhotoRect.x && live > 0.0) {
+    vec2 lo = uPhotoRect.xy;
+    vec2 hi = uPhotoRect.zw;
+    float inside = step(lo.x, uv.x) * step(uv.x, hi.x) * step(lo.y, uv.y) * step(uv.y, hi.y);
+    vec2 d = fwidth(uv) * uSketchTone.y;
+    float tl = gammaLum(uv + vec2(-d.x, d.y), 0.0);
+    float tc = gammaLum(uv + vec2(0.0, d.y), 0.0);
+    float tr = gammaLum(uv + vec2(d.x, d.y), 0.0);
+    float ml = gammaLum(uv + vec2(-d.x, 0.0), 0.0);
+    float mr = gammaLum(uv + vec2(d.x, 0.0), 0.0);
+    float bl = gammaLum(uv + vec2(-d.x, -d.y), 0.0);
+    float bc = gammaLum(uv + vec2(0.0, -d.y), 0.0);
+    float br = gammaLum(uv + vec2(d.x, -d.y), 0.0);
+    float gx = (tr + 2.0 * mr + br) - (tl + 2.0 * ml + bl);
+    float gy = (tl + 2.0 * tc + tr) - (bl + 2.0 * bc + br);
+    float edge = smoothstep(uSketchRange.x, uSketchRange.y, length(vec2(gx, gy)) * 0.25);
+    float here = gammaLum(uv, 0.0);
+    float around = gammaLum(uv, uSketchTone.x);
+    float ink = smoothstep(uSketchRange.z, uSketchRange.w, around - here);
+    float stroke = max(edge, ink);
+    color.rgb = mix(color.rgb, uHoloTint * uSketchTone.w * stroke, inside * live);
+    color.a = mix(color.a, color.a * mix(uSketchTone.z, 1.0, stroke), inside * live);
   }
 
   // 그림 밝기 누르기: 무릎 위 밝기는 천장에 다가갈 뿐 넘지 않아 흰 바탕 사진이 블룸에 번지지 않는다. 펼친 카드는 제 밝기다
@@ -293,7 +341,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uFocus: { value: 0 },
       uFade: { value: 1 },
       uPhotoRect: { value: o.photoRect ? new Vector4(...o.photoRect) : new Vector4(0, 0, -1, 0) },
-      uPhotoOn: photoFxSwitch,
+      uPhotoOn: photoStyleUniform,
     },
     vertexShader,
     fragmentShader,

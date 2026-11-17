@@ -8,7 +8,7 @@ import { mountCosmosDemo, type CosmosAxis } from './gallery/cosmosDemo';
 import { mountExplorerDemo } from './gallery/explorerDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
 import { isExplorerState } from './widgets/explorer/ExplorerView';
-import { photoFxSwitch } from './widgets/noteCard/cardMaterial';
+import { setPhotoStyle } from './widgets/noteCard/cardMaterial';
 import { PerfOverlay } from './gallery/perfOverlay';
 import { loadSettings } from './gallery/settings';
 import { SettingsPanel } from './gallery/settingsPanel';
@@ -152,7 +152,7 @@ async function importFiles(files: File[], progress?: (text: string) => void): Pr
 }
 
 let perf: PerfOverlay | null = settings.perf ? new PerfOverlay(stage.renderer) : null;
-photoFxSwitch.value = settings.photoFx ? 1 : 0;
+setPhotoStyle(settings.photoStyle);
 new SettingsPanel(
   settings,
   readQuality(),
@@ -160,7 +160,7 @@ new SettingsPanel(
     perf?.dispose();
     perf = on ? new PerfOverlay(stage.renderer) : null;
   },
-  (on) => (photoFxSwitch.value = on ? 1 : 0),
+  setPhotoStyle,
   importFiles,
 );
 
