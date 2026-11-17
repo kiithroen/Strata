@@ -132,6 +132,22 @@ export function nearestLayer(layers: readonly Pick<StrataLayer, 'anchorTime'>[],
 }
 
 /**
+ * 층을 바라볼 때 카메라가 겨누는 높이(판 좌표). 고른 층 높이에서 쌓인 층 전체의 가운데 쪽으로 strata.stackBias 만큼 옮겨,
+ * 고른 층 위아래로 쌓인 층도 화면에 함께 들어오게 한다
+ */
+export function strataFocusHeight(layers: readonly Pick<StrataLayer, 'y'>[], index: number): number {
+  const layer = layers[index];
+  if (!layer) return 0;
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const l of layers) {
+    lo = Math.min(lo, l.y);
+    hi = Math.max(hi, l.y);
+  }
+  return layer.y + ((lo + hi) / 2 - layer.y) * tuning.strata.stackBias;
+}
+
+/**
  * 지층을 내려다보는 카메라 거리. 기본은 strata.distance 이고, 넘긴 층 원판(보통 바라보는 층)이 화면 폭에 안 들어오면 더 물러난다.
  * 원판 앞 가장자리(가운데보다 반지름 × cos(strata.pitch)만큼 가깝다)에서 반지름이 화면 반폭 × strata.fitWidth 안에 들도록 한다.
  * aspect 는 화면 가로/세로 비율이다

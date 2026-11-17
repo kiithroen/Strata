@@ -17,6 +17,7 @@ import {
   type StrataLayerInput,
   type StrataTile,
   strataDistance,
+  strataFocusHeight,
 } from '../widgets/strata/strataLayout';
 import { StrataView } from '../widgets/strata/StrataView';
 import type { Stage } from './stage';
@@ -143,7 +144,7 @@ export class StrataMode {
     });
     this.focus = focusIndex;
     this.view.build(this.layers, this.frame);
-    this.rig.focusPoint(origin);
+    this.rig.focusPoint(strataPoint(this.frame, 0, strataFocusHeight(this.layers, focusIndex), 0, this.hit));
     this.rig.setGoalDistance(this.fitDistance());
     this.rig.orbitTo(s.pitch, this.frame.yaw);
     this.actions.hidden = false;
@@ -194,7 +195,7 @@ export class StrataMode {
     const layer = this.layers[index];
     if (!layer) return;
     this.focus = index;
-    this.rig.focusPoint(strataPoint(this.frame, 0, layer.y, 0, this.hit));
+    this.rig.focusPoint(strataPoint(this.frame, 0, strataFocusHeight(this.layers, index), 0, this.hit));
     this.rig.setGoalDistance(this.fitDistance());
   }
 

@@ -191,7 +191,7 @@ export class StrataView {
       ring.scale.set(r * 2 * RING_EXTENT, r * 2 * RING_EXTENT, 1);
       ring.rotation.x = -Math.PI / 2;
 
-      // 날짜는 원판 앞쪽 바깥 가운데에 눕힌다
+      // 날짜는 원판 뒤쪽 바깥 가운데에 눕힌다. 앞쪽에 두면 아래층 카드 위에 겹친다
       const tex = this.labels.get(layer.label, 'major');
       const label = new Mesh(
         this.labelGeometry,
@@ -200,7 +200,7 @@ export class StrataView {
       const lh = s.labelHeight;
       label.scale.set(lh * tex.aspect, lh, 1);
       label.rotation.x = -Math.PI / 2;
-      label.position.set(0, 0, r * LABEL_RING + lh * 0.5);
+      label.position.set(0, 0, -(r * LABEL_RING + lh * 0.5));
 
       const table = new Group();
       table.add(ring);

@@ -389,7 +389,7 @@ export const tuning = {
    */
   strata: {
     /** 층 사이 높이(월드) */
-    layerGap: 1.65,
+    layerGap: 1.7,
     /** 노트 창 배율(card.width 기준 크기 대비). 관련도가 낮은 노트부터 높은 노트까지 */
     cardScale: [0.42, 0.62],
     /** 창 사이·고리 사이 여백(가장 큰 창 대각선 대비) */
@@ -398,12 +398,12 @@ export const tuning = {
     leaveFade: 2.5,
     /** 층 원판이 가장 바깥 창보다 넓게 두르는 여백(월드)과 날짜 글자 높이(월드) */
     margin: 0.35,
-    labelHeight: 0.14,
+    labelHeight: 0.2,
     /**
      * 층 원판의 HUD 링(반지름 1 기준). line 은 선 굵기, alpha 는 가장 밝을 때 불투명도, fillAlpha 는 가운데가 밝은 원판 바탕,
      * dashes 는 안쪽 점선 링의 점 수, dashSpeed·arcSpeed·dotSpeed 는 점선 링·바깥 호 조각·안쪽 점 링이 원판에 대해 더 도는 빠르기(초당 바퀴, 음수는 반대 방향)다
      */
-    ring: { line: 0.009, alpha: 0.76, fillAlpha: 0.11, dashes: 96, dashSpeed: 0, arcSpeed: -0.045, dotSpeed: 0 },
+    ring: { line: 0.006, alpha: 0.5, fillAlpha: 0.05, dashes: 96, dashSpeed: 0, arcSpeed: -0.045, dotSpeed: 0 },
     /** 원판(테이블)이 창을 얹은 채 도는 빠르기(라디안/초)와, 멈추고 다시 돌 때 빠르기가 따라가는 속도(1/초) */
     spin: { speed: 0.08, rate: 2.5 },
     /**
@@ -411,12 +411,14 @@ export const tuning = {
      * spread 는 위쪽 반지름(가장 큰 층 반지름 배), base 는 발광부 반지름(월드), alpha 는 빛기둥 밝기, glow·glowAlpha 는 발광부 빛 무리 크기(월드)·밝기다
      */
     beam: { emitterGap: 0.9, topGap: 0.35, spread: 0.85, base: 0.12, alpha: 0.72, glow: 1.85, glowAlpha: 0.8 },
+    /** 카메라가 고른 층에서 쌓인 층 전체의 가운데 쪽으로 겨눔을 옮기는 비율(0 이면 고른 층 중심) */
+    stackBias: 0.35,
     /** 바라보는 층이 아닌 층의 밝기 배율 */
     otherLayerAlpha: 0.42,
     /** 들어가고 나오는 전환 속도(1/초) */
     transitionRate: 3.2,
     /** 카메라가 층을 내려다보는 각(라디안)과 거리, 판 반폭이 차지해도 되는 화면 반폭 비율(넘으면 물러난다) */
-    pitch: 0.8,
+    pitch: 0.65,
     distance: 5.2,
     fitWidth: 0.88,
     /** 지층 보기 동안 은하 그래프의 밝기 배율 */

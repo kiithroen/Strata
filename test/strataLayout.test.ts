@@ -7,6 +7,7 @@ import {
   nearestLayer,
   paintOrder,
   strataDistance,
+  strataFocusHeight,
   strataPose,
   type StrataLayerInput,
   type StrataTileInput,
@@ -89,6 +90,19 @@ describe('nearestLayer', () => {
   it('시각이 가장 가까운 층을 고른다', () => {
     const out = layoutStrata(layers, 0);
     out.forEach((l, i) => expect(nearestLayer(out, l.anchorTime + 1000)).toBe(i));
+  });
+});
+
+describe('strataFocusHeight', () => {
+  it('고른 층 높이에서 쌓인 층 가운데 쪽으로 stackBias 만큼 옮긴 높이를 겨눈다', () => {
+    const out = layoutStrata(layers, 0);
+    const ys = out.map((l) => l.y);
+    const mid = (Math.min(...ys) + Math.max(...ys)) / 2;
+    out.forEach((l, i) => {
+      expect(strataFocusHeight(out, i)).toBeCloseTo(l.y + (mid - l.y) * s.stackBias, 9);
+    });
+    // 층이 하나면 그 층 중심이다
+    expect(strataFocusHeight([out[0]], 0)).toBeCloseTo(out[0].y, 9);
   });
 });
 
