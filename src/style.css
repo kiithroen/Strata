@@ -54,7 +54,8 @@ body {
 .hud-top .tag {
   color: var(--bg);
   background: var(--accent);
-  padding: 2px 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
   font-weight: 700;
 }
 
@@ -138,6 +139,7 @@ body {
   right: -3px;
   width: 12px;
   height: 3px;
+  border-radius: 999px;
   transform: translateY(-50%);
   background: var(--accent);
   box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 65%, transparent);
@@ -178,13 +180,16 @@ body {
   top: calc(env(safe-area-inset-top) + 36px);
   right: 16px;
   z-index: 20;
-  padding: 4px 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.08em;
   white-space: nowrap;
-  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--text) 32%, transparent);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--text-dim);
   cursor: pointer;
 }
@@ -328,9 +333,12 @@ body {
 .card-list-close {
   flex-shrink: 0;
   white-space: nowrap;
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 36%, transparent);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--text);
   font-family: var(--mono);
   font-size: 12px;
@@ -392,14 +400,21 @@ body.card-view-open .strata-actions {
   display: flex;
   flex-shrink: 0;
   margin-left: auto;
-  border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
+  padding: 2px;
+  gap: 2px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 36%, transparent);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .card-list-mode {
   white-space: nowrap;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border: 0;
-  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  border-radius: 999px;
+  background: transparent;
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 12px;

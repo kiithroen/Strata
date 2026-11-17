@@ -31,6 +31,8 @@ export interface CardLook {
   uIris: { value: number };
   uIrisShift: { value: number };
   uChroma: { value: number };
+  /** 유리 표면 광택: 대각선 반사 세기, 내측 베벨 하이라이트 세기 */
+  uGlass: { value: Vector2 };
   /** 테두리 빛: 폭, 밝기 / 도는 빛: 밝기, 빠르기, 꼬리 길이 */
   uBorder: { value: Vector2 };
   uRunner: { value: Vector3 };
@@ -65,6 +67,7 @@ export function createCardLook(): CardLook {
     uIris: { value: h.iridescence },
     uIrisShift: { value: h.irisShift },
     uChroma: { value: h.chroma },
+    uGlass: { value: new Vector2(h.glassSheen, h.bevel) },
     uBorder: { value: new Vector2(tuning.card.border.width, tuning.card.border.strength) },
     uRunner: { value: new Vector3(tuning.card.border.runnerStrength, tuning.card.border.runnerSpeed, tuning.card.border.runnerTail) },
   };
@@ -139,6 +142,7 @@ uniform vec3 uStripe;
 uniform float uIris;
 uniform float uIrisShift;
 uniform float uChroma;
+uniform vec2 uGlass;
 uniform vec2 uBorder;
 uniform vec3 uRunner;
 /** 이 카드의 도는 빛 배율: 빠르기(부호가 방향), 꼬리, 밝기 */
@@ -224,6 +228,15 @@ void main() {
   float lit = rim * (uBorder.y + uRunner.x * uRunnerVar.z * runner) * body;
   color.rgb += uHoloTint * lit;
   color.a = max(color.a, min(1.0, lit));
+
+  // 유리 표면 광택: 시선 각도에 따른 은은한 대각선 반사와 윗변·왼쪽 안쪽 베벨 하이라이트
+  float diag = (vUv.x * 0.65 + vUv.y * 0.85) + dot(viewDir.xy, vec2(0.45, 0.55));
+  float sheenBand = pow(max(0.0, 1.0 - abs(fract(diag * 0.45) - 0.5) * 2.4), 3.0);
+  float sheen = sheenBand * uGlass.x * (0.45 + graze * 0.85) * body * live;
+  float topLeft = smoothstep(-0.3, 0.7, vUv.y - vUv.x * 0.7);
+  float bevel = exp(-abs(edgeD - uBorder.x * 1.4) / max(uBorder.x * 0.9, 0.002)) * uGlass.y * (0.35 + 0.65 * topLeft) * body * live;
+  color.rgb += mix(uHoloTint, vec3(1.0), 0.55) * (sheen + bevel * 0.5);
+  color.a = min(1.0, color.a + sheen * 0.4);
 
   // 펼친 카드의 테두리 빛. 둥근 겉모양 선을 따라 같은 두께로 두른다
   float edge = (1.0 - smoothstep(0.0, uEdgeWidth, edgeD)) * body;

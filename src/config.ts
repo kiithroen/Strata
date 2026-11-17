@@ -89,7 +89,8 @@ export const tuning = {
     /**
      * 홀로그램 빛. stripe* 는 카드를 가로지르는 가는 줄무늬의 빈도(카드 높이당 줄 수)·세기(줄 사이가 투명해지는 정도)·
      * 위로 흐르는 속도(카드 높이/초), iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기,
-     * irisShift 는 무지개빛이 보는 각도에 따라 도는 정도, chroma 는 선의 빨강·파랑이 갈라지는 폭(텍스처 좌표)이다
+     * irisShift 는 무지개빛이 보는 각도에 따라 도는 정도, chroma 는 선의 빨강·파랑이 갈라지는 폭(텍스처 좌표),
+     * glassSheen 은 시선 각도에 따라 카드 유리면에 비치는 은은한 광택 세기, bevel 은 둥근 모서리 안쪽 반사광 세기다
      */
     holoFx: {
       stripeFreq: 42,
@@ -98,6 +99,8 @@ export const tuning = {
       iridescence: 0.035,
       irisShift: 1.4,
       chroma: 0.0022,
+      glassSheen: 0.075,
+      bevel: 0.22,
     },
     /**
      * 테두리 빛: 겉모양 선을 따라 종류 색을 더해 블룸이 걸리게 한다. width 는 빛이 퍼지는 폭(카드 높이 대비), strength 는 밝기.
