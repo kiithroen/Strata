@@ -49,6 +49,8 @@ function isStrataHistoryState(state: unknown): boolean {
 export class StrataMode {
   /** 지층 보기로 들어간 정도(0~1) */
   mix = 0;
+  /** 층 판과 층 낱말의 밝기 배율(0~1). 카드 공간 보기가 지층 위를 덮을 때 줄인다 */
+  veil = 1;
   active = false;
   private layers: StrataLayer[] = [];
   private frame: StrataFrame = { origin: new Vector3(), yaw: 0 };
@@ -101,7 +103,7 @@ export class StrataMode {
     };
     button('← 은하로', () => this.exit());
     const onCards = hooks?.onCards;
-    if (onCards) button('카드로 보기', onCards);
+    if (onCards) button('카드 보기', onCards);
     document.body.appendChild(this.actions);
     window.addEventListener('popstate', this.onPop);
     window.addEventListener('keydown', this.onKey);
@@ -229,7 +231,7 @@ export class StrataMode {
       strataPoint(this.frame, 0, layer.y, 0, this.center);
       const far = cloudVisibility(screenFraction(height, this.center.distanceTo(cameraPosition), p11));
       this.hidden.set(layer, far.cards);
-      drawCloud(labels, this.center, layer.words, far.words * this.mix, cameraPosition);
+      drawCloud(labels, this.center, layer.words, far.words * this.mix * this.veil, cameraPosition);
     }
   }
 
@@ -245,7 +247,7 @@ export class StrataMode {
         this.view.clear();
       }
     }
-    this.view.update(dt, this.mix, this.focus);
+    this.view.update(dt, this.mix * this.veil, this.focus);
   }
 
   dispose(): void {

@@ -336,6 +336,15 @@ body {
   cursor: pointer;
 }
 
+/* 카드 보기 동안에는 우주 보기의 HUD·시간 띠·지층 단추를 숨긴다 */
+body.card-view-open .hud,
+body.card-view-open .axis-readout,
+body.card-view-open .time-scrubber,
+body.card-view-open .settings-button,
+body.card-view-open .strata-actions {
+  visibility: hidden;
+}
+
 .card-list {
   position: fixed;
   inset: 0;
@@ -357,6 +366,46 @@ body {
   gap: 12px;
   padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.card-list.space {
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.card-list.space .card-list-head {
+  pointer-events: auto;
+  border-bottom-color: transparent;
+  background: linear-gradient(color-mix(in srgb, var(--bg) 80%, transparent), transparent);
+}
+
+.card-list.space .card-list-body {
+  display: none;
+}
+
+.card-list-toggle {
+  display: flex;
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
+}
+
+.card-list-mode {
+  padding: 8px 12px;
+  border: 0;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.card-list-mode.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
 }
 
 .card-list-title {

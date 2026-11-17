@@ -15,9 +15,10 @@ export interface FieldSlot {
 /**
  * 시야 원뿔 안에 카드 자리를 고르게 흩는다. 화면 좌표(깊이로 나눈 x, y)에서
  * 기존 자리와 가장 먼 후보를 고르는 방식이라 화면에서 겹침이 적다.
- * 시드가 같으면 같은 배치가 나온다.
+ * 시드가 같으면 같은 배치가 나온다. depthFar 를 field.depthFar 보다 깊게 주면 그보다 깊은 자리는
+ * field.depthFar 에서의 폭으로 퍼져, 앞으로 날아 들어가며 훑는 긴 통로가 된다.
  */
-export function generateField(count: number, seed: number, fovDeg: number): FieldSlot[] {
+export function generateField(count: number, seed: number, fovDeg: number, depthFar: number = tuning.field.depthFar): FieldSlot[] {
   const f = tuning.field;
   const fl = tuning.float;
   const rng = createRng(seed);
@@ -46,8 +47,8 @@ export function generateField(count: number, seed: number, fovDeg: number): Fiel
     }
     picked.push({ u: bestU, v: bestV });
 
-    const depth = range(rng, f.depthNear, f.depthFar);
-    const half = depth * halfTan;
+    const depth = range(rng, f.depthNear, depthFar);
+    const half = Math.min(depth, f.depthFar) * halfTan;
     slots.push({
       x: bestU * f.spreadX * half,
       y: bestV * f.spreadY * half,

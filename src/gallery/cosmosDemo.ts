@@ -43,6 +43,7 @@ import { GraphView } from '../widgets/cosmos/GraphView';
 import { TapApproach, approachDistance } from '../widgets/cosmos/tapApproach';
 import { Universe } from '../widgets/cosmos/Universe';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
+import { CardField } from '../widgets/noteCard/cardField';
 import { createPose } from '../widgets/noteCard/cardMotion';
 import { NoteCard } from '../widgets/noteCard/NoteCard';
 import { bendHeight } from '../widgets/noteCard/paperBend';
@@ -60,6 +61,7 @@ import { createTimeScrubber } from './timeScrubber';
 import { CardFocus } from './cardFocus';
 import { CardListMode } from './cardListMode';
 import { buildCardSections } from '../widgets/cardList/cardListModel';
+import type { CardViewMode } from '../widgets/cardList/CardListView';
 import { StrataMode } from './strataMode';
 import type { StrataLayerInput } from '../widgets/strata/strataLayout';
 import type { Stage, WidgetDemo } from './stage';
@@ -94,10 +96,20 @@ export interface CosmosDemo extends WidgetDemo {
   strataState(): { active: boolean; mix: number; layers: number; focus: number };
   /** 화면 좌표(CSS px)에서 처음 닿는 층 판 번호. 없으면 -1 */
   pickStrataLayer(x: number, y: number): number;
-  /** 지층 보기의 노트를 2D 카드 목록으로 연다(`카드로 보기` 단추와 같다) */
+  /** 지층 보기의 노트를 카드 보기로 연다(`카드 보기` 단추와 같다) */
   openCardList(): void;
-  /** 2D 카드 목록 상태: 열림, 카드 수, 사진을 아직 받지 않은 칸 수 */
-  cardListState(): { open: boolean; cards: number; waitingPhotos: number };
+  /** 카드 보기의 공간(3D)/목록(2D) 모드를 바꾼다(머리의 토글과 같다) */
+  setCardMode(mode: CardViewMode): void;
+  /** 카드 보기 상태: 열림, 모드, 공간 모드로 들어간 정도·앞으로 들어간 거리, 목록 카드 수, 사진을 아직 받지 않은 칸 수 */
+  cardListState(): {
+    open: boolean;
+    mode: CardViewMode;
+    fieldMix: number;
+    fieldOffset: number;
+    fieldMaxOffset: number;
+    cards: number;
+    waitingPhotos: number;
+  };
 }
 
 /**
@@ -260,23 +272,37 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     initialDistance: c.initialDistance,
   });
 
-  const cardList = new CardListMode('← 지층으로');
-  /** 지층에 깔린 노트만 층별로 2D 카드 목록에 펼치고, 바라보는 층을 맨 위에 둔다 */
+  // 카드 보기: 지층에 깔린 노트만 3D 카드 공간(field 배치) 또는 2D 카드 목록으로 본다
+  const cardList = new CardListMode('← 지층으로', () => focus.set(null));
+  let field: CardField | null = null;
+  /** 노트 번호 → 카드 공간 자리 번호(-1 이면 공간에 없음). 최근 노트가 앞자리다 */
+  const fieldSlotOf = new Int32Array(notes.length).fill(-1);
+  /** 카드 공간 보기로 들어간 정도(0~1) */
+  let fieldMix = 0;
+  const fieldPose = createPose();
+  const fieldOn = (): boolean => field !== null && cardList.open && cardList.mode === 'space';
+  /** 목록은 층별로 펼치고 바라보는 층을 맨 위에 둔다 */
   const openCardList = () => {
     if (!strata.active) return;
     focus.set(null);
     const groups = strata.groups().map((g) => ({ ...g, label: planetByKey.get(g.key)?.date ?? g.label }));
+    const members = groups.flatMap((g) => g.members).sort((a, b) => notes[b].time - notes[a].time);
+    field = new CardField(members.length, tuning.field.seed, stage.camera.fov);
+    fieldSlotOf.fill(-1);
+    members.forEach((m, i) => (fieldSlotOf[m] = i));
     cardList.show(buildCardSections(groups, notes, photos), strata.focusKey ?? undefined);
   };
   const strata = new StrataMode(stage, cameraRig, labels, {
     onEscape: () => {
+      if (focus.focused) {
+        focus.set(null);
+        return true;
+      }
       if (cardList.open) {
         cardList.close();
         return true;
       }
-      if (!focus.focused) return false;
-      focus.set(null);
-      return true;
+      return false;
     },
     onLeave: () => {
       cardList.dismiss();
@@ -354,27 +380,29 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       touchCount = count;
       if (count > 0) cameraRig.cancelInertia();
     },
+    // 카드 공간 보기에서는 카메라가 멈추고, 세로 끌기·핀치·휠이 카드 사이를 앞뒤로 날게 한다
     onDragStart: () => {
-      if (focus.focused) return;
+      if (focus.focused || fieldOn()) return;
       cameraRig.onDragStart();
     },
     onDragMove: (e) => {
       if (focus.focused) return;
-      cameraRig.onDragMove(e.dx, e.dy);
+      if (fieldOn()) field?.dolly(-e.dy * tuning.cardField.dollyPerPx);
+      else cameraRig.onDragMove(e.dx, e.dy);
     },
     onDragEnd: (e) => {
-      if (focus.focused) return;
+      if (focus.focused || fieldOn()) return;
       cameraRig.onDragEnd(e.vx, e.vy);
     },
     onPanStart: () => {
-      if (focus.focused) return;
+      if (focus.focused || fieldOn()) return;
       approach.clear();
       panning = true;
       pinnedTime = null;
       cameraRig.cancelInertia();
     },
     onPanMove: (e) => {
-      if (focus.focused) return;
+      if (focus.focused || fieldOn()) return;
       cameraRig.pan(e.dx, e.dy);
     },
     onPanEnd: () => {
@@ -389,6 +417,10 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     },
     onPinchMove: (e) => {
       if (focus.focused) return;
+      if (fieldOn()) {
+        field?.dolly(Math.log(e.ratio) * tuning.cardField.pinchDolly);
+        return;
+      }
       cameraRig.zoomByFactor(Math.pow(1 / e.ratio, tuning.gesture.pinchZoomScale));
       cameraRig.pan(e.x - lastPinchX, e.y - lastPinchY);
       lastPinchX = e.x;
@@ -396,11 +428,21 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     },
     onWheel: (e) => {
       if (focus.focused) return;
+      if (fieldOn()) {
+        field?.dolly(e.deltaY * tuning.cardField.wheelDolly);
+        return;
+      }
       cameraRig.zoomByFactor(Math.exp((e.deltaY / 100) * tuning.gesture.wheelZoomSpeed));
     },
     onTap: ({ x, y }) => {
       if (focus.focused) {
         focus.set(null);
+        return;
+      }
+      // 카드 공간 보기에서는 공간의 카드만 펼친다
+      if (fieldOn()) {
+        const hit = focus.pickHit(x, y, (card) => fieldSlotOf[cardIndex.get(card) ?? -1] >= 0);
+        if (hit) focus.set(hit.card);
         return;
       }
       // 광선이 종이에 정확히 맞으면 그 종이다. 지층 보기에서는 현재 지층 카드만 펼치고, 은하에서는 그 종이의 행성을 탭한 것으로 친다
@@ -496,14 +538,31 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     exitStrata: () => strata.exit(),
     pickStrataLayer: (x, y) => strata.pickLayer(x, y),
     openCardList,
-    cardListState: () => ({ open: cardList.open, ...cardList.stats() }),
+    setCardMode: (mode) => {
+      if (!cardList.open || cardList.mode === mode) return;
+      focus.set(null);
+      cardList.setMode(mode);
+    },
+    cardListState: () => ({
+      open: cardList.open,
+      mode: cardList.mode,
+      fieldMix,
+      fieldOffset: field?.offset ?? 0,
+      fieldMaxOffset: field?.maxOffset ?? 0,
+      ...cardList.stats(),
+    }),
     strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
       look.uTime.value = time;
       // 지층 보기 동안에는 은하가 멈춰 있어 돌아왔을 때 보던 자리 그대로다
       strata.update(dt);
       const mix = strata.mix;
-      graph.alphaScale = 1 - mix * (1 - tuning.strata.galaxyDim);
+      fieldMix = damp(fieldMix, fieldOn() ? 1 : 0, tuning.strata.transitionRate, dt);
+      if (!fieldOn() && fieldMix < 0.002) fieldMix = 0;
+      field?.step(dt);
+      // 카드 공간 보기 동안에는 층 판·층 낱말·은하 그래프를 걷고 별 배경만 남긴다
+      strata.veil = 1 - fieldMix;
+      graph.alphaScale = (1 - mix * (1 - tuning.strata.galaxyDim)) * (1 - fieldMix);
       // 지층에 눕힌 창은 종이 휨과 떠 있는 흔들림 없이 판 위에 가만히 놓인다
       look.uBend.value = 1 - mix;
       if (strata.active) {
@@ -572,8 +631,24 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           home.scale = c.satelliteScale;
           const card = cards[m];
           const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * paperFade[m] * (1 - far.cards);
-          const fade = strata.blendCard(m, home, baseFade);
-          card.motion.floatScale = 1 - mix;
+          let fade = strata.blendCard(m, home, baseFade);
+          if (fieldMix > 0 && field) {
+            // 카드 공간: 카메라 앞 자리로 날아가고, 공간에 없는 카드는 사라진다
+            const slot = fieldSlotOf[m];
+            if (slot >= 0) {
+              field.localPose(slot, fieldPose);
+              fieldPose.position.applyQuaternion(stage.camera.quaternion).add(stage.camera.position);
+              fieldPose.quaternion.premultiply(stage.camera.quaternion);
+              home.position.lerp(fieldPose.position, fieldMix);
+              home.quaternion.slerp(fieldPose.quaternion, fieldMix);
+              home.scale += (fieldPose.scale - home.scale) * fieldMix;
+              fade = fade * (1 - fieldMix) + field.fade(slot) * fieldMix;
+            } else {
+              fade *= 1 - fieldMix;
+            }
+          }
+          // 지층에 눕힌 창은 흔들리지 않고, 카드 공간에서는 노트 카드처럼 다시 떠 흔들린다
+          card.motion.floatScale = 1 - mix * (1 - fieldMix);
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,

@@ -3,14 +3,20 @@ import { formatStamp } from '../../core/format';
 import { holoTint, releasePhoto, type PhotoSource } from '../noteCard/cardTexture';
 import { countItems, photoBoxRatio, type CardListItem, type CardListSection } from './cardListModel';
 
+/** 카드 보기 방식: 3D 공간(목록 화면은 머리만 남기고 뒤의 3D 화면을 보인다) 또는 2D 목록 */
+export type CardViewMode = 'space' | 'list';
+
 export interface CardListOptions {
   /** 닫기 단추 글자 */
   closeLabel: string;
   onClose: () => void;
+  /** 있으면 머리에 공간/목록 토글을 띄우고, 바꿀 때 부른다 */
+  onModeChange?: (mode: CardViewMode) => void;
 }
 
 /**
  * 2D 카드 목록: 노트를 읽기 좋은 HTML 카드로 묶음별로 펼친 화면. 3D 화면 위를 덮는다.
+ * 토글이 있으면 공간 모드에서는 머리(닫기·장수·토글)만 남고 목록은 숨어 뒤의 3D 카드 공간이 보인다.
  * 사진은 화면 가까이 왔을 때만 칸 폭에 맞춰 그려 받는다(PhotoSource.render). 닫으면 늦게 온 사진은 버린다.
  */
 export class CardListView {
@@ -21,6 +27,9 @@ export class CardListView {
   private readonly pending = new Map<Element, PhotoSource>();
   /** 보여 줄 때마다 늘린다. 닫힌 뒤 도착한 사진을 가려낸다 */
   private generation = 0;
+  private count = 0;
+  private current: CardViewMode = 'list';
+  private readonly toggles = new Map<CardViewMode, HTMLButtonElement>();
 
   constructor(private readonly options: CardListOptions) {
     const c = tuning.cardList;
@@ -34,6 +43,27 @@ export class CardListView {
     close.addEventListener('click', () => this.options.onClose());
     this.title = el('span', 'card-list-title');
     head.append(close, this.title);
+    if (options.onModeChange) {
+      const toggle = el('div', 'card-list-toggle');
+      for (const [mode, text] of [
+        ['space', '공간'],
+        ['list', '목록'],
+      ] as const) {
+        const b = el('button', 'card-list-mode');
+        b.type = 'button';
+        b.textContent = text;
+        b.addEventListener('click', () => {
+          if (mode === this.current) return;
+          this.setMode(mode);
+          this.options.onModeChange?.(mode);
+        });
+        this.toggles.set(mode, b);
+        toggle.append(b);
+      }
+      head.append(toggle);
+      this.current = 'space';
+    }
+    this.applyMode();
     this.body = el('div', 'card-list-body');
     this.root.append(head, this.body);
     document.body.appendChild(this.root);
@@ -47,6 +77,22 @@ export class CardListView {
     return !this.root.hidden;
   }
 
+  get mode(): CardViewMode {
+    return this.current;
+  }
+
+  /** 보기 방식을 바꾼다(onModeChange 는 부르지 않는다). 목록으로 바뀌면 보이는 칸의 사진을 받는다 */
+  setMode(mode: CardViewMode): void {
+    this.current = mode;
+    this.applyMode();
+  }
+
+  private applyMode(): void {
+    this.root.classList.toggle('space', this.current === 'space');
+    this.title.textContent = this.current === 'space' ? `노트 ${this.count}장 · 끌기: 앞뒤 이동` : `노트 ${this.count}장`;
+    for (const [mode, b] of this.toggles) b.classList.toggle('active', mode === this.current);
+  }
+
   /** 지금 목록에 있는 카드 수와 사진을 아직 받지 않은 칸 수 */
   stats(): { cards: number; waitingPhotos: number } {
     return { cards: this.body.querySelectorAll('.card-item').length, waitingPhotos: this.pending.size };
@@ -56,7 +102,8 @@ export class CardListView {
   show(sections: readonly CardListSection[], focusKey?: string): void {
     this.reset();
     const gen = ++this.generation;
-    this.title.textContent = `노트 ${countItems(sections)}장`;
+    this.count = countItems(sections);
+    this.applyMode();
     let focusEl: HTMLElement | null = null;
     for (const section of sections) {
       const sec = el('section', 'card-list-section');
@@ -72,16 +119,19 @@ export class CardListView {
       if (section.key === focusKey) focusEl = sec;
     }
     this.root.hidden = false;
+    document.body.classList.add('card-view-open');
     this.body.scrollTop = focusEl ? focusEl.offsetTop : 0;
   }
 
   hide(): void {
     if (!this.open) return;
     this.root.hidden = true;
+    document.body.classList.remove('card-view-open');
     this.reset();
   }
 
   dispose(): void {
+    document.body.classList.remove('card-view-open');
     this.reset();
     this.observer.disconnect();
     this.root.remove();

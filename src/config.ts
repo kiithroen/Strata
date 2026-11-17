@@ -135,6 +135,19 @@ export const tuning = {
     yawMax: 0.35,
   },
 
+  /**
+   * 카드 공간 보기(카드 보기의 3D 모드): field 배치로 흩은 카드 사이를 앞뒤로 날아 훑는다.
+   * dollyPerPx 는 세로 끌기 1px, wheelDolly 는 휠 deltaY 1, pinchDolly 는 핀치 배율 로그 1 만큼 들어가는 거리,
+   * dollyRate 는 앞뒤 이동이 목표를 따라가는 속도(1/초), nearFade 는 카메라에서 이 거리 범위로 다가오면 카드가 사라지는 구간이다
+   */
+  cardField: {
+    dollyPerPx: 0.04,
+    wheelDolly: 0.012,
+    pinchDolly: 6,
+    dollyRate: 8,
+    nearFade: [0.9, 2.4],
+  },
+
   axis: {
     /** 카메라에서 지금 시점(초점면)까지 거리 */
     focusDepth: 6,

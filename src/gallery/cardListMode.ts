@@ -1,4 +1,4 @@
-import { CardListView } from '../widgets/cardList/CardListView';
+import { CardListView, type CardViewMode } from '../widgets/cardList/CardListView';
 import type { CardListSection } from '../widgets/cardList/cardListModel';
 
 function isCardListHistoryState(state: unknown): boolean {
@@ -6,8 +6,9 @@ function isCardListHistoryState(state: unknown): boolean {
 }
 
 /**
- * 2D 카드 목록을 여닫고 방문 기록을 맞춘다. 열 때 지금 기록 상태에 cardList 표시를 더해 하나 쌓으므로
- * 브라우저·안드로이드 뒤로는 목록만 닫고 그 아래 화면(지층 보기)은 그대로 둔다. 닫기 단추와 close() 는 그 기록을 되돌린다.
+ * 카드 보기(2D 목록. onModeChange 를 주면 3D 공간과 토글한다)를 여닫고 방문 기록을 맞춘다.
+ * 열 때 지금 기록 상태에 cardList 표시를 더해 하나 쌓으므로 브라우저·안드로이드 뒤로는 카드 보기만 닫고
+ * 그 아래 화면(지층 보기)은 그대로 둔다. 닫기 단추와 close() 는 그 기록을 되돌린다. 모드를 바꿔도 기록은 쌓지 않는다.
  */
 export class CardListMode {
   private readonly view: CardListView;
@@ -18,13 +19,21 @@ export class CardListMode {
     this.view.hide();
   };
 
-  constructor(closeLabel: string) {
-    this.view = new CardListView({ closeLabel, onClose: () => this.close() });
+  constructor(closeLabel: string, onModeChange?: (mode: CardViewMode) => void) {
+    this.view = new CardListView({ closeLabel, onClose: () => this.close(), onModeChange });
     window.addEventListener('popstate', this.onPop);
   }
 
   get open(): boolean {
     return this.view.open;
+  }
+
+  get mode(): CardViewMode {
+    return this.view.mode;
+  }
+
+  setMode(mode: CardViewMode): void {
+    this.view.setMode(mode);
   }
 
   stats(): { cards: number; waitingPhotos: number } {
