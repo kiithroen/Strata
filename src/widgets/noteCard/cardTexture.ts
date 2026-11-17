@@ -50,7 +50,8 @@ interface Palette {
   dim: string;
   faint: string;
   band: string;
-  wash: string;
+  washTop: string;
+  washBottom: string;
   rule: string;
 }
 
@@ -58,7 +59,15 @@ function palette(face: CardFace): Palette {
   const h = tuning.card.holo;
   const c = new Color(holoTint(face));
   const rgba = (a: number) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
-  return { line: rgba(1), dim: rgba(h.dimAlpha), faint: rgba(h.faintAlpha), band: rgba(h.bandAlpha), wash: rgba(h.washAlpha), rule: rgba(h.ruleAlpha) };
+  return {
+    line: rgba(1),
+    dim: rgba(h.dimAlpha),
+    faint: rgba(h.faintAlpha),
+    band: rgba(h.bandAlpha),
+    washTop: rgba(h.washAlpha * 1.25),
+    washBottom: rgba(h.washAlpha * 0.45),
+    rule: rgba(h.ruleAlpha),
+  };
 }
 
 function idHash(id: string): number {
@@ -231,15 +240,23 @@ function drawBody(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette,
   outline(ctx, layout, line / 2);
   ctx.stroke();
 
-  if (layout.kind === 'memo') {
-    // 메모: 메모 색을 옅게 깔고 오른쪽 아래 귀퉁이를 접는다
+  if (layout.kind === 'memo' || layout.kind === 'doc') {
+    // 메모·문서: 종류 색 유리 그라데이션을 깔고, 메모는 오른쪽 아래 귀퉁이를 접는다
     ctx.save();
     outline(ctx, layout, line / 2);
     ctx.clip();
-    ctx.fillStyle = p.wash;
+    const g = ctx.createLinearGradient(0, 0, 0, layout.textureHeight);
+    if (layout.kind === 'memo') {
+      g.addColorStop(0, p.washTop);
+      g.addColorStop(1, p.washBottom);
+    } else {
+      g.addColorStop(0, p.washBottom);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+    }
+    ctx.fillStyle = g;
     ctx.fillRect(0, 0, layout.textureWidth, layout.textureHeight);
     ctx.restore();
-    drawFold(ctx, layout, p, line);
+    if (layout.kind === 'memo') drawFold(ctx, layout, p, line);
   }
 
   // 실을 묶는 자리에 종류 아이콘(멀리서는 점)
@@ -324,6 +341,10 @@ function drawPhoto(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLa
     ctx.fillRect(content.x, content.y, content.width, content.height);
   }
   ctx.restore();
+  innerRect(ctx, content, layout.unit);
+  ctx.strokeStyle = p.faint;
+  ctx.lineWidth = layout.line;
+  ctx.stroke();
   drawLabel(ctx, layout, p, face.title ?? `IMG_${face.id}`, titleBar.width - padding);
 }
 

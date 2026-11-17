@@ -366,11 +366,11 @@ function createNebula(): Mesh<SphereGeometry, ShaderMaterial> {
       }
       void main() {
         vec3 p = vDir * 2.2 + vec3(0.0, 0.0, uTime * 0.004);
-        float a = smoothstep(0.45, 0.85, fbm(p));
-        float b = smoothstep(0.5, 0.9, fbm(p * 1.7 + 11.0));
-        float c = smoothstep(0.55, 0.95, fbm(p * 1.3 + 23.0));
-        vec3 col = uColorA * a + uColorB * b * 0.8 + uColorC * c * 0.7;
-        gl_FragColor = vec4(col * 0.45, 1.0);
+        float a = smoothstep(0.36, 0.84, fbm(p));
+        float b = smoothstep(0.42, 0.88, fbm(p * 1.7 + 11.0));
+        float c = smoothstep(0.48, 0.92, fbm(p * 1.3 + 23.0));
+        vec3 col = uColorA * a + uColorB * b * 0.85 + uColorC * c * 0.75;
+        gl_FragColor = vec4(col * 0.72, 1.0);
         #include <colorspace_fragment>
       }
     `,

@@ -68,14 +68,14 @@ export const tuning = {
     holo: {
       kinds: { photo: '#48d6ff', doc: '#7fa4ff' },
       memoColors: ['#5ef0c8', '#ffcf5a', '#ff7fbf'],
-      fill: 'rgba(3, 13, 32, 0.74)',
-      dimAlpha: 0.5,
-      faintAlpha: 0.2,
-      bandAlpha: 0.14,
-      glowRatio: 0.014,
+      fill: 'rgba(6, 22, 52, 0.78)',
+      dimAlpha: 0.55,
+      faintAlpha: 0.24,
+      bandAlpha: 0.18,
+      glowRatio: 0.016,
       /** 메모 바탕에 까는 메모 색의 불투명도, 문서 괘선의 불투명도 */
-      washAlpha: 0.07,
-      ruleAlpha: 0.12,
+      washAlpha: 0.22,
+      ruleAlpha: 0.18,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
     simple: { photoBlocks: 9, barRatio: 0.045, barGapRatio: 0.085 },
@@ -85,7 +85,7 @@ export const tuning = {
      * farAlpha 는 단순한 모양일 때의 불투명도 배율, focusAlpha 는 펼친 카드 바탕의 최소 불투명도(뒤가 비쳐 글이 흐려지지 않게),
      * glint 는 비스듬히 볼 때 가장자리가 밝아지는 정도다
      */
-    lod: { detail: [0.045, 0.11], color: [0.12, 0.26], farAlpha: 0.7, focusAlpha: 0.94, glint: 0.5 },
+    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], farAlpha: 0.78, focusAlpha: 0.94, glint: 0.55 },
     /**
      * 홀로그램 빛. stripe* 는 카드를 가로지르는 가는 줄무늬의 빈도(카드 높이당 줄 수)·세기(줄 사이가 투명해지는 정도)·
      * 위로 흐르는 속도(카드 높이/초), iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기,
@@ -96,11 +96,11 @@ export const tuning = {
       stripeFreq: 42,
       stripeStrength: 0.11,
       stripeSpeed: 0.035,
-      iridescence: 0.035,
+      iridescence: 0.045,
       irisShift: 1.4,
       chroma: 0.0022,
-      glassSheen: 0.075,
-      bevel: 0.22,
+      glassSheen: 0.13,
+      bevel: 0.34,
     },
     /**
      * 테두리 빛: 겉모양 선을 따라 종류 색을 더해 블룸이 걸리게 한다. width 는 빛이 퍼지는 폭(카드 높이 대비), strength 는 밝기.
@@ -108,8 +108,8 @@ export const tuning = {
      * runnerJitter 는 카드마다 그 셋에 곱하는 배율의 범위와 반대 방향으로 도는 카드의 비율이다
      */
     border: {
-      width: 0.007,
-      strength: 0.6,
+      width: 0.01,
+      strength: 0.85,
       runnerStrength: 1.5,
       runnerSpeed: 0.16,
       runnerTail: 0.14,
@@ -292,20 +292,20 @@ export const tuning = {
      * hourColors: 노트가 찍힌 시각(4시간 단위)별 점 색
      */
     graph: {
-      branchWidth: 4.5,
+      branchWidth: 5.2,
       branchSegments: 14,
       spokeWidth: 1.0,
-      branchColor: '#7fd2ff',
+      branchColor: '#5cd8ff',
       hubColor: '#e4f8ff',
-      nodeColor: { saturation: [0.65, 0.95], lightness: [0.55, 0.72], coreMix: 0.55 },
-      branchAlpha: 0.55,
+      nodeColor: { saturation: [0.82, 1.0], lightness: [0.46, 0.6], coreMix: 0.62 },
+      branchAlpha: 0.62,
       spokeAlpha: 0.55,
       nodeSize: 0.08,
       hubSize: 0.11,
       dotSize: 0.055,
-      glowSize: 1.4,
-      hubGlowSize: 2.1,
-      glowAlpha: 0.26,
+      glowSize: 1.65,
+      hubGlowSize: 2.5,
+      glowAlpha: 0.34,
       /** 허브 글자 높이(CSS px) */
       hubLabelPx: 15,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
@@ -367,7 +367,7 @@ export const tuning = {
      * 성운 배경. bakeSize 가 0 이면 매 프레임 화면 해상도로 계산하고, 양수면 그 크기(px)의 큐브맵에 구워 두고
      * refreshSeconds(게임 시간)마다 다시 굽는다
      */
-    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, colors: ['#0b1f66', '#05445e', '#16127a'] },
+    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, colors: ['#0d2b80', '#075c7a', '#1e1894'] },
   },
 
   /**
@@ -389,16 +389,16 @@ export const tuning = {
      * 층 원판의 HUD 링(반지름 1 기준). line 은 선 굵기, alpha 는 가장 밝을 때 불투명도, fillAlpha 는 가운데가 밝은 원판 바탕,
      * dashes 는 안쪽 점선 링의 점 수, dashSpeed·arcSpeed·dotSpeed 는 점선 링·바깥 호 조각·안쪽 점 링이 원판에 대해 더 도는 빠르기(초당 바퀴, 음수는 반대 방향)다
      */
-    ring: { line: 0.009, alpha: 0.6, fillAlpha: 0.07, dashes: 96, dashSpeed: 0, arcSpeed: -0.045, dotSpeed: 0 },
+    ring: { line: 0.009, alpha: 0.76, fillAlpha: 0.11, dashes: 96, dashSpeed: 0, arcSpeed: -0.045, dotSpeed: 0 },
     /** 원판(테이블)이 창을 얹은 채 도는 빠르기(라디안/초)와, 멈추고 다시 돌 때 빠르기가 따라가는 속도(1/초) */
     spin: { speed: 0.08, rate: 2.5 },
     /**
      * 아래에서 올라오는 빛기둥. emitterGap 은 가장 아래층에서 발광부까지 거리(layerGap 배), topGap 은 가장 위층 위로 더 뻗는 거리(layerGap 배),
      * spread 는 위쪽 반지름(가장 큰 층 반지름 배), base 는 발광부 반지름(월드), alpha 는 빛기둥 밝기, glow·glowAlpha 는 발광부 빛 무리 크기(월드)·밝기다
      */
-    beam: { emitterGap: 0.9, topGap: 0.35, spread: 0.85, base: 0.12, alpha: 0.42, glow: 1.45, glowAlpha: 0.55 },
+    beam: { emitterGap: 0.9, topGap: 0.35, spread: 0.85, base: 0.12, alpha: 0.72, glow: 1.85, glowAlpha: 0.8 },
     /** 바라보는 층이 아닌 층의 밝기 배율 */
-    otherLayerAlpha: 0.36,
+    otherLayerAlpha: 0.42,
     /** 들어가고 나오는 전환 속도(1/초) */
     transitionRate: 3.2,
     /** 카메라가 층을 내려다보는 각(라디안)과 거리, 판 반폭이 차지해도 되는 화면 반폭 비율(넘으면 물러난다) */
@@ -432,7 +432,7 @@ export const tuning = {
     show: [0.075, 0.045],
     hide: [0.04, 0.022],
     liftPx: 30,
-    alpha: 0.78,
+    alpha: 0.92,
   },
 
   dev: {

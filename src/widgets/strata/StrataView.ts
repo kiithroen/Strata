@@ -138,7 +138,7 @@ void main() {
   float facing = abs(dot(normalize(vNormalV), normalize(-vViewPos)));
   float rays = 0.72 + 0.28 * sin(vAngle * 18.0 + uTime * 0.5) * sin(vAngle * 7.0 - uTime * 0.3);
   float a = pow(1.0 - vH, 1.45) * pow(facing, 1.5) * rays;
-  gl_FragColor = vec4(mix(uColor, vec3(1.0), 0.2 * (1.0 - vH)), a * uOpacity);
+  gl_FragColor = vec4(mix(uColor, vec3(1.0), 0.14 * (1.0 - vH)), a * uOpacity);
   #include <colorspace_fragment>
 }
 `;
