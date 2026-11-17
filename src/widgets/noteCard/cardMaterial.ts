@@ -25,11 +25,10 @@ export interface CardLook {
   uFarAlpha: { value: number };
   uFocusAlpha: { value: number };
   uGlint: { value: number };
-  /** 훑는 빛 띠: 속도, 밝기, 두께 */
-  uSweep: { value: Vector3 };
-  /** 간섭 무늬: 빈도, 밝기, 각도에 따라 미끄러지는 정도 */
-  uFringe: { value: Vector3 };
+  /** 가로 줄무늬: 빈도, 세기, 흐르는 속도 */
+  uStripe: { value: Vector3 };
   uIris: { value: number };
+  uIrisShift: { value: number };
   uChroma: { value: number };
 }
 
@@ -58,9 +57,9 @@ export function createCardLook(): CardLook {
     uFarAlpha: { value: lod.farAlpha },
     uFocusAlpha: { value: lod.focusAlpha },
     uGlint: { value: lod.glint },
-    uSweep: { value: new Vector3(h.sweepSpeed, h.sweepStrength, h.sweepWidth) },
-    uFringe: { value: new Vector3(h.fringeFreq, h.fringeStrength, h.fringeShift) },
+    uStripe: { value: new Vector3(h.stripeFreq, h.stripeStrength, h.stripeSpeed) },
     uIris: { value: h.iridescence },
+    uIrisShift: { value: h.irisShift },
     uChroma: { value: h.chroma },
   };
 }
@@ -130,9 +129,9 @@ uniform vec3 uHoloTint;
 uniform float uFarAlpha;
 uniform float uFocusAlpha;
 uniform float uGlint;
-uniform vec3 uSweep;
-uniform vec3 uFringe;
+uniform vec3 uStripe;
 uniform float uIris;
+uniform float uIrisShift;
 uniform float uChroma;
 uniform float uBendPhase;
 uniform float uAspect;
@@ -178,7 +177,7 @@ void main() {
   color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
 
   // 보는 각도(면의 기울기와 시선)에 따라 미끄러지는 위상. 카드가 돌거나 시점이 움직이면 빛이 흐른다
-  float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uFringe.z + dot(viewDir.xy, vec2(-0.6, 0.8)) * uFringe.z * 0.5 + uBendPhase;
+  float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uIrisShift + dot(viewDir.xy, vec2(-0.6, 0.8)) * uIrisShift * 0.5 + uBendPhase;
   vec3 rainbow = iris(phase + (vUv.x + vUv.y) * 0.35);
 
   // 비스듬히 볼수록 가장자리가 밝아지고 무지개빛 막이 돈다
@@ -187,14 +186,12 @@ void main() {
   color.a = min(1.0, color.a + glint * 0.5 * body);
   color.rgb += rainbow * uIris * (0.15 + graze) * body * live;
 
-  // 위에서 아래로 천천히 훑는 부드러운 빛 띠
-  float sweep = fract(vUv.y + uTime * uSweep.x + uBendPhase) - 0.5;
-  float band = exp(-(sweep * sweep) / (uSweep.z * uSweep.z));
-  color.rgb += mix(uHoloTint, rainbow, 0.15) * band * uSweep.y * body * live;
-
-  // 비스듬한 가는 간섭 무늬. 각도에 따라 옆으로 흐르고, 비스듬하거나 빛 띠가 지날 때 드러난다
-  float lines = 0.5 + 0.5 * sin(((vUv.x * uAspect + vUv.y) * uFringe.x + phase * 2.0) * 3.14159265359);
-  color.rgb += rainbow * pow(lines, 16.0) * uFringe.y * (0.15 + graze + band * 2.0) * body * live;
+  // 가는 가로 줄무늬가 천천히 위로 흐르고 줄 사이는 조금 투명해진다. 빛을 더하지 않아 하얗게 뜨지 않는다.
+  // 줄이 화면에서 너무 촘촘해지면(멀리 있는 카드) 물결무늬가 생기지 않게 옅어진다
+  float sy = (vUv.y - uTime * uStripe.z) * uStripe.x;
+  float stripe = pow(0.5 + 0.5 * sin(sy * 6.28318530718), 2.0);
+  float fine = 1.0 - smoothstep(0.3, 0.6, fwidth(sy));
+  color.a *= 1.0 - uStripe.y * (1.0 - stripe) * fine * live;
 
   // 펼친 카드의 테두리 빛. 가로 거리를 높이 단위로 맞춰 네 변의 두께를 같게 한다
   vec2 edgeDist = min(vUv, 1.0 - vUv);

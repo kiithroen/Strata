@@ -86,18 +86,16 @@ export const tuning = {
      */
     lod: { detail: [0.045, 0.11], color: [0.12, 0.26], farAlpha: 0.7, focusAlpha: 0.94, glint: 0.5 },
     /**
-     * 홀로그램 빛. sweep* 는 위에서 아래로 훑는 부드러운 빛 띠의 속도(1/초)·밝기·두께(카드 높이 대비),
-     * fringe* 는 비스듬한 가는 간섭 무늬의 빈도(카드 대각선 한 번에 지나가는 줄 수)·밝기·보는 각도에 따라 미끄러지는 정도,
-     * iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기, chroma 는 선의 빨강·파랑이 갈라지는 폭(텍스처 좌표)이다
+     * 홀로그램 빛. stripe* 는 카드를 가로지르는 가는 줄무늬의 빈도(카드 높이당 줄 수)·세기(줄 사이가 투명해지는 정도)·
+     * 위로 흐르는 속도(카드 높이/초), iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기,
+     * irisShift 는 무지개빛이 보는 각도에 따라 도는 정도, chroma 는 선의 빨강·파랑이 갈라지는 폭(텍스처 좌표)이다
      */
     holoFx: {
-      sweepSpeed: 0.07,
-      sweepStrength: 0.14,
-      sweepWidth: 0.07,
-      fringeFreq: 34,
-      fringeStrength: 0.03,
-      fringeShift: 1.4,
+      stripeFreq: 42,
+      stripeStrength: 0.22,
+      stripeSpeed: 0.035,
       iridescence: 0.035,
+      irisShift: 1.4,
       chroma: 0.0022,
     },
     /**
