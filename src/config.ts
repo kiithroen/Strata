@@ -101,9 +101,17 @@ export const tuning = {
     },
     /**
      * 테두리 빛: 겉모양 선을 따라 종류 색을 더해 블룸이 걸리게 한다. width 는 빛이 퍼지는 폭(카드 높이 대비), strength 는 밝기.
-     * runner* 는 테두리를 따라 도는 빛의 밝기·빠르기(초당 바퀴)·꼬리 길이(한 바퀴 대비)다
+     * runner* 는 테두리를 따라 도는 빛의 밝기·빠르기(초당 바퀴)·꼬리 길이(한 바퀴 대비)다.
+     * runnerJitter 는 카드마다 그 셋에 곱하는 배율의 범위와 반대 방향으로 도는 카드의 비율이다
      */
-    border: { width: 0.012, strength: 0.6, runnerStrength: 1.5, runnerSpeed: 0.16, runnerTail: 0.14 },
+    border: {
+      width: 0.012,
+      strength: 0.6,
+      runnerStrength: 1.5,
+      runnerSpeed: 0.16,
+      runnerTail: 0.14,
+      runnerJitter: { speed: [0.55, 1.6], tail: [0.6, 1.6], strength: [0.55, 1.15], reverse: 0.4 },
+    },
     /**
      * 짧은 노트(메모): 글 양에 맞춰 크기가 바뀐다. 폭은 기준 폭 대비 widthScales 범위에서 글 폭(어림, 글자 크기 단위)이 fullText 에 가까울수록 넓고,
      * 높이는 제목·본문 줄 수에 맞추되 폭 대비 aspect 범위로 자른다. 글자 크기는 텍스처 기준 폭 대비 titleRatio·bodyRatio, 줄 간격 배율 lineHeight

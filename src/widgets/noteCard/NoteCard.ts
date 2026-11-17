@@ -1,6 +1,7 @@
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial } from 'three';
 import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
+import { runnerVariation } from './borderRunner';
 import { cornerUv, faceLayout, type CardLayout } from './cardLayout';
 import { createCardMaterial, type CardLook } from './cardMaterial';
 import {
@@ -87,6 +88,7 @@ export class NoteCard {
       height: this.layout.worldHeight,
       bendPhase: phase / 1000,
       corner: cornerUv(this.layout),
+      runner: runnerVariation(this.id),
       tint: holoTint(opts.face),
     });
     this.bendPhase = phase / 1000;

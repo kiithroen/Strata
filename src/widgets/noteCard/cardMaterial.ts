@@ -1,5 +1,6 @@
 import { Color, DoubleSide, ShaderMaterial, type Texture, Vector2, Vector3 } from 'three';
 import { tuning } from '../../config';
+import type { RunnerVariation } from './borderRunner';
 
 /** 모든 카드가 함께 쓰는 유니폼. 같은 객체를 각 재질에 넘겨 한 번만 갱신한다. */
 export interface CardLook {
@@ -140,6 +141,8 @@ uniform float uIrisShift;
 uniform float uChroma;
 uniform vec2 uBorder;
 uniform vec3 uRunner;
+/** 이 카드의 도는 빛 배율: 빠르기(부호가 방향), 꼬리, 밝기 */
+uniform vec3 uRunnerVar;
 /** 카드 겉모양(둥근 사각형)의 모서리 반지름(카드 높이 단위) */
 uniform float uCorner;
 uniform float uBendPhase;
@@ -215,9 +218,10 @@ void main() {
   float rim = exp(-edgeD / uBorder.x) * live;
   vec2 fromCenter = vec2((vUv.x - 0.5) * uAspect, vUv.y - 0.5);
   float around = atan(fromCenter.y, fromCenter.x) / 6.28318530718 + 0.5;
-  float behind = fract(uTime * uRunner.y + uBendPhase - around);
-  float runner = exp(-behind / uRunner.z) * smoothstep(1.0, 0.97, behind);
-  float lit = rim * (uBorder.y + uRunner.x * runner) * body;
+  float dir = sign(uRunnerVar.x);
+  float behind = fract(uTime * uRunner.y * abs(uRunnerVar.x) + uBendPhase - around * dir);
+  float runner = exp(-behind / (uRunner.z * uRunnerVar.y)) * smoothstep(1.0, 0.97, behind);
+  float lit = rim * (uBorder.y + uRunner.x * uRunnerVar.z * runner) * body;
   color.rgb += uHoloTint * lit;
   color.a = max(color.a, min(1.0, lit));
 
@@ -248,6 +252,8 @@ export interface CardMaterialOptions {
   bendPhase: number;
   /** 카드 겉모양의 모서리 반지름(카드 높이 단위, cornerUv). 테두리 빛이 이 선을 따른다 */
   corner: number;
+  /** 테두리를 따라 도는 빛의 카드별 배율(runnerVariation) */
+  runner: RunnerVariation;
   /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때 이 색으로 물들고, 테두리 빛·반짝임·훑는 띠도 이 색을 바탕으로 한다 */
   tint: string;
 }
@@ -263,6 +269,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uCardSize: { value: new Vector2(o.width, o.height) },
       uBendPhase: { value: o.bendPhase },
       uCorner: { value: o.corner },
+      uRunnerVar: { value: new Vector3(o.runner.speed, o.runner.tail, o.runner.strength) },
       uDim: { value: 0 },
       uFocus: { value: 0 },
       uFade: { value: 1 },

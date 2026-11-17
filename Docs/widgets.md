@@ -58,7 +58,7 @@
   - 가로 줄무늬(`stripeFreq`, `stripeStrength`, `stripeSpeed`): 카드 세로 좌표로 만든 가는 줄이 천천히 위로 흐르고, 줄 사이가 조금 투명해진다(빛을 더하지 않는다). 화면에서 줄이 너무 촘촘해지는 먼 카드는 물결무늬가 생기지 않게 줄이 옅어진다.
   - 무지개빛 막(`iridescence`, `irisShift`): 보는 각도(면의 기울기와 시선)로 정한 위상에 따라 색이 돌고, 비스듬히 볼수록 짙다.
   - 색수차(`chroma`): 선의 빨강·파랑이 옆으로 살짝 갈라지고 비스듬할수록 더 갈라진다.
-- 테두리 빛(`card.border`): 셰이더가 카드 겉모양(둥근 사각형, `cardLayout.ts`의 `cornerUv`로 텍스처와 같은 둥글기)까지의 거리로 선을 따라 종류 색을 더한다(`width`, `strength`). 밝아진 선에 블룸이 걸린다. 그 위로 꼬리 달린 빛이 테두리를 따라 돈다(`runnerStrength`, `runnerSpeed`, `runnerTail`). 도는 위치는 카드 가운데에서 본 각도로 재고 카드마다 출발점이 다르다. 펼친 카드는 꺼진다.
+- 테두리 빛(`card.border`): 셰이더가 카드 겉모양(둥근 사각형, `cardLayout.ts`의 `cornerUv`로 텍스처와 같은 둥글기)까지의 거리로 선을 따라 종류 색을 더한다(`width`, `strength`). 밝아진 선에 블룸이 걸린다. 그 위로 꼬리 달린 빛이 테두리를 따라 돈다(`runnerStrength`, `runnerSpeed`, `runnerTail`). 도는 위치는 카드 가운데에서 본 각도로 재고 카드마다 출발점이 다르다. 빠르기·꼬리·밝기는 노트 번호로 정한 배율(`runnerJitter`, `borderRunner.ts`의 `runnerVariation`)을 곱하고, `runnerJitter.reverse` 비율의 카드는 반대 방향으로 돈다. 펼친 카드는 꺼진다.
 - 휨(`CardLook.uBend`, 0~1): 메시를 `card.segments` 칸 격자로 나누고, 정점 셰이더가 카드 좌표의 가로·세로 물결과 가로 말림(`card.bend`)을 더한 높이만큼 앞뒤로 민다. 종이마다 노트 번호로 정한 위상만큼 어긋나게 출렁이고, 펼치는 동안에는 평평해진다.
 - 반짝임(`CardLook.uShade`, 0~1): 휜 면을 비스듬히 볼수록 가장자리가 종류 색과 무지개빛으로 밝아진다(`card.lod.glint`). 펼치는 동안에는 꺼진다. 우주 보기만 휨과 반짝임을 켠다.
 - `setBadge(text)`로 카드 오른쪽 위에 배지를 붙인다(높이 `axis.badgeHeight`). 글자 텍스처는 `widgets/common/labelCache.ts`가 구워 재사용한다.
