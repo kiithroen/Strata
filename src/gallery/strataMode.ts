@@ -35,6 +35,8 @@ export interface StrataModeHooks {
   onLeave?: () => void;
   /** 있으면 `카드로 보기` 단추를 띄우고, 누르면 부른다 */
   onCards?: () => void;
+  /** `카드 보기` 뒤에 더 띄울 단추(메모 앨범의 `+ 노트`, `검색`) */
+  buttons?: readonly { label: string; onClick: () => void }[];
 }
 
 const AXIS_Y = new Vector3(0, 1, 0);
@@ -112,6 +114,7 @@ export class StrataMode {
     button('← 은하로', () => this.exit());
     const onCards = hooks?.onCards;
     if (onCards) button('카드 보기', onCards);
+    for (const b of hooks?.buttons ?? []) button(b.label, b.onClick);
     document.body.appendChild(this.actions);
     window.addEventListener('popstate', this.onPop);
     window.addEventListener('keydown', this.onKey);

@@ -379,6 +379,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   /** focusInput 이 거짓이면 검색 칸에 입력 초점을 두지 않는다(폰에서 가상 키보드가 뜨지 않게, 되살릴 때) */
   const openSearch = (query?: string, focusInput = true): number => {
     focus.set(null);
+    searchList.setCloseLabel(strata.active ? '← 지층으로' : '← 은하로');
     const n = runSearch(query ?? searchList.query);
     if (query !== undefined) searchList.setQuery(query);
     if (focusInput) searchList.focusSearch();
@@ -504,6 +505,10 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
         cardList.close();
         return true;
       }
+      if (searchList.open) {
+        searchList.close();
+        return true;
+      }
       return false;
     },
     onLeave: () => {
@@ -511,6 +516,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       focus.set(null);
     },
     onCards: () => openCardList(),
+    // 지층 보기에서도 노트를 쓰고 찾는다. 검색은 지층 위에 열고 닫으면 지층으로 돌아온다
+    buttons: [
+      ...(options.album ? [{ label: '+ 노트', onClick: () => screens.compose() }] : []),
+      { label: '검색', onClick: () => void openSearch() },
+    ],
   });
   let strataWasActive = false;
 
@@ -903,7 +913,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       if (actions.hidden !== strata.active) actions.hidden = strata.active;
       look.uTime.value = time;
       // 지층 원판은 손가락이 닿아 있거나 카드를 펼쳤거나 카드 보기를 열면 멈춘다
-      strata.spinning = touchCount === 0 && !focus.focused && !cardList.open;
+      strata.spinning = touchCount === 0 && !focus.focused && !cardList.open && !searchList.open;
       // 지층 보기 동안에는 은하가 멈춰 있어 돌아왔을 때 보던 자리 그대로다
       strata.update(dt);
       const mix = strata.mix;
