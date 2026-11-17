@@ -30,6 +30,9 @@ export interface CardLook {
   uIris: { value: number };
   uIrisShift: { value: number };
   uChroma: { value: number };
+  /** 테두리 빛: 폭, 밝기 / 도는 빛: 밝기, 빠르기, 꼬리 길이 */
+  uBorder: { value: Vector2 };
+  uRunner: { value: Vector3 };
 }
 
 export function createCardLook(): CardLook {
@@ -61,6 +64,8 @@ export function createCardLook(): CardLook {
     uIris: { value: h.iridescence },
     uIrisShift: { value: h.irisShift },
     uChroma: { value: h.chroma },
+    uBorder: { value: new Vector2(tuning.card.border.width, tuning.card.border.strength) },
+    uRunner: { value: new Vector3(tuning.card.border.runnerStrength, tuning.card.border.runnerSpeed, tuning.card.border.runnerTail) },
   };
 }
 
@@ -133,6 +138,11 @@ uniform vec3 uStripe;
 uniform float uIris;
 uniform float uIrisShift;
 uniform float uChroma;
+uniform vec2 uBorder;
+uniform vec3 uRunner;
+/** 카드 겉모양 꼭짓점(uv). 사각형 4, 메모 5, 문서 6개 */
+uniform vec2 uOutline[6];
+uniform int uOutlineCount;
 uniform float uBendPhase;
 uniform float uAspect;
 uniform float uDim;
@@ -145,6 +155,22 @@ varying vec3 vNormalV;
 varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
+
+// 카드 겉모양 선까지의 거리(카드 높이 단위). 가로는 uAspect 를 곱해 네 변의 거리 단위를 맞춘다
+float outlineDistance(vec2 uv) {
+  vec2 p = vec2(uv.x * uAspect, uv.y);
+  float d = 1e9;
+  for (int i = 0; i < 6; i++) {
+    if (i >= uOutlineCount) break;
+    int j = i + 1 == uOutlineCount ? 0 : i + 1;
+    vec2 a = vec2(uOutline[i].x * uAspect, uOutline[i].y);
+    vec2 b = vec2(uOutline[j].x * uAspect, uOutline[j].y);
+    vec2 ab = b - a;
+    float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+    d = min(d, length(p - a - ab * t));
+  }
+  return d;
+}
 
 // 얇은 막의 무지개빛: 위상 t 에 따라 색상이 돈다
 vec3 iris(float t) {
@@ -193,6 +219,18 @@ void main() {
   float fine = 1.0 - smoothstep(0.3, 0.6, fwidth(sy));
   color.a *= 1.0 - uStripe.y * (1.0 - stripe) * fine * live;
 
+  // 테두리 빛: 겉모양 선을 따라 종류 색을 더해 블룸이 걸리게 하고, 그 위로 꼬리 달린 빛이 테두리를 따라 돈다.
+  // 도는 위치는 카드 가운데에서 본 각도로 잰다. 카드마다 출발점이 다르다
+  float edgeD = outlineDistance(vUv);
+  float rim = exp(-edgeD / uBorder.x) * live;
+  vec2 fromCenter = vec2((vUv.x - 0.5) * uAspect, vUv.y - 0.5);
+  float around = atan(fromCenter.y, fromCenter.x) / 6.28318530718 + 0.5;
+  float behind = fract(uTime * uRunner.y + uBendPhase - around);
+  float runner = exp(-behind / uRunner.z) * smoothstep(1.0, 0.97, behind);
+  float lit = rim * (uBorder.y + uRunner.x * runner) * body;
+  color.rgb += uHoloTint * lit;
+  color.a = max(color.a, min(1.0, lit));
+
   // 펼친 카드의 테두리 빛. 가로 거리를 높이 단위로 맞춰 네 변의 두께를 같게 한다
   vec2 edgeDist = min(vUv, 1.0 - vUv);
   edgeDist.x *= uAspect;
@@ -220,9 +258,14 @@ export interface CardMaterialOptions {
   height: number;
   /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다. 훑는 빛 띠의 때와 무지개빛 위상도 어긋낸다 */
   bendPhase: number;
+  /** 카드 겉모양 꼭짓점(uv, outlineUv). 테두리 빛이 이 선을 따른다 */
+  outline: readonly (readonly [number, number])[];
   /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때 이 색으로 물들고, 테두리 빛·반짝임·훑는 띠도 이 색을 바탕으로 한다 */
   tint: string;
 }
+
+/** 셰이더가 받는 겉모양 꼭짓점 수의 상한 */
+const MAX_OUTLINE = 6;
 
 export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
   return new ShaderMaterial({
@@ -234,6 +277,8 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uAspect: { value: o.width / o.height },
       uCardSize: { value: new Vector2(o.width, o.height) },
       uBendPhase: { value: o.bendPhase },
+      uOutline: { value: Array.from({ length: MAX_OUTLINE }, (_, i) => new Vector2(...(o.outline[i] ?? [0, 0]))) },
+      uOutlineCount: { value: Math.min(o.outline.length, MAX_OUTLINE) },
       uDim: { value: 0 },
       uFocus: { value: 0 },
       uFade: { value: 1 },

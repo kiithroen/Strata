@@ -41,6 +41,51 @@ export interface CardLayout {
   worldHeight: number;
 }
 
+/**
+ * 카드 겉모양의 꼭짓점(텍스처 px, 왼쪽 위가 원점, 시계 방향). 사진은 사각형, 메모는 오른쪽 위를 깎은 오각형,
+ * 문서는 왼쪽 위 제목 탭이 솟은 육각형이다. inset 만큼 안쪽으로 들인다(테두리 선 굵기의 반).
+ * 텍스처의 바탕·테두리·클립과 셰이더의 테두리 빛(outlineUv)이 함께 쓴다
+ */
+export function outlinePoints(layout: CardLayout, inset = 0): [number, number][] {
+  const win = tuning.card.window;
+  const w = layout.textureWidth;
+  const h = layout.textureHeight;
+  const i = inset;
+  if (layout.kind === 'memo') {
+    const cut = layout.unit * win.chamferRatio;
+    return [
+      [i, i],
+      [w - cut, i],
+      [w - i, cut],
+      [w - i, h - i],
+      [i, h - i],
+    ];
+  }
+  if (layout.kind === 'doc') {
+    const t = layout.titleBar.height;
+    const tab = layout.unit * win.tabRatio;
+    return [
+      [i, i],
+      [tab, i],
+      [tab + t, t + i],
+      [w - i, t + i],
+      [w - i, h - i],
+      [i, h - i],
+    ];
+  }
+  return [
+    [i, i],
+    [w - i, i],
+    [w - i, h - i],
+    [i, h - i],
+  ];
+}
+
+/** 겉모양 꼭짓점을 카드 uv(0~1, 아래쪽이 0)로 바꾼다. 셰이더가 테두리를 따라 빛을 그릴 때 쓴다 */
+export function outlineUv(layout: CardLayout): [number, number][] {
+  return outlinePoints(layout).map(([x, y]) => [x / layout.textureWidth, 1 - y / layout.textureHeight]);
+}
+
 /** 메모 글자 크기와 줄 간격(px). 레이아웃과 그리기가 함께 쓴다 */
 export function memoMetrics(unit: number): { titleSize: number; bodySize: number; titleLineH: number; bodyLineH: number; titleGap: number } {
   const m = tuning.card.memo;

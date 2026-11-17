@@ -2,7 +2,7 @@ import { CanvasTexture, Color, SRGBColorSpace } from 'three';
 import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import { createRng } from '../../core/random';
-import { memoMetrics, MEMO_TITLE_LINES, type CardLayout, type NoteKind, type Rect } from './cardLayout';
+import { memoMetrics, MEMO_TITLE_LINES, outlinePoints, type CardLayout, type NoteKind, type Rect } from './cardLayout';
 import { wrapLines } from './textWrap';
 
 /**
@@ -100,30 +100,8 @@ function glow(ctx: CanvasRenderingContext2D, color: string | null, unit: number)
  * 바탕 칠·테두리·클립이 모두 이 길을 쓴다.
  */
 function outline(ctx: CanvasRenderingContext2D, layout: CardLayout, inset: number): void {
-  const win = tuning.card.window;
-  const w = layout.textureWidth;
-  const h = layout.textureHeight;
-  const i = inset;
   ctx.beginPath();
-  if (layout.kind === 'memo') {
-    const cut = layout.unit * win.chamferRatio;
-    ctx.moveTo(i, i);
-    ctx.lineTo(w - cut, i);
-    ctx.lineTo(w - i, cut);
-    ctx.lineTo(w - i, h - i);
-    ctx.lineTo(i, h - i);
-  } else if (layout.kind === 'doc') {
-    const t = layout.titleBar.height;
-    const tab = layout.unit * win.tabRatio;
-    ctx.moveTo(i, i);
-    ctx.lineTo(tab, i);
-    ctx.lineTo(tab + t, t + i);
-    ctx.lineTo(w - i, t + i);
-    ctx.lineTo(w - i, h - i);
-    ctx.lineTo(i, h - i);
-  } else {
-    ctx.rect(i, i, w - i * 2, h - i * 2);
-  }
+  outlinePoints(layout, inset).forEach(([x, y], k) => (k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
   ctx.closePath();
 }
 
