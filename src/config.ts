@@ -105,7 +105,7 @@ export const tuning = {
      * runnerJitter 는 카드마다 그 셋에 곱하는 배율의 범위와 반대 방향으로 도는 카드의 비율이다
      */
     border: {
-      width: 0.012,
+      width: 0.007,
       strength: 0.6,
       runnerStrength: 1.5,
       runnerSpeed: 0.16,
