@@ -46,6 +46,8 @@ export function holoTint(face: Pick<CardFace, 'id' | 'kind' | 'tint'>): string {
 /** 선 색에서 낸 칠 색들 */
 interface Palette {
   line: string;
+  /** 메모·문서 글자색: 카드 색을 흰색 쪽으로 밝혀 색을 깐 바탕 위에서도 읽힌다 */
+  ink: string;
   dim: string;
   faint: string;
   band: string;
@@ -58,13 +60,16 @@ function palette(face: CardFace): Palette {
   const h = tuning.card.holo;
   const c = new Color(holoTint(face));
   const rgba = (a: number) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
+  const ink = c.clone().lerp(new Color(1, 1, 1), h.inkLift);
+  const wash = face.kind === 'doc' ? h.docWashAlpha : h.washAlpha;
   return {
     line: rgba(1),
+    ink: `rgb(${Math.round(ink.r * 255)}, ${Math.round(ink.g * 255)}, ${Math.round(ink.b * 255)})`,
     dim: rgba(h.dimAlpha),
     faint: rgba(h.faintAlpha),
     band: rgba(h.bandAlpha),
-    washTop: rgba(h.washAlpha[0]),
-    washBottom: rgba(h.washAlpha[1]),
+    washTop: rgba(wash[0]),
+    washBottom: rgba(wash[1]),
     rule: rgba(h.ruleAlpha),
   };
 }
@@ -240,18 +245,13 @@ function drawBody(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette,
   ctx.stroke();
 
   if (layout.kind === 'memo' || layout.kind === 'doc') {
-    // 메모·문서: 종류 색 유리 그라데이션을 깔고, 메모는 오른쪽 아래 귀퉁이를 접는다
+    // 메모·문서: 위가 짙은 종류 색 유리 그라데이션을 깔고, 메모는 오른쪽 아래 귀퉁이를 접는다
     ctx.save();
     outline(ctx, layout, line / 2);
     ctx.clip();
     const g = ctx.createLinearGradient(0, 0, 0, layout.textureHeight);
-    if (layout.kind === 'memo') {
-      g.addColorStop(0, p.washTop);
-      g.addColorStop(1, p.washBottom);
-    } else {
-      g.addColorStop(0, p.washBottom);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-    }
+    g.addColorStop(0, p.washTop);
+    g.addColorStop(1, p.washBottom);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, layout.textureWidth, layout.textureHeight);
     ctx.restore();
@@ -359,7 +359,7 @@ function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLay
   glow(ctx, p.line, u);
   if (face.title) {
     ctx.font = `700 ${m.titleSize}px ${SANS}`;
-    ctx.fillStyle = p.line;
+    ctx.fillStyle = p.ink;
     for (const l of wrapLines(ctx, face.title, content.width, MEMO_TITLE_LINES)) {
       ctx.fillText(l, content.x, y);
       y += m.titleLineH;
@@ -368,7 +368,7 @@ function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLay
   }
   if (face.body) {
     ctx.font = `${m.bodySize}px ${SANS}`;
-    ctx.fillStyle = p.line;
+    ctx.fillStyle = p.ink;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / m.bodyLineH));
     for (const l of wrapLines(ctx, face.body, content.width, maxLines)) {
       ctx.fillText(l, content.x, y);
@@ -392,7 +392,7 @@ function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayo
   let y = content.y + padding * 0.3;
   glow(ctx, p.line, w);
   ctx.font = `700 ${titleSize}px ${SANS}`;
-  ctx.fillStyle = p.line;
+  ctx.fillStyle = p.ink;
   ctx.fillText(truncateText(ctx, face.title ?? `DOC ${face.id}`, content.width), content.x, y);
   y += titleSize * 1.7;
   glow(ctx, null, w);
@@ -408,7 +408,7 @@ function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayo
   ctx.stroke();
 
   glow(ctx, p.line, w);
-  ctx.fillStyle = p.line;
+  ctx.fillStyle = p.ink;
   if (face.body) {
     ctx.font = `${bodySize}px ${SANS}`;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / lineH));

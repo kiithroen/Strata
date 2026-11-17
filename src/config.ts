@@ -78,9 +78,12 @@ export const tuning = {
       faintAlpha: 0.24,
       bandAlpha: 0.18,
       glowRatio: 0.016,
-      /** 메모 바탕에 까는 메모 색 그라데이션의 위·아래 불투명도(문서는 아래 값에서 투명으로), 문서 괘선의 불투명도 */
-      washAlpha: [0.275, 0.1],
+      /** 메모·문서 바탕에 까는 종류 색 유리 그라데이션의 위·아래 불투명도, 문서 괘선의 불투명도 */
+      washAlpha: [0.5, 0.26],
+      docWashAlpha: [0.4, 0.18],
       ruleAlpha: 0.18,
+      /** 메모·문서 글자색이 카드 색에서 흰색 쪽으로 밝아지는 비율 */
+      inkLift: 0.6,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
     simple: { photoBlocks: 9, barRatio: 0.045, barGapRatio: 0.085 },

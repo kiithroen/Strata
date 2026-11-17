@@ -19,9 +19,9 @@
 노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 카드 색(사진·문서는 `card.holo.kinds`, 메모는 `card.holo.memoColors` 가운데 하나)의 가는 테두리와 글자(`card.holo.glowRatio`)로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선은 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 사진만 제 색이다.
 - 세 종류 모두 같은 둥근 사각형이고(`card.window.cornerRatio`, `cardLayout.ts`의 `cornerRadius`) 색과 내용, 주제에 맞는 작은 요소로 구분된다. 제목 줄 왼쪽에 종류 아이콘(사진은 조리개, 메모는 접착 메모지, 문서는 귀퉁이 접힌 페이지)과 작은 이름표(고정폭 글꼴, 흐린 색), 상태 줄 왼쪽에 찍은 시각을 적는다. 멀리서 보는 단순한 텍스처는 아이콘 대신 점이다. 본문 글꼴은 산세리프다.
 - **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채우고 모서리를 둥글게 자른다(`card.window.innerCornerRatio`). 이름표는 캡션, 없으면 `IMG_번호`다.
-- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색 그라데이션을 깔고(`card.holo.washAlpha`의 위·아래 불투명도) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
+- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색 파스텔 유리 그라데이션을 깔고(`card.holo.washAlpha`의 위·아래 불투명도) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 메모·문서 글자는 카드 색을 흰색 쪽으로 `card.holo.inkLift`만큼 밝힌 색이라 색을 깐 바탕 위에서도 읽힌다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
 - 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기본 해상도(`qualityDefaults.tex`)에서 한 번 정해 품질 설정을 바꾸거나 단순·상세 텍스처를 써도 같은 모양이다.
-- **긴 문서 (`doc`)**: `1 : √2` 카드. 이름표는 `TXT_번호`이고, 옅은 푸른 유리 바탕 위에 굵은 제목과 공책처럼 본문 줄마다 옅은 괘선(`card.holo.ruleAlpha`)을 긋고 촘촘한 문단을 쓴다.
+- **긴 문서 (`doc`)**: `1 : √2` 카드. 이름표는 `TXT_번호`이고, 푸른 유리 그라데이션 바탕(`card.holo.docWashAlpha`) 위에 굵은 제목과 공책처럼 본문 줄마다 옅은 괘선(`card.holo.ruleAlpha`)을 긋고 촘촘한 문단을 쓴다.
 - 둥근 모서리 밖은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
 
 **멀고 가까움** (`cardMaterial.ts`, `createSimpleTexture`)
