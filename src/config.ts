@@ -282,8 +282,9 @@ export const tuning = {
     planetMaxRadius: 0.34,
     /** 행성 글자 높이(CSS px). 화면에 늘 같은 크기로 보인다 */
     planetLabelPx: 12,
-    /**
+     /**
      * 선 그래프. 선 굵기는 CSS px, 점·빛 크기는 월드 단위 지름이다.
+     * nodeColor: 노드(행성·허브)마다 키로 고르는 색의 채도·명도 범위와 중심 점을 hubColor 와 섞는 비율.
      * burst: 노드에서 노트 점이 방사형으로 퍼지는 원판(안쪽 반지름, 간격, 앞뒤 흔들림, 회전 속도).
      * hourColors: 노트가 찍힌 시각(4시간 단위)별 점 색
      */
@@ -292,6 +293,7 @@ export const tuning = {
       spokeWidth: 1.0,
       branchColor: '#7fd2ff',
       hubColor: '#e4f8ff',
+      nodeColor: { saturation: [0.65, 0.95], lightness: [0.55, 0.72], coreMix: 0.45 },
       branchAlpha: 0.5,
       spokeAlpha: 0.55,
       nodeSize: 0.09,

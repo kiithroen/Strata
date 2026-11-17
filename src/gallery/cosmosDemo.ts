@@ -27,6 +27,7 @@ import {
   gust,
   gustTime,
   hourColorIndex,
+  nodeColor,
   parentUnit,
   planetJitter,
   planetLabel,
@@ -200,12 +201,14 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const planets = clusters.map((cluster) => {
     const n = cluster.members.length;
     const affinities = clusterAffinities(notes, cluster.members, unit);
+    const color = nodeColor(cluster.key);
     return {
       cluster,
       offsetS: timeOffsetDepth(spiralState, cluster.anchorTime),
       jitter: planetJitter(cluster.key),
       fade: 0,
-      color: noteColors[cluster.members[0]],
+      color,
+      coreColor: color.clone().lerp(hubColor, g.nodeColor.coreMix),
       radius: planetRadius(n),
       size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
       glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
@@ -220,12 +223,17 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       node: { kind: 'planet', key: cluster.key, anchorTime: cluster.anchorTime, position: new Vector3() } as CosmosNode,
     };
   });
-  const hubViews = hubs.map((hub) => ({
-    hub,
-    childOffsets: hub.children.map((ci) => planets[ci].offsetS),
-    label: planetLabel(parent ?? unit, hub.bucket, hub.notes),
-    node: { kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: new Vector3() } as CosmosNode,
-  }));
+  const hubViews = hubs.map((hub) => {
+    const color = nodeColor(hub.key);
+    return {
+      hub,
+      childOffsets: hub.children.map((ci) => planets[ci].offsetS),
+      color,
+      coreColor: color.clone().lerp(hubColor, g.nodeColor.coreMix),
+      label: planetLabel(parent ?? unit, hub.bucket, hub.notes),
+      node: { kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: new Vector3() } as CosmosNode,
+    };
+  });
   const planetByKey = new Map(planets.map((p) => [p.cluster.key, p]));
   const nodes: CosmosNode[] = [...planets.map((p) => p.node), ...hubViews.map((h) => h.node)];
   let pinnedTime: number | null = newest;
@@ -625,7 +633,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         const dist = pos.distanceTo(cameraPosition);
 
         const alpha = planet.fade * cosmosFade(dist);
-        graph.dot(pos, hubColor, planet.size, alpha);
+        graph.dot(pos, planet.coreColor, planet.size, alpha);
         graph.glow(pos, planet.color, planet.glowSize * glowOf(planet.node.key), g.glowAlpha * alpha);
         graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
         const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
@@ -705,8 +713,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         if (prevHub) {
           graph.branch(prevHub, hp, branchColor, g.branchAlpha * Math.min(hubAlpha, cosmosFade(prevHub.distanceTo(cameraPosition))));
         }
-        graph.dot(hp, hubColor, g.hubSize, hubAlpha);
-        graph.glow(hp, branchColor, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
+        graph.dot(hp, view.coreColor, g.hubSize, hubAlpha);
+        graph.glow(hp, view.color, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
         graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, g.hubLabelPx * 1.1);
         prevHub = hp;
       }

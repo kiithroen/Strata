@@ -119,7 +119,7 @@
 - 행성 단위는 `month` 기준 고정 시계열 축척(`choosePlanetUnit`)으로 정하고, 같은 단위 칸의 노트가 한 행성이 되어 그 칸에서 가장 최근 노트의 시각에 놓인다. 줌·이동 중에도 노드 배치와 묶음은 흔들리지 않는다.
 - 로그 나선 진행도는 `spiralArc(s) = sign(s) × ln(1 + cosmos.spiralKnee × |s|)`다. 반지름 `cosmos.radialScale × |spiralArc(s)|`, 방위각 `cosmos.twist × spiralArc(s) + cosmos.spin × 공전 시계`, 고도각 `cosmos.elevationAmp × sin(cosmos.elevationFreq × spiralArc(s))`(`cosmos.maxElevation` 안으로 자름)로 3차원 구면 나선 위에 놓는다.
 - 나선 위 자리는 묶음 키로 정한 난수 편차(`cosmos.radiusJitter`, `cosmos.angleJitter`, `cosmos.elevationJitter`)만큼 벗어난다. 같은 묶음은 늘 같은 자리다.
-- 노드는 흰 점(`graph.nodeSize`, 노트 수에 따라 조금 커짐)과 가장 최근 노트 색의 빛 무리(`graph.glowSize`, `graph.glowAlpha`), 아래쪽 `날짜 · 노트 수` 글자(`cosmos.planetLabelPx`)로 그린다. 묶음이 바뀌면 빠진 노드는 마지막 자리에서 옅어지고 새 노드는 나타난다(`cosmos.planetFadeRate`).
+- 노드는 묶음 키로 정한 각기 다른 색의 점(`graph.nodeSize`, 노트 수에 따라 조금 커지며 중심은 `graph.hubColor`와 `graph.nodeColor.coreMix`만큼 섞는다)과 같은 색의 빛 무리(`graph.glowSize`, `graph.glowAlpha`), 아래쪽 `날짜 · 노트 수` 글자(`cosmos.planetLabelPx`)로 그린다. 묶음이 바뀌면 빠진 노드는 마지막 자리에서 옅어지고 새 노드는 나타난다(`cosmos.planetFadeRate`).
 
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
 - `clusterAffinities`가 묶음 안 각 노트의 관련도(0~1)를 절대 기준으로 구한다. 시간 점수는 묶음 중앙값 시각과의 거리로 `exp(−|dt| / (행성 단위 길이 × cosmos.affinity.timeScale))`이다. 묶음에 태그가 있으면 태그 점수(노트 태그마다 그 태그를 가진 묶음 노트 비율의 평균 ÷ √태그 수)와 `cosmos.affinity.timeWeight` 비율로 섞는다. 몰아 찍은 노트는 모두 노드 가까이에, 흩어진 노트는 멀리 놓인다.
@@ -131,7 +131,7 @@
 **허브와 가지** (`parentUnit`, `buildHubs`, `hubPoint`)
 - 허브 단위는 행성 단위의 한 단계 위다(연이면 허브가 없다). 같은 허브 칸의 행성이 한 허브에 이어진다.
 - 허브는 자식 행성들의 평균 시간 오프셋(`s`)과 평균 나선 반지름에 `graph.hubRadius` 비율을 곱한 안쪽 구면 껍질 위에 놓인다. 허브에서 자식 행성으로 가지(`graph.branchWidth`, `graph.branchColor`, `graph.branchAlpha`)를 뻗고, 허브끼리는 시간 순서로 잇는다. 허브가 없으면 행성끼리 시간 순서로 잇는다.
-- 허브는 큰 흰 점(`graph.hubSize`)과 빛 무리(`graph.hubGlowSize`), 위쪽 글자(`graph.hubLabelPx`)로 그린다. 은하의 글자는 카메라를 향하고 거리와 상관없이 화면에서 정한 CSS px 높이로 보인다(`GraphView.label`).
+- 허브는 묶음 키로 정한 각기 다른 색의 큰 점(`graph.hubSize`, 중심은 `graph.hubColor`와 섞는다)과 같은 색의 빛 무리(`graph.hubGlowSize`), 위쪽 글자(`graph.hubLabelPx`)로 그린다. 은하의 글자는 카메라를 향하고 거리와 상관없이 화면에서 정한 CSS px 높이로 보인다(`GraphView.label`).
 - 선은 화면 px 굵기 선분(`LineSegments2`), 점과 빛 무리는 거리에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
 
 **날리는 종이** (`flightParams`, `flightOffset`, `flightQuaternion`, `gust`, `gustTime`)

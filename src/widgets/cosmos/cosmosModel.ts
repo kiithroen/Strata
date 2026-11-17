@@ -1,4 +1,4 @@
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Color, Matrix4, Quaternion, Vector3 } from 'three';
 import { tuning } from '../../config';
 import { DAY_MS, UNIT_DAYS, floorTo, type TimeUnit } from '../../core/calendar';
 import { approachFactor } from '../../core/motion';
@@ -224,6 +224,16 @@ export function burstOffset(k: number, spin: number, out: Vector3, affinity = 1)
 export function hourColorIndex(time: number): number {
   const colors = tuning.cosmos.graph.hourColors.length;
   return Math.min(colors - 1, Math.floor((new Date(time).getHours() * colors) / 24));
+}
+
+/** 묶음 키로 정한 노드(행성·허브) 색. 같은 키면 늘 같고, 키마다 색상환 전체에서 고르게 고른다 */
+export function nodeColor(key: string, out = new Color()): Color {
+  const n = tuning.cosmos.graph.nodeColor;
+  const h = hashString(key);
+  const hue = hash01(h, 101);
+  const sat = n.saturation[0] + (n.saturation[1] - n.saturation[0]) * hash01(h, 102);
+  const light = n.lightness[0] + (n.lightness[1] - n.lightness[0]) * hash01(h, 103);
+  return out.setHSL(hue, sat, light);
 }
 
 // ── 행성과 위성 ───────────────────────────────────────

@@ -20,6 +20,7 @@ import {
   flightRadius,
   gust,
   gustTime,
+  nodeColor,
   orbitSpeed,
   planetJitter,
   planetLabel,
@@ -515,5 +516,24 @@ describe('planetLabel', () => {
     expect(planetLabel('month', new Date(2026, 10, 1).getTime(), 6)).toBe('2026.11 · 6');
     expect(planetLabel('day', new Date(2026, 10, 5).getTime(), 3)).toBe('11.05 · 3');
     expect(planetLabel('hour', new Date(2026, 10, 5, 9).getTime(), 1)).toBe('11.05 09:00 · 1');
+  });
+});
+
+describe('nodeColor', () => {
+  it('같은 키면 같은 색이고, 키마다 설정된 채도·명도 범위에서 다른 색을 고른다', () => {
+    const n = c.graph.nodeColor;
+    expect(nodeColor('month:1').getHex()).toBe(nodeColor('month:1').getHex());
+    const hues = new Set<number>();
+    const hsl = { h: 0, s: 0, l: 0 };
+    for (let i = 0; i < 20; i++) {
+      const col = nodeColor(`month:${1700000000000 + i * 2592000000}`);
+      col.getHSL(hsl);
+      expect(hsl.s).toBeGreaterThanOrEqual(n.saturation[0] - 1e-4);
+      expect(hsl.s).toBeLessThanOrEqual(n.saturation[1] + 1e-4);
+      expect(hsl.l).toBeGreaterThanOrEqual(n.lightness[0] - 1e-4);
+      expect(hsl.l).toBeLessThanOrEqual(n.lightness[1] + 1e-4);
+      hues.add(Math.round(hsl.h * 20));
+    }
+    expect(hues.size).toBeGreaterThan(8);
   });
 });
