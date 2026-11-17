@@ -126,7 +126,7 @@ export const tuning = {
      * 높이는 카드 폭 대비다
      */
     bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [1.9, 1.5], curl: 0.32, curlSpeed: 0.6 },
-    /** 실이 묶이는 자리(제목 줄 왼쪽 고리)가 앞면 위로 뜬 높이(폭 대비) */
+    /** 카드 중심에서 연결 선이 닿는 뒷면 오프셋(폭 대비) */
     pin: { lift: 0.012 },
   },
 
@@ -302,8 +302,6 @@ export const tuning = {
       glowAlpha: 0.16,
       /** 허브 글자 높이(CSS px) */
       hubLabelPx: 15,
-      /** 종이에 꽂힌 압정 머리 크기 */
-      pinSize: 0.05,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
       hubRadius: 0.72,
       tapRadius: 34,

@@ -47,7 +47,7 @@ import { CardField } from '../widgets/noteCard/cardField';
 import { createPose } from '../widgets/noteCard/cardMotion';
 import { NoteCard } from '../widgets/noteCard/NoteCard';
 import { bendHeight } from '../widgets/noteCard/paperBend';
-import { paperPin, pinPoint } from '../widgets/noteCard/paperPin';
+import { pinPoint } from '../widgets/noteCard/paperPin';
 import {
   AxisController,
   clusterNotes,
@@ -189,7 +189,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const dotBlends = notes.map(() => new RegroupBlend());
   const paperFade = new Float64Array(notes.length);
   const flights = notes.map((n) => flightParams(n.id));
-  const pins = cards.map((card) => paperPin(card.layout));
   const homes = notes.map(createPose);
 
   // 시계열 공간이 고정돼 있어 묶음·허브·관련도·글자는 한 번만 구하고, 노드 위치 벡터도 재사용한다
@@ -669,22 +668,19 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
           opened = Math.max(opened, card.motion.focus);
 
-          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,
+          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 카드 중심 뒷면에 이어져 그래프 간선처럼 보이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
           burstOffset(rank, spin, offset, affinity).applyQuaternion(burstQuat);
           target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = paperFade[m] * (1 - card.motion.focus);
-          const pin = pins[m];
-          const bent = bendHeight(pin.u, pin.v, time, card.bendPhase) * look.uBend.value * (1 - card.motion.focus);
+          const bent = bendHeight(0, 0, time, card.bendPhase) * look.uBend.value * (1 - card.motion.focus);
           pinPoint(
             card.mesh.position,
             card.mesh.quaternion,
             card.mesh.scale.x,
             card.layout.worldWidth,
-            card.layout.worldHeight,
-            pin,
-            bent + tuning.card.pin.lift,
+            bent - tuning.card.pin.lift,
             pinWorld,
           );
           spokeEnd.copy(dotP).lerp(pinWorld, tied);
@@ -692,12 +688,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition)) * (1 - strata.mix);
           graph.spoke(pos, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
           graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(dotP.distanceTo(cameraPosition)) * (1 - tied));
-          graph.dot(
-            pinWorld,
-            noteColors[m],
-            (g.pinSize * card.mesh.scale.x) / c.satelliteScale,
-            cosmosFade(pinWorld.distanceTo(cameraPosition)) * planet.fade * tied * (1 - strata.mix),
-          );
         });
       }
 

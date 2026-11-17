@@ -17,7 +17,7 @@
 파일: `src/widgets/noteCard/`
 
 노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 카드 색(사진·문서는 `card.holo.kinds`, 메모는 `card.holo.memoColors` 가운데 하나)의 가는 테두리와 글자(`card.holo.glowRatio`)로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선은 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 사진만 제 색이다.
-- 세 종류 모두 같은 둥근 사각형이고(`card.window.cornerRatio`, `cardLayout.ts`의 `cornerRadius`) 색과 내용, 주제에 맞는 작은 요소로 구분된다. 제목 줄 왼쪽 실을 묶는 자리에 종류 아이콘(사진은 조리개, 메모는 접착 메모지, 문서는 귀퉁이 접힌 페이지)과 작은 이름표(고정폭 글꼴, 흐린 색), 상태 줄 왼쪽에 찍은 시각을 적는다. 멀리서 보는 단순한 텍스처는 아이콘 대신 점이다. 본문 글꼴은 산세리프다.
+- 세 종류 모두 같은 둥근 사각형이고(`card.window.cornerRatio`, `cardLayout.ts`의 `cornerRadius`) 색과 내용, 주제에 맞는 작은 요소로 구분된다. 제목 줄 왼쪽에 종류 아이콘(사진은 조리개, 메모는 접착 메모지, 문서는 귀퉁이 접힌 페이지)과 작은 이름표(고정폭 글꼴, 흐린 색), 상태 줄 왼쪽에 찍은 시각을 적는다. 멀리서 보는 단순한 텍스처는 아이콘 대신 점이다. 본문 글꼴은 산세리프다.
 - **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채우고 모서리를 둥글게 자른다(`card.window.innerCornerRatio`). 이름표는 캡션, 없으면 `IMG_번호`다.
 - **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색을 옅게 깔고(`card.holo.washAlpha`) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
 - 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기본 해상도(`qualityDefaults.tex`)에서 한 번 정해 품질 설정을 바꾸거나 단순·상세 텍스처를 써도 같은 모양이다.
@@ -29,9 +29,9 @@
 - 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(그 카드 종류 색으로 물든 밝기)을 제 색으로 섞는다. 한 장 안에서는 같은 값이다. 펼치는 카드는 둘 다 1이다.
 - 단순한 모양일수록 옅어진다(`card.lod.farAlpha`). 펼친 카드는 바탕 불투명도를 `card.lod.focusAlpha` 이상으로 올려 뒤 카드가 글을 가리지 않게 한다.
 
-**실 묶는 고리** (`paperPin.ts`)
-- 노드에서 나온 실은 제목 줄 왼쪽 고리에 묶인다. 자리는 레이아웃 비율로 정해져 텍스처 해상도와 상관없다. `pinPoint`가 종이의 위치·회전·배율로 월드 자리를 구한다.
-- 고리 자리는 앞면 위로 뜬다. 그 자리의 휨 높이(`paperBend.ts`의 `bendHeight`, 셰이더와 같은 식)에 `card.pin.lift`(폭 대비)를 더한다.
+**그래프 연결 자리** (`paperPin.ts`)
+- 노드에서 나온 살은 카드 중심 뒷면에 이어진다. `pinPoint`가 카드의 위치·회전·배율로 월드 자리를 구한다.
+- 연결 자리는 카드 중심의 휨 높이(`paperBend.ts`의 `bendHeight`, 셰이더와 같은 식)에서 `card.pin.lift`(폭 대비)만큼 뒤로 물러난 곳이다. 앞면에서 볼 때는 카드가 선 끝을 가려 테두리에 닿은 것처럼 보이고, 뒤에서 볼 때는 카드 중심에 꽂힌다.
 
 **사진 원본** (`cardTexture.ts`의 `PhotoSource`)
 - 사진은 폭·높이(레이아웃 비율에 쓰므로 미리 안다)와 `render(targetWidth, urgent)`를 가진다. 텍스처를 만들 때 필요한 해상도로 그려 받고, 결과는 들고 있지 않는다(`ImageBitmap`이면 그린 뒤 `releasePhoto`로 닫는다).
@@ -124,7 +124,7 @@
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
 - `clusterAffinities`가 묶음 안 각 노트의 관련도(0~1)를 절대 기준으로 구한다. 시간 점수는 묶음 중앙값 시각과의 거리로 `exp(−|dt| / (행성 단위 길이 × cosmos.affinity.timeScale))`이다. 묶음에 태그가 있으면 태그 점수(노트 태그마다 그 태그를 가진 묶음 노트 비율의 평균 ÷ √태그 수)와 `cosmos.affinity.timeWeight` 비율로 섞는다. 몰아 찍은 노트는 모두 노드 가까이에, 흩어진 노트는 멀리 놓인다.
 - k 번째(관련도 높은 순) 노트 점은 노드 둘레의 카메라를 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½) + burst.pullSpread × (1 − 관련도)^burst.pullCurve`이고, 앞뒤로 `burst.depthJitter`만큼 흔들리며 원판 전체가 `burst.spin`으로 돈다. 관련도가 높을수록 노드 가까이에 모이고 낮을수록 긴 살 끝에 놓인다.
-- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 살이 창 제목 줄의 고리(`noteCard/paperPin.ts`)에 실로 묶여 함께 끌려다니고, 묶인 자리에 점(`graph.pinSize`)을 그 노트 색으로 그린다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 고리 사이를 그만큼 옮겨 간다.
+- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 살이 카드 중심 뒷면(`noteCard/paperPin.ts`)에 이어지고, 카드 뒤에 그리는 순서로 두어 앞면에서는 카드 테두리에서 멈춘 것처럼 보인다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 카드 중심 사이를 그만큼 옮겨 간다.
 - 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
 

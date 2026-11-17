@@ -36,6 +36,8 @@ export class GraphView {
     const g = tuning.cosmos.graph;
     this.branches = new LineBatch(maxSegments, g.branchWidth);
     this.spokes = new LineBatch(maxSegments, g.spokeWidth);
+    // 카드를 먼저 그린 뒤 살을 그려 카드 뒤로 들어가는 선 끝은 테두리에서 가려지고 앞의 선은 보인다
+    this.spokes.line.renderOrder = 1;
     this.dots = new PointBatch(maxPoints, false);
     this.glows = new PointBatch(maxPoints, true);
     this.group.add(this.glows.points, this.branches.line, this.spokes.line, this.dots.points, this.labels.group);

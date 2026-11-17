@@ -235,6 +235,8 @@ void main() {
   float fog = smoothstep(uFogNear, uFogFar, vDepth);
   color.rgb = mix(color.rgb, uFogColor, fog);
   color.a *= (1.0 - fog * 0.6) * uFade;
+  // 둥근 모서리 밖과 거의 사라진 카드는 깊이를 쓰지 않아 뒤의 그래프 선·배경이 잘리지 않는다
+  if (body <= 0.001 || color.a <= 0.02) discard;
 
   gl_FragColor = color;
   #include <colorspace_fragment>

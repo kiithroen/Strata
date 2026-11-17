@@ -33,7 +33,7 @@ export interface CardLayout {
   /** 테두리 선 굵기(px) */
   line: number;
   titleBar: Rect;
-  /** 제목 줄 왼쪽 고리. 노드에서 나온 실이 여기에 묶인다 */
+  /** 제목 줄 왼쪽 종류 아이콘 자리 */
   ring: { x: number; y: number; size: number };
   content: Rect;
   footer: Rect;
