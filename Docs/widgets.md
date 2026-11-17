@@ -264,7 +264,7 @@
 - HUD 아래를 채운다. 머리 줄에 `↑ 위로`, 경로 막대(누르면 그 폴더로), 정렬, `은하로 보기`, `폴더 열기`가 있고, 아래 상태 줄이 보이는 폴더·파일 수와 크기, 숨긴 파일 수를 보인다. 좁은 화면에서는 경로 막대가 단추 아래 줄로 내려가고, 넘치면 지금 폴더(끝)가 보이게 스크롤한다.
 - 칸은 썸네일 격자(`explorer.tileMinPx`)다. 칸 색은 종류 색(`explorer.kindColors`)이고, 폴더는 폴더 그림, 파일은 확장자 글자다. 사진은 화면 근처(`explorer.preloadPx`)에 들어온 칸만 디코딩 큐(`explorer.decodeConcurrency`)로 `explorer.thumbPx` 폭(기기 픽셀 비율, 최대 2배)의 썸네일을 만든다. 폴더를 옮기면 기다리던 썸네일은 버린다.
 - 폴더를 옮길 때마다 방문 기록을 쌓아 브라우저·안드로이드 뒤로가 지난 폴더로 간다. `Backspace`·`Alt+↑`는 위 폴더로 간다.
-- `은하로 보기`는 지금 폴더와 하위 폴더의 열 수 있는 파일을 폴더 축 은하로 띄운다(`explorerNotes.ts`의 `folderNotes`, 우주 보기의 "묶는 축"). 가까운 폴더부터 너비 우선으로 훑어 `explorer.cosmosMaxFiles` 개에서 멈추고, 파일 앞부분은 `explorer.readConcurrency` 개씩 겹쳐 읽는다. 사진은 사진 카드(EXIF 촬영 시각, 없으면 수정 시각), 동영상은 길이의 `explorer.videoThumbAt` 비율 자리 장면을 그리는 사진 카드, 음악은 메모 카드, 텍스트는 앞 `explorer.cardTextBytes` 바이트를 담은 문서 카드다. 읽는 동안 상태 줄에 진행을 적는다.
+- `은하로 보기`는 지금 폴더와 하위 폴더의 열 수 있는 파일을 폴더 축 은하로 띄운다(`explorerNotes.ts`의 `folderNotes`, 우주 보기의 "묶는 축"). 가까운 폴더부터 너비 우선으로 훑어 `explorer.cosmosMaxFiles` 개에서 멈추고, 파일 앞부분은 `explorer.readConcurrency` 개씩 겹쳐 읽는다. 사진은 사진 카드(EXIF 촬영 시각, 없으면 수정 시각), 동영상은 길이의 `explorer.videoThumbAt` 비율 자리 장면을 그리는 사진 카드(크기·장면을 읽을 때마다 숨은 video 요소와 객체 URL 을 만들고 끝나면 바로 비운다. `explorer.videoTimeoutMs` 안에 끝나지 않으면 실패로 친다), 음악은 메모 카드, 텍스트는 앞 `explorer.cardTextBytes` 바이트를 담은 문서 카드다. 읽는 동안 상태 줄에 진행을 적는다.
 - 은하에서 `← 탐색기로`를 누르면 같은 원본의 보던 폴더로 돌아온다(`appHooks.explorerResume`).
 
 **뷰어** (`MediaViewer`)
