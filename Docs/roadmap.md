@@ -14,7 +14,7 @@ Vite + TypeScript + Three.js 웹 앱 틀과 위젯 갤러리가 있다. 주 화�
 
 차례대로 한다. 각 위젯은 갤러리 데모, 단위 테스트, 화면 캡처 확인까지 마쳐야 끝난다.
 
-1. **실기기 손맛과 두 단계 탐색 다듬기**: 폰에서 갤러리를 열어([development.md](development.md) "폰에서 열기", "설정 화면") 보고 `src/config.ts`에서 고친다. 웹 페이지는 주사율을 요청할 수 없으니 손을 뗐을 때의 60Hz는 앱으로 감쌀 때 안드로이드 쪽에서 요청해 본다.
+1. **실기기 손맛과 두 단계 탐색 다듬기**: 화면 기준은 폴드 펼친 화면이다. 먼저 폴드에서 성능 표시의 `화면` 값을 읽어 [development.md](development.md) "검증"의 기준 크기를 실제 값으로 바꾼다. 폰에서 갤러리를 열어([development.md](development.md) "폰에서 열기", "설정 화면") 보고 `src/config.ts`에서 고친다. 웹 페이지는 주사율을 요청할 수 없으니 손을 뗐을 때의 60Hz는 앱으로 감쌀 때 안드로이드 쪽에서 요청해 본다.
    - 은하 탭 두 단계: 다가가는 거리(`cosmos.approach.planetDistance`, `hubDistance`)와 다가간 노드 표시(`cosmos.approach.glowScale`)가 손가락으로 충분히 알아볼 만한지
    - 제스처 손맛, 종이 크기·속도와 탭 정확도(돌풍이 셀 때 너무 빠른지), 선 굵기, 은하 밀도
    - 카드: 단순한 모양·흑백으로 바뀌는 시점(`card.lod`), 빛 번짐(`card.holo.glowRatio`), 메모 크기 범위(`card.memo`)

@@ -16,6 +16,7 @@ import {
   type StrataLayer,
   type StrataLayerInput,
   type StrataTile,
+  strataDistance,
 } from '../widgets/strata/strataLayout';
 import { StrataView } from '../widgets/strata/StrataView';
 import type { Stage } from './stage';
@@ -67,6 +68,7 @@ export class StrataMode {
   private readonly raycaster = new Raycaster();
   private readonly ndc = new Vector2();
   private readonly hit = new Vector3();
+  private readonly stopResize: () => void;
   private readonly onPop = (e: PopStateEvent) => {
     if (!this.active) return;
     // 빠른 exit → enter 직후 지난 history.back() 의 popstate 가 뒤늦게 도착해도 현재 상태가 지층이면 유지한다
@@ -107,6 +109,15 @@ export class StrataMode {
     document.body.appendChild(this.actions);
     window.addEventListener('popstate', this.onPop);
     window.addEventListener('keydown', this.onKey);
+    // 화면 비율이 바뀌면(회전, 폴더블) 판이 화면 폭에 들어오도록 거리를 다시 잡는다
+    this.stopResize = stage.onResize(() => {
+      if (this.active) this.rig.setGoalDistance(this.fitDistance());
+    });
+  }
+
+  private fitDistance(): number {
+    const layer = this.layers[this.focus];
+    return layer ? strataDistance([layer], this.stage.camera.fov, this.stage.camera.aspect) : tuning.strata.distance;
   }
 
   /** layers 는 최근 것부터, focusIndex 는 고른 층, origin 은 고른 층 판의 중심(고른 노드 자리)이다 */
@@ -124,7 +135,7 @@ export class StrataMode {
     this.focus = focusIndex;
     this.view.build(this.layers, this.frame);
     this.rig.focusPoint(origin);
-    this.rig.setGoalDistance(s.distance);
+    this.rig.setGoalDistance(this.fitDistance());
     this.rig.orbitTo(s.pitch, this.frame.yaw);
     this.actions.hidden = false;
     if (!this.pushed) {
@@ -175,6 +186,7 @@ export class StrataMode {
     if (!layer) return;
     this.focus = index;
     this.rig.focusPoint(strataPoint(this.frame, 0, layer.y, 0, this.hit));
+    this.rig.setGoalDistance(this.fitDistance());
   }
 
   /** 시간 띠로 고른 시각에 가장 가까운 층을 바라본다 */
@@ -253,6 +265,7 @@ export class StrataMode {
   dispose(): void {
     window.removeEventListener('popstate', this.onPop);
     window.removeEventListener('keydown', this.onKey);
+    this.stopResize();
     this.actions.remove();
     this.stage.scene.remove(this.view.group);
     this.view.dispose();

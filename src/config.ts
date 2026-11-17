@@ -144,7 +144,7 @@ export const tuning = {
    * dollyRate 는 앞뒤 이동이 목표를 따라가는 속도(1/초), nearFade 는 카메라에서 이 거리 범위로 다가오면 카드가 사라지는 구간이다
    */
   cardField: {
-    depthNear: 4.4,
+    depthNear: 5.2,
     cardsPerDepth: 3,
     minSpan: 4,
     spreadDepth: 8,
@@ -361,9 +361,10 @@ export const tuning = {
     otherLayerAlpha: 0.45,
     /** 들어가고 나오는 전환 속도(1/초) */
     transitionRate: 3.2,
-    /** 카메라가 층을 내려다보는 각(라디안)과 거리 */
+    /** 카메라가 층을 내려다보는 각(라디안)과 거리, 판 반폭이 차지해도 되는 화면 반폭 비율(넘으면 물러난다) */
     pitch: 0.8,
     distance: 5.2,
+    fitWidth: 0.88,
     /** 지층 보기 동안 은하 그래프의 밝기 배율 */
     galaxyDim: 0.03,
   },

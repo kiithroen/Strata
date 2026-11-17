@@ -130,6 +130,19 @@ export function nearestLayer(layers: readonly Pick<StrataLayer, 'anchorTime'>[],
   return best;
 }
 
+/**
+ * 지층을 내려다보는 카메라 거리. 기본은 strata.distance 이고, 넘긴 층 판(보통 바라보는 층)이 화면 폭에 안 들어오면 더 물러난다.
+ * 판 앞 모서리(가운데보다 반깊이 × cos(strata.pitch)만큼 가깝다)에서 판 반폭이 화면 반폭 × strata.fitWidth 안에 들도록 한다.
+ * aspect 는 화면 가로/세로 비율이다
+ */
+export function strataDistance(layers: readonly Pick<StrataLayer, 'halfWidth' | 'halfDepth'>[], fovDeg: number, aspect: number): number {
+  const s = tuning.strata;
+  const halfTan = Math.tan((fovDeg * Math.PI) / 360) * aspect;
+  let need = 0;
+  for (const l of layers) need = Math.max(need, l.halfWidth / (halfTan * s.fitWidth) + l.halfDepth * Math.cos(s.pitch));
+  return Math.max(s.distance, need);
+}
+
 const AXIS_X = new Vector3(1, 0, 0);
 const AXIS_Y = new Vector3(0, 1, 0);
 const lay = new Quaternion().setFromAxisAngle(AXIS_X, -Math.PI / 2);

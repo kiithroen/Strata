@@ -5,6 +5,7 @@ import { createPose } from '../src/widgets/noteCard/cardMotion';
 import {
   layoutStrata,
   nearestLayer,
+  strataDistance,
   strataPose,
   type StrataLayerInput,
   type StrataTileInput,
@@ -97,5 +98,32 @@ describe('strataPose', () => {
         expect(pose.scale).toBe(tile.scale);
       }
     }
+  });
+});
+
+describe('strataDistance', () => {
+  const s = tuning.strata;
+  const fovDeg = tuning.camera.fovDeg;
+  const halfTan = Math.tan((fovDeg * Math.PI) / 360);
+
+  it('판이 화면 폭에 들어오면 기본 거리다', () => {
+    const tiny = [{ halfWidth: 0.01, halfDepth: 0.01 }];
+    expect(strataDistance(tiny, fovDeg, 1)).toBe(s.distance);
+  });
+
+  it('좁은 화면에서는 판 앞 모서리의 반폭이 화면 반폭 × fitWidth 안에 들 만큼 물러난다', () => {
+    const layers = [
+      { halfWidth: 1, halfDepth: 1 },
+      { halfWidth: 3, halfDepth: 2 },
+    ];
+    for (const aspect of [0.45, 0.86, 2]) {
+      const d = strataDistance(layers, fovDeg, aspect);
+      expect(d).toBeGreaterThanOrEqual(s.distance);
+      for (const l of layers) {
+        const front = d - l.halfDepth * Math.cos(s.pitch);
+        expect(l.halfWidth / (front * halfTan * aspect)).toBeLessThanOrEqual(s.fitWidth + 1e-9);
+      }
+    }
+    expect(strataDistance(layers, fovDeg, 0.45)).toBeGreaterThan(strataDistance(layers, fovDeg, 0.86));
   });
 });

@@ -23,3 +23,4 @@
 ## 검증
 
 `npm run typecheck`, `npm test`, `npm run build`. 화면은 개발 서버를 띄워 캡처로 확인한다([Docs/development.md](Docs/development.md)).
+화면 기준은 폴드 펼친 화면이다. 배치·간격은 그 크기에서 먼저 캡처해 맞추고, 접은 화면과 데스크톱은 깨지지 않는지만 본다(기준 크기는 development.md "검증").
