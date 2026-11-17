@@ -2,7 +2,7 @@ import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, ShaderMaterial }
 import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
 import { runnerVariation } from './borderRunner';
-import { cornerUv, faceLayout, type CardLayout } from './cardLayout';
+import { cornerUv, faceLayout, photoUvRect, type CardLayout } from './cardLayout';
 import { createCardMaterial, type CardLook } from './cardMaterial';
 import {
   createCardTexture,
@@ -90,6 +90,7 @@ export class NoteCard {
       height: this.layout.worldHeight,
       phase: phase / 1000,
       corner: cornerUv(this.layout),
+      photoRect: photoUvRect(this.layout),
       runner: runnerVariation(this.id),
       tint: holoTint(opts.face),
     });

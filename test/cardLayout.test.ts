@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { formatStamp } from '../src/core/format';
 import { applyQuality, qualityDefaults } from '../src/core/quality';
-import { cardLayout, cornerRadius, cornerUv, faceLayout, type LayoutFace } from '../src/widgets/noteCard/cardLayout';
+import { cardLayout, cornerRadius, cornerUv, faceLayout, photoUvRect, type LayoutFace } from '../src/widgets/noteCard/cardLayout';
 
 const FACES: LayoutFace[] = [
   { kind: 'photo', photo: { width: 640, height: 480 } },
@@ -123,6 +123,27 @@ describe('faceLayout', () => {
       expect(l.ring.x + l.ring.size / 2).toBeLessThan(l.textureWidth / 2);
       expect(l.ring.size).toBeLessThan(l.titleBar.height);
     }
+  });
+});
+
+describe('photoUvRect', () => {
+  it('사진 칸을 위아래 뒤집힌 텍스처 uv 사각형으로 내고, 텍스처 해상도가 달라도 같다', () => {
+    const l = cardLayout(1600, 1200);
+    const [x0, y0, x1, y1] = photoUvRect(l)!;
+    const { content: c, textureWidth: w, textureHeight: h } = l;
+    expect(x0 * w).toBeCloseTo(c.x, 6);
+    expect(x1 * w).toBeCloseTo(c.x + c.width, 6);
+    // uv 위쪽(y1)이 캔버스의 사진 칸 윗변, 아래쪽(y0)이 아랫변이다
+    expect((1 - y1) * h).toBeCloseTo(c.y, 6);
+    expect((1 - y0) * h).toBeCloseTo(c.y + c.height, 6);
+    expect(y1).toBeGreaterThan(y0);
+    const hi = photoUvRect(cardLayout(1600, 1200, tuning.card.textureWidth * 2))!;
+    hi.forEach((v, i) => expect(v).toBeCloseTo([x0, y0, x1, y1][i], 2));
+  });
+
+  it('사진 카드가 아니면 없다', () => {
+    expect(photoUvRect(faceLayout({ kind: 'memo', title: '메모', body: '짧은 글' }))).toBeNull();
+    expect(photoUvRect(faceLayout({ kind: 'doc', title: '문서', body: '긴 글' }))).toBeNull();
   });
 });
 

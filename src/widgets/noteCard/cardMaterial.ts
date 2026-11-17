@@ -1,4 +1,4 @@
-import { Color, DoubleSide, SRGBColorSpace, ShaderMaterial, type Texture, Vector2, Vector3 } from 'three';
+import { Color, DoubleSide, SRGBColorSpace, ShaderMaterial, type Texture, Vector2, Vector3, Vector4 } from 'three';
 import { tuning } from '../../config';
 import type { RunnerVariation } from './borderRunner';
 
@@ -28,6 +28,9 @@ export interface CardLook {
   uRunner: { value: Vector3 };
   /** 그림 밝기 누르기의 무릎·천장(선형 밝기) */
   uHighlight: { value: Vector2 };
+  /** 사진 홀로그램: 선 수, 휨, 어두운 곳·밝은 곳 굵기 / 바탕 비율, 밝기, 흐림, 흐르는 빠르기 */
+  uPhotoLines: { value: Vector4 };
+  uPhotoTone: { value: Vector4 };
 }
 
 /** 화면(sRGB) 밝기를 셰이더가 다루는 선형 밝기로 바꾼다 */
@@ -61,6 +64,8 @@ export function createCardLook(): CardLook {
     uHighlight: {
       value: new Vector2(linearOf(tuning.bloom.threshold * tuning.card.highlight.knee), linearOf(tuning.bloom.threshold * tuning.card.highlight.ceiling)),
     },
+    uPhotoLines: { value: new Vector4(tuning.card.photoFx.lines, tuning.card.photoFx.warp, ...tuning.card.photoFx.width) },
+    uPhotoTone: { value: new Vector4(tuning.card.photoFx.base, tuning.card.photoFx.gain, tuning.card.photoFx.blur, tuning.card.photoFx.speed) },
   };
 }
 
@@ -114,6 +119,10 @@ uniform vec2 uGlass;
 uniform vec2 uBorder;
 uniform vec3 uRunner;
 uniform vec2 uHighlight;
+uniform vec4 uPhotoLines;
+uniform vec4 uPhotoTone;
+/** 사진 칸의 uv 사각형 [왼쪽, 아래, 오른쪽, 위]. 사진 카드가 아니면 오른쪽이 왼쪽보다 작다 */
+uniform vec4 uPhotoRect;
 /** 이 카드의 도는 빛 배율: 빠르기(부호가 방향), 꼬리, 밝기 */
 uniform vec3 uRunnerVar;
 /** 카드 겉모양(둥근 사각형)의 모서리 반지름(카드 높이 단위) */
@@ -166,6 +175,24 @@ void main() {
   color.a *= mix(uFarAlpha, 1.0, vDetail);
   // 펼친 카드는 바탕을 거의 불투명하게 해 뒤 카드가 글을 가리지 않게 한다
   color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
+
+  // 사진 홀로그램: 사진 칸을 카드 색 가로 선으로 다시 그린다. 선은 흐린 사진 밝기만큼 휘고 굵어지며 천천히 흐른다.
+  // 선이 화면에서 너무 촘촘하면(멀리 있는 카드) 물결무늬가 생기지 않게 선이 덮는 평균 밝기로 칠한다. 펼친 카드는 원래 사진이다
+  if (uPhotoRect.z > uPhotoRect.x && live > 0.0) {
+    vec2 lo = uPhotoRect.xy;
+    vec2 hi = uPhotoRect.zw;
+    float inside = step(lo.x, uv.x) * step(uv.x, hi.x) * step(lo.y, uv.y) * step(uv.y, hi.y);
+    float py = (hi.y - uv.y) / (hi.y - lo.y);
+    float l = sqrt(max(dot(texture2D(map, uv, uPhotoTone.z).rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0));
+    float ly = py * uPhotoLines.x + uPhotoLines.y * l - uTime * uPhotoTone.w;
+    float fromCenter = abs(fract(ly) - 0.5) * 2.0;
+    float thick = mix(uPhotoLines.z, uPhotoLines.w, l);
+    float aa = fwidth(ly) * 2.0;
+    float line = 1.0 - smoothstep(thick - aa, thick + aa, fromCenter);
+    line = mix(line, thick, smoothstep(0.25, 0.5, fwidth(ly)));
+    vec3 holo = uHoloTint * (uPhotoTone.x * l + (1.0 - uPhotoTone.x) * line * (0.35 + 0.65 * l)) * uPhotoTone.y;
+    color.rgb = mix(color.rgb, holo, inside * live);
+  }
 
   // 그림 밝기 누르기: 무릎 위 밝기는 천장에 다가갈 뿐 넘지 않아 흰 바탕 사진이 블룸에 번지지 않는다. 펼친 카드는 제 밝기다
   float lum = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -240,6 +267,8 @@ export interface CardMaterialOptions {
   corner: number;
   /** 테두리를 따라 도는 빛의 카드별 배율(runnerVariation) */
   runner: RunnerVariation;
+  /** 사진 칸의 uv 사각형(photoUvRect). 있으면 펼치지 않은 동안 그 칸을 홀로그램 선으로 다시 그린다 */
+  photoRect?: readonly [number, number, number, number] | null;
   /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때 이 색으로 물들고, 테두리 빛·반짝임·훑는 띠도 이 색을 바탕으로 한다 */
   tint: string;
 }
@@ -259,6 +288,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uDim: { value: 0 },
       uFocus: { value: 0 },
       uFade: { value: 1 },
+      uPhotoRect: { value: o.photoRect ? new Vector4(...o.photoRect) : new Vector4(0, 0, -1, 0) },
     },
     vertexShader,
     fragmentShader,

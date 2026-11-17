@@ -53,6 +53,16 @@ export function cornerUv(layout: CardLayout): number {
   return cornerRadius(layout) / layout.textureHeight;
 }
 
+/**
+ * 사진 칸(content)의 텍스처 uv 사각형 [왼쪽, 아래, 오른쪽, 위]. 캔버스 텍스처는 위아래가 뒤집혀 올라가 uv 세로는 아래가 0 이다.
+ * 사진 카드가 아니면 null 이다. 셰이더가 사진 칸만 홀로그램 선으로 다시 그릴 때 쓴다
+ */
+export function photoUvRect(layout: CardLayout): [number, number, number, number] | null {
+  if (layout.kind !== 'photo') return null;
+  const { content: c, textureWidth: w, textureHeight: h } = layout;
+  return [c.x / w, 1 - (c.y + c.height) / h, (c.x + c.width) / w, 1 - c.y / h];
+}
+
 /** 메모 글자 크기와 줄 간격(px). 레이아웃과 그리기가 함께 쓴다 */
 export function memoMetrics(unit: number): { titleSize: number; bodySize: number; titleLineH: number; bodyLineH: number; titleGap: number } {
   const m = tuning.card.memo;
