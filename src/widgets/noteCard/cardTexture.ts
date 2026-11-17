@@ -50,13 +50,15 @@ interface Palette {
   dim: string;
   faint: string;
   band: string;
+  wash: string;
+  rule: string;
 }
 
 function palette(face: CardFace): Palette {
   const h = tuning.card.holo;
   const c = new Color(holoTint(face));
   const rgba = (a: number) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
-  return { line: rgba(1), dim: rgba(h.dimAlpha), faint: rgba(h.faintAlpha), band: rgba(h.bandAlpha) };
+  return { line: rgba(1), dim: rgba(h.dimAlpha), faint: rgba(h.faintAlpha), band: rgba(h.bandAlpha), wash: rgba(h.washAlpha), rule: rgba(h.ruleAlpha) };
 }
 
 function idHash(id: string): number {
@@ -209,7 +211,7 @@ function mosaic(image: CanvasImageSource, blocks: number): HTMLCanvasElement {
   return canvas;
 }
 
-/** 겉모양 바탕과 테두리, 실을 묶는 점 */
+/** 겉모양 바탕과 테두리, 실을 묶는 자리의 종류 아이콘. 메모는 메모 색 바탕과 접힌 귀퉁이도 그린다 */
 function drawBody(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette, simple: boolean): void {
   const h = tuning.card.holo;
   const u = layout.unit;
@@ -227,11 +229,73 @@ function drawBody(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette,
   outline(ctx, layout, line / 2);
   ctx.stroke();
 
+  if (layout.kind === 'memo') {
+    // 메모: 메모 색을 옅게 깔고 오른쪽 아래 귀퉁이를 접는다
+    ctx.save();
+    outline(ctx, layout, line / 2);
+    ctx.clip();
+    ctx.fillStyle = p.wash;
+    ctx.fillRect(0, 0, layout.textureWidth, layout.textureHeight);
+    ctx.restore();
+    drawFold(ctx, layout, p, line);
+  }
+
+  // 실을 묶는 자리에 종류 아이콘(멀리서는 점)
   ctx.fillStyle = p.line;
-  ctx.beginPath();
-  ctx.arc(ring.x, ring.y, (ring.size / 2) * (simple ? 1 : 0.6), 0, Math.PI * 2);
-  ctx.fill();
+  ctx.strokeStyle = p.line;
+  if (simple) {
+    ctx.beginPath();
+    ctx.arc(ring.x, ring.y, ring.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+  } else drawKindIcon(ctx, layout, line);
   glow(ctx, null, u);
+}
+
+/** 종류 아이콘: 사진은 조리개, 메모는 접착 메모지, 문서는 귀퉁이 접힌 페이지. 실을 묶는 자리(ring)가 가운데다 */
+function drawKindIcon(ctx: CanvasRenderingContext2D, layout: CardLayout, line: number): void {
+  const { ring } = layout;
+  const r = ring.size / 2;
+  const { x, y } = ring;
+  ctx.lineWidth = line * 1.4;
+  ctx.beginPath();
+  if (layout.kind === 'photo') {
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (layout.kind === 'memo') {
+    ctx.roundRect(x - r, y - r, r * 2, r * 2, r * 0.35);
+    ctx.fill();
+  } else {
+    const w = r * 1.5;
+    const f = r * 0.7;
+    ctx.moveTo(x - w / 2, y - r);
+    ctx.lineTo(x + w / 2 - f, y - r);
+    ctx.lineTo(x + w / 2, y - r + f);
+    ctx.lineTo(x + w / 2, y + r);
+    ctx.lineTo(x - w / 2, y + r);
+    ctx.closePath();
+    ctx.stroke();
+  }
+}
+
+/** 메모 오른쪽 아래의 접힌 귀퉁이: 둥근 모서리 안쪽에 접혀 올라온 삼각형 */
+function drawFold(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette, line: number): void {
+  const f = layout.unit * tuning.card.window.foldRatio;
+  const inset = cornerRadius(layout) * 0.3 + line;
+  const right = layout.textureWidth - inset;
+  const bottom = layout.textureHeight - inset;
+  ctx.beginPath();
+  ctx.moveTo(right, bottom - f);
+  ctx.lineTo(right - f, bottom);
+  ctx.lineTo(right - f, bottom - f);
+  ctx.closePath();
+  ctx.fillStyle = p.band;
+  ctx.fill();
+  ctx.lineWidth = line;
+  ctx.strokeStyle = p.dim;
+  ctx.stroke();
 }
 
 /** 제목 줄의 작은 이름표(종류·파일 이름). right 는 넘지 말아야 할 오른쪽 끝(px) */
@@ -292,7 +356,7 @@ function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLay
   glow(ctx, null, u);
 }
 
-/** 문서: 굵은 제목과 촘촘한 문단 */
+/** 문서: 굵은 제목과 공책 괘선 위의 촘촘한 문단 */
 function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout, p: Palette): void {
   const { content, padding } = layout;
   const w = layout.unit;
@@ -309,6 +373,20 @@ function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayo
   ctx.fillStyle = p.line;
   ctx.fillText(truncateText(ctx, face.title ?? `DOC ${face.id}`, content.width), content.x, y);
   y += titleSize * 1.7;
+  glow(ctx, null, w);
+
+  // 공책처럼 본문 줄마다 아주 옅은 괘선을 긋는다(글자 밑줄 자리)
+  ctx.strokeStyle = p.rule;
+  ctx.lineWidth = layout.line;
+  ctx.beginPath();
+  for (let ry = y + lineH - bodySize * 0.2; ry < content.y + content.height; ry += lineH) {
+    ctx.moveTo(content.x, Math.round(ry) + 0.5);
+    ctx.lineTo(content.x + content.width, Math.round(ry) + 0.5);
+  }
+  ctx.stroke();
+
+  glow(ctx, p.line, w);
+  ctx.fillStyle = p.line;
   if (face.body) {
     ctx.font = `${bodySize}px ${SANS}`;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / lineH));

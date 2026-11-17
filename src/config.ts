@@ -58,6 +58,8 @@ export const tuning = {
       simpleLineRatio: 0.022,
       cornerRatio: 0.07,
       innerCornerRatio: 0.035,
+      /** 메모 오른쪽 아래 접힌 귀퉁이 크기(텍스처 폭 대비) */
+      foldRatio: 0.11,
     },
     /**
      * 홀로그램 색. kinds 는 사진·문서의 선·글자 색, memoColors 는 메모가 고르는 포스트잇 색이다. 멀리서 흑백으로 바꿀 때도 그 카드 색으로 물든다.
@@ -71,6 +73,9 @@ export const tuning = {
       faintAlpha: 0.2,
       bandAlpha: 0.14,
       glowRatio: 0.014,
+      /** 메모 바탕에 까는 메모 색의 불투명도, 문서 괘선의 불투명도 */
+      washAlpha: 0.07,
+      ruleAlpha: 0.12,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
     simple: { photoBlocks: 9, barRatio: 0.045, barGapRatio: 0.085 },
