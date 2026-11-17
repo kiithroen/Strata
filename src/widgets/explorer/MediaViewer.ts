@@ -195,7 +195,13 @@ export class MediaViewer {
     const gen = this.generation;
     const max = tuning.explorer.textMaxBytes;
     const truncated = file.size > max;
-    const bytes = new Uint8Array(await file.slice(0, max).arrayBuffer());
+    let bytes: Uint8Array;
+    try {
+      bytes = new Uint8Array(await file.slice(0, max).arrayBuffer());
+    } catch {
+      if (gen === this.generation) this.message('파일을 읽을 수 없다');
+      return;
+    }
     if (gen !== this.generation) return;
     const { text, encoding } = decodeText(bytes, truncated);
     const pre = document.createElement('pre');

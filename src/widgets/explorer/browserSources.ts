@@ -1,3 +1,5 @@
+import { tuning } from '../../config';
+import { TaskQueue } from '../../core/taskQueue';
 import { joinPath, kindOf } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 
@@ -90,6 +92,8 @@ export class HandleSource implements FileSource {
     const dir = await this.dirHandle(path);
     const out: FileEntry[] = [];
     const pending: Promise<void>[] = [];
+    // 파일이 수천 개인 폴더에서도 파일 열기를 몇 개씩만 겹쳐 돌린다
+    const opens = new TaskQueue(tuning.explorer.readConcurrency);
     for await (const handle of (dir as FileSystemDirectoryHandle & { values(): AsyncIterable<FileSystemHandle> }).values()) {
       const entryPath = joinPath(path, handle.name);
       if (handle.kind === 'directory') {
@@ -98,8 +102,8 @@ export class HandleSource implements FileSource {
       } else {
         // 크기·시각은 파일을 열어야 알 수 있어 한꺼번에 기다린다
         pending.push(
-          (handle as FileSystemFileHandle)
-            .getFile()
+          opens
+            .run(() => (handle as FileSystemFileHandle).getFile())
             .then((f) => {
               out.push({ name: handle.name, path: entryPath, kind: kindOf(handle.name, f.type), size: f.size, modified: f.lastModified });
             })

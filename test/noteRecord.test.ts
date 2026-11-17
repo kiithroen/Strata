@@ -49,6 +49,14 @@ describe('mergeRecords', () => {
     expect(same.upload.length + same.download.length).toBe(0);
   });
 
+  it('필드를 만든 순서만 다른 같은 기록은 같은 것으로 보고 받지 않는다', () => {
+    const local: NoteRecord = { v: 1, id: 'a', time: 1000, modified: 3, kind: 'photo', title: 'T', photo: { file: 'p.jpg', width: 4, height: 3 } };
+    const remote = JSON.parse('{"photo":{"height":3,"width":4,"file":"p.jpg"},"title":"T","kind":"photo","modified":3,"time":1000,"id":"a","v":1}') as NoteRecord;
+    const m = mergeRecords([local], [remote]);
+    expect(m.download).toHaveLength(0);
+    expect(m.upload).toHaveLength(0);
+  });
+
   it('수정 시각이 같은데 내용이 다르면 드라이브 쪽을 따른다', () => {
     const m = mergeRecords([rec('a', 3, { title: 'L' })], [rec('a', 3, { title: 'R' })]);
     expect(m.merged[0].title).toBe('R');

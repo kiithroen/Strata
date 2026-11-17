@@ -20,7 +20,8 @@ interface HistoryState {
   path: string;
 }
 
-function isExplorerState(state: unknown): state is HistoryState {
+/** 탐색기가 쌓은 방문 기록 상태인지 */
+export function isExplorerState(state: unknown): state is HistoryState {
   return typeof state === 'object' && state !== null && (state as { explorer?: unknown }).explorer === true;
 }
 
@@ -62,7 +63,7 @@ export class ExplorerView {
   private readonly onKey = (e: KeyboardEvent) => {
     if (this.viewer.open || !this.source) return;
     const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT')) return;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
     if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowUp')) {
       e.preventDefault();
       this.up();
@@ -139,7 +140,6 @@ export class ExplorerView {
     return { source: this.source?.name ?? null, dir: this.dir, entries: this.entries.length, thumbsPending: this.pending.size, viewer: this.viewer.current };
   }
 
-  /** 원본을 열고 원본 폴더로 간다 */
   /** 원본을 열고 dir 폴더(기본은 원본 폴더)로 간다 */
   async setSource(source: FileSource, dir = ''): Promise<void> {
     this.source = source;

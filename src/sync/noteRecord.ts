@@ -62,9 +62,22 @@ export function parseNoteRecord(json: unknown): NoteRecord | null {
   return out;
 }
 
-/** 두 기록이 같은 내용인지(수정 시각 포함) */
+/** 키 순서와 상관없이 같은 값이면 같은 글이 되는 JSON(객체 키를 정렬한다) */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (typeof value === 'object' && value !== null) {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj)
+      .filter((k) => obj[k] !== undefined)
+      .sort();
+    return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** 두 기록이 같은 내용인지(수정 시각 포함). 필드를 만든 순서는 보지 않는다 */
 function sameRecord(a: NoteRecord, b: NoteRecord): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return canonicalJson(a) === canonicalJson(b);
 }
 
 export interface MergeResult {
