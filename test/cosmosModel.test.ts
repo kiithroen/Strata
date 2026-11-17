@@ -4,9 +4,10 @@ import { tuning } from '../src/config';
 import {
   PLANET_UNITS,
   RegroupBlend,
-  bezierPoint,
-  branchControl,
+  branchCubicControls,
   buildHubs,
+  catmullRomPoint,
+  cubicBezierPoint,
   burstOffset,
   clusterAffinities,
   hourColorIndex,
@@ -540,16 +541,28 @@ describe('nodeColor', () => {
   });
 });
 
-describe('branchControl · bezierPoint', () => {
-  it('가지 제어점은 중점보다 원점 바깥으로 휘고 베지어 양 끝은 두 노드와 일치한다', () => {
-    const a = new Vector3(2, 0, -2);
-    const b = new Vector3(0, 1, -4);
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    const ctrl = branchControl(a, b, new Vector3());
-    expect(ctrl.length()).toBeGreaterThan(mid.length());
-    expect(ctrl.distanceTo(mid)).toBeCloseTo(a.distanceTo(b) * c.graph.branchCurve, 9);
-    expect(bezierPoint(a, ctrl, b, 0, new Vector3()).distanceTo(a)).toBeLessThan(1e-12);
-    expect(bezierPoint(a, ctrl, b, 1, new Vector3()).distanceTo(b)).toBeLessThan(1e-12);
-    expect(bezierPoint(a, ctrl, b, 0.5, new Vector3()).length()).toBeGreaterThan(mid.length());
+describe('catmullRomPoint · branchCubicControls · cubicBezierPoint', () => {
+  it('Catmull-Rom 스플라인은 양 끝점을 지나며 매끄럽게 이어진다', () => {
+    const p0 = new Vector3(0, 0, 0);
+    const p1 = new Vector3(1, 1, 0);
+    const p2 = new Vector3(3, 1, 0);
+    const p3 = new Vector3(4, 0, 0);
+    expect(catmullRomPoint(p0, p1, p2, p3, 0, new Vector3()).distanceTo(p1)).toBeLessThan(1e-12);
+    expect(catmullRomPoint(p0, p1, p2, p3, 1, new Vector3()).distanceTo(p2)).toBeLessThan(1e-12);
+    const mid = catmullRomPoint(p0, p1, p2, p3, 0.5, new Vector3());
+    expect(mid.x).toBeCloseTo(2, 9);
+    expect(mid.y).toBeGreaterThan(1);
+  });
+
+  it('분기 3차 베지어는 허브 접선을 따라 갈라져 나와 자식 행성에 닿는다', () => {
+    const hp = new Vector3(1, 0, 0);
+    const tangent = new Vector3(0, 1, 0);
+    const child = new Vector3(2, 1, 0);
+    const c1 = new Vector3();
+    const c2 = new Vector3();
+    branchCubicControls(hp, tangent, child, c1, c2);
+    expect(c1.clone().sub(hp).dot(tangent)).toBeGreaterThan(0);
+    expect(cubicBezierPoint(hp, c1, c2, child, 0, new Vector3()).distanceTo(hp)).toBeLessThan(1e-12);
+    expect(cubicBezierPoint(hp, c1, c2, child, 1, new Vector3()).distanceTo(child)).toBeLessThan(1e-12);
   });
 });

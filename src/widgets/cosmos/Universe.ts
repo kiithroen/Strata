@@ -222,7 +222,7 @@ function createDust(pixelRatio: number): Points<BufferGeometry, ShaderMaterial> 
         vec4 mv = modelViewMatrix * vec4(pos, 1.0);
         gl_Position = projectionMatrix * mv;
         float dist = max(-mv.z, 0.25);
-        gl_PointSize = min(aSize * uSize * uPixelRatio * (6.0 / dist), 8.0 * uPixelRatio);
+        gl_PointSize = clamp(aSize * uSize * uPixelRatio * (6.0 / dist), 1.2 * uPixelRatio, 8.0 * uPixelRatio);
         vFade = smoothstep(0.0, 0.12, t) * (1.0 - smoothstep(0.78, 1.0, t));
         vTint = aTint;
       }

@@ -12,10 +12,13 @@ import { LabelCache } from '../widgets/common/labelCache';
 import { ScreenLabels } from '../widgets/common/screenLabels';
 import {
   RegroupBlend,
+  branchCubicControls,
   buildHubs,
   bucketLabel,
   burstOffset,
+  catmullRomPoint,
   clusterAffinities,
+  cubicBezierPoint,
   facingQuaternion,
   hubPoint,
   pickNearest,
@@ -259,6 +262,17 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const spokeEnd = new Vector3();
   const scrubPoint = new Vector3();
   const burstQuat = new Quaternion();
+  const branchC1 = new Vector3();
+  const branchC2 = new Vector3();
+  const branchTangent = new Vector3();
+  const branchSegs = g.branchSegments;
+  const branchPoints = Array.from({ length: branchSegs + 1 }, () => new Vector3());
+  const branchAlphas = new Array<number>(branchSegs + 1);
+  const spineCount = Math.max(hubViews.length, planets.length);
+  const spinePoints = Array.from({ length: Math.max(2, (spineCount - 1) * branchSegs + 1) }, () => new Vector3());
+  const spineAlphas = new Array<number>(spinePoints.length);
+  const hubAlphas = new Array<number>(hubViews.length);
+  const planetAlphas = new Array<number>(planets.length);
 
   const cameraDepth = (position: Vector3) =>
     -camSpace.copy(position).applyMatrix4(stage.camera.matrixWorldInverse).z;
@@ -625,7 +639,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       /** 가장 많이 펼친 카드의 펼친 정도. 그만큼 블룸을 줄인다 */
       let opened = 0;
 
-      for (const planet of planets) {
+      for (let pi = 0; pi < planets.length; pi++) {
+        const planet = planets[pi];
         const { cluster, affinities, order } = planet;
         planet.fade = damp(planet.fade, 1, c.planetFadeRate, dt);
         const pos = planet.node.position;
@@ -633,6 +648,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         const dist = pos.distanceTo(cameraPosition);
 
         const alpha = planet.fade * cosmosFade(dist);
+        planetAlphas[pi] = alpha;
         graph.dot(pos, planet.coreColor, planet.size, alpha);
         graph.glow(pos, planet.color, planet.glowSize * glowOf(planet.node.key), g.glowAlpha * alpha);
         graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
@@ -699,35 +715,61 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         });
       }
 
-      // 허브: 안쪽 구면 껍질에 놓이고 자식 행성으로 가지를 뻗는다. 허브끼리는 시간 순서로 잇는다
-      let prevHub: Vector3 | null = null;
-      for (const view of hubViews) {
-        const { hub } = view;
+      // 허브: 안쪽 구면 껍질에 놓이고 자식 행성으로 부드럽게 갈라져 나가는 가지를 뻗는다. 척추는 스플라인 한 줄로 잇는다
+      for (let hi = 0; hi < hubViews.length; hi++) {
+        const view = hubViews[hi];
         const hp = hubPoint(view.childOffsets, orbitClock, view.node.position);
         const hubAlpha = cosmosFade(hp.distanceTo(cameraPosition));
-        for (const ci of hub.children) {
-          const child = planets[ci].node.position;
-          const childAlpha = cosmosFade(child.distanceTo(cameraPosition));
-          graph.branch(hp, child, branchColor, g.branchAlpha * hubAlpha, g.branchAlpha * childAlpha);
-        }
-        if (prevHub) {
-          const prevAlpha = cosmosFade(prevHub.distanceTo(cameraPosition));
-          graph.branch(prevHub, hp, branchColor, g.branchAlpha * prevAlpha, g.branchAlpha * hubAlpha);
-        }
+        hubAlphas[hi] = hubAlpha;
         graph.dot(hp, view.coreColor, g.hubSize, hubAlpha);
         graph.glow(hp, view.color, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
         graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, g.hubLabelPx * 1.1);
-        prevHub = hp;
       }
-      // 허브가 없으면(가장 큰 단위) 행성끼리 시간 순서로 잇는다
-      if (hubs.length === 0) {
-        for (let i = 1; i < planets.length; i++) {
-          const a = planets[i - 1].node.position;
-          const b = planets[i].node.position;
-          const alphaA = cosmosFade(a.distanceTo(cameraPosition));
-          const alphaB = cosmosFade(b.distanceTo(cameraPosition));
-          graph.branch(a, b, branchColor, g.branchAlpha * alphaA, g.branchAlpha * alphaB);
+      const drawSpine = (spineNodes: readonly { node: CosmosNode }[], alphas: readonly number[]) => {
+        const n = spineNodes.length;
+        if (n < 2) return;
+        let idx = 0;
+        for (let i = 0; i < n - 1; i++) {
+          const p0 = spineNodes[Math.max(0, i - 1)].node.position;
+          const p1 = spineNodes[i].node.position;
+          const p2 = spineNodes[i + 1].node.position;
+          const p3 = spineNodes[Math.min(n - 1, i + 2)].node.position;
+          const a1 = alphas[i];
+          const a2 = alphas[i + 1];
+          const start = i === 0 ? 0 : 1;
+          for (let s = start; s <= branchSegs; s++) {
+            const t = s / branchSegs;
+            catmullRomPoint(p0, p1, p2, p3, t, spinePoints[idx]);
+            spineAlphas[idx] = g.branchAlpha * (a1 + (a2 - a1) * t);
+            idx++;
+          }
         }
+        graph.branchCurve(spinePoints.slice(0, idx), spineAlphas.slice(0, idx), branchColor);
+      };
+      if (hubViews.length > 0) {
+        drawSpine(hubViews, hubAlphas);
+        for (let hi = 0; hi < hubViews.length; hi++) {
+          const view = hubViews[hi];
+          const hp = view.node.position;
+          const hubAlpha = hubAlphas[hi];
+          const prev = hubViews[Math.max(0, hi - 1)].node.position;
+          const next = hubViews[Math.min(hubViews.length - 1, hi + 1)].node.position;
+          branchTangent.copy(next).sub(prev);
+          if (branchTangent.lengthSq() > 1e-8) branchTangent.normalize();
+          for (const ci of view.hub.children) {
+            const child = planets[ci].node.position;
+            const childAlpha = planetAlphas[ci];
+            branchCubicControls(hp, branchTangent, child, branchC1, branchC2);
+            for (let s = 0; s <= branchSegs; s++) {
+              const t = s / branchSegs;
+              cubicBezierPoint(hp, branchC1, branchC2, child, t, branchPoints[s]);
+              branchAlphas[s] = g.branchAlpha * (hubAlpha + (childAlpha - hubAlpha) * t);
+            }
+            graph.branchCurve(branchPoints, branchAlphas, branchColor);
+          }
+        }
+      } else {
+        drawSpine(planets, planetAlphas);
       }
 
       // 수동 팬 중에는 궤도 중심과 가장 가까운 노드의 시각을 시점 표시·시간 띠에 반영한다

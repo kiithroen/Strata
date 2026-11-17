@@ -131,9 +131,9 @@
 
 **허브와 가지** (`parentUnit`, `buildHubs`, `hubPoint`)
 - 허브 단위는 행성 단위의 한 단계 위다(연이면 허브가 없다). 같은 허브 칸의 행성이 한 허브에 이어진다.
-- 허브는 자식 행성들의 평균 시간 오프셋(`s`)과 평균 나선 반지름에 `graph.hubRadius` 비율을 곱한 안쪽 구면 껍질 위에 놓인다. 허브에서 자식 행성으로 곡선 가지(`graph.branchWidth`, `graph.branchSegments`, `graph.branchCurve`, `graph.branchColor`, `graph.branchAlpha`)를 뻗고, 허브끼리는 시간 순서로 잇는다. 허브가 없으면 행성끼리 시간 순서로 잇는다.
+- 허브는 자식 행성들의 평균 시간 오프셋(`s`)과 평균 나선 반지름에 `graph.hubRadius` 비율을 곱한 안쪽 구면 껍질 위에 놓인다. 허브끼리는 Catmull-Rom 스플라인 한 줄로 매끄럽게 잇고, 허브에서 자식 행성으로는 척추 접선을 따라 갈라져 나오는 3차 베지어 곡선 가지(`graph.branchWidth`, `graph.branchSegments`, `graph.branchColor`, `graph.branchAlpha`)를 뻗는다. 허브가 없으면 행성끼리 스플라인 한 줄로 잇는다.
 - 허브는 묶음 키로 정한 각기 다른 색의 큰 점(`graph.hubSize`, 중심은 `graph.hubColor`와 섞는다)과 같은 색의 빛 무리(`graph.hubGlowSize`), 위쪽 글자(`graph.hubLabelPx`)로 그린다. 은하의 글자는 카메라를 향하고 거리와 상관없이 화면에서 정한 CSS px 높이로 보인다(`GraphView.label`).
-- 선은 화면 px 굵기 선분(`LineSegments2`), 점과 빛 무리는 거리에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
+- 가지는 정점을 공유하는 화면 공간 발광 리본(`RibbonBatch`)으로 그려 이음매에 점이 찍히지 않고, 살은 `LineSegments2`, 점과 빛 무리는 거리에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
 
 **날리는 종이** (`flightParams`, `flightOffset`, `flightQuaternion`, `gust`, `gustTime`)
 - 행성 단위별로 `swarm.capacityByUnit`장까지(관련도 높은 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.

@@ -3,10 +3,13 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  DoubleSide,
   DynamicDrawUsage,
   Group,
+  Mesh,
   Points,
   ShaderMaterial,
+  Vector2,
   Vector3,
   type InterleavedBufferAttribute,
 } from 'three';
@@ -16,40 +19,36 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
 import { ScreenLabels } from '../common/screenLabels';
-import { bezierPoint, branchControl } from './cosmosModel';
 
 /**
- * 우주 보기의 선 그래프: 가지(허브 ↔ 행성, 허브끼리), 살(행성 → 노트 점), 점, 빛 무리, 글자.
+ * 우주 보기의 선 그래프: 가지(연속 발광 곡선 리본), 살(행성 → 카드/점 직선), 점, 빛 무리, 글자.
  * 매 프레임 begin() 다음 그릴 것을 넣고 end() 로 한 번에 올린다. 모두 가산 합성이라 겹칠수록 밝다.
  */
 export class GraphView {
   readonly group = new Group();
-  private readonly branches: LineBatch;
+  private readonly branches: RibbonBatch;
   private readonly spokes: LineBatch;
   private readonly dots: PointBatch;
   private readonly glows: PointBatch;
   private readonly labels: ScreenLabels;
-  private readonly curveControl = new Vector3();
-  private readonly curvePrev = new Vector3();
-  private readonly curveNext = new Vector3();
   /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
   alphaScale = 1;
 
   constructor(labelCache: LabelCache, maxSegments: number, maxPoints: number) {
     this.labels = new ScreenLabels(labelCache);
     const g = tuning.cosmos.graph;
-    this.branches = new LineBatch(maxSegments * g.branchSegments, g.branchWidth);
+    this.branches = new RibbonBatch(maxSegments, g.branchSegments, g.branchWidth);
     this.spokes = new LineBatch(maxSegments, g.spokeWidth);
     // 카드를 먼저 그린 뒤 살을 그려 카드 뒤로 들어가는 선 끝은 테두리에서 가려지고 앞의 선은 보인다
     this.spokes.line.renderOrder = 1;
     this.dots = new PointBatch(maxPoints, false);
     this.glows = new PointBatch(maxPoints, true);
-    this.group.add(this.glows.points, this.branches.line, this.spokes.line, this.dots.points, this.labels.group);
+    this.group.add(this.glows.points, this.branches.mesh, this.spokes.line, this.dots.points, this.labels.group);
   }
 
   /** 화면 크기(CSS px)와 시야각이 바뀌면 다시 맞춘다 */
   setViewport(width: number, height: number, pixelRatio: number, fovDeg: number): void {
-    this.branches.setResolution(width, height);
+    this.branches.setViewport(width, height, fovDeg);
     this.spokes.setResolution(width, height);
     const scale = (height * pixelRatio) / (2 * Math.tan((fovDeg * Math.PI) / 360));
     this.dots.setScale(scale);
@@ -65,17 +64,9 @@ export class GraphView {
     this.labels.begin();
   }
 
-  branch(a: Vector3, b: Vector3, color: Color, alphaA: number, alphaB = alphaA): void {
-    const segs = tuning.cosmos.graph.branchSegments;
-    const ctrl = branchControl(a, b, this.curveControl);
-    this.curvePrev.copy(a);
-    for (let i = 1; i <= segs; i++) {
-      const t = i / segs;
-      bezierPoint(a, ctrl, b, t, this.curveNext);
-      const alpha = alphaA + (alphaB - alphaA) * ((i - 0.5) / segs);
-      this.branches.add(this.curvePrev, this.curveNext, color, alpha * this.alphaScale);
-      this.curvePrev.copy(this.curveNext);
-    }
+  /** 정점을 공유하는 연속 곡선 가지를 그린다. 각 점마다 alpha 를 주면 깊이에 따라 부드럽게 옅어진다 */
+  branchCurve(points: readonly Vector3[], alphas: readonly number[], color: Color): void {
+    this.branches.addCurve(points, alphas, color, this.alphaScale);
   }
 
   spoke(a: Vector3, b: Vector3, color: Color, alpha: number): void {
@@ -109,6 +100,195 @@ export class GraphView {
     this.dots.dispose();
     this.glows.dispose();
     this.labels.dispose();
+  }
+}
+
+/**
+ * 이음매 겹침 없이 곡선을 그리는 화면 공간 빌보드 리본 묶음.
+ * 각 샘플점의 양쪽(±side) 정점을 공유해 가산 합성에서도 연결점마다 점이 찍히지 않고, 중심 코어에서 바깥으로 부드럽게 번진다.
+ */
+class RibbonBatch {
+  readonly mesh: Mesh<BufferGeometry, ShaderMaterial>;
+  private readonly position: BufferAttribute;
+  private readonly prev: BufferAttribute;
+  private readonly next: BufferAttribute;
+  private readonly side: BufferAttribute;
+  private readonly color: BufferAttribute;
+  private readonly alpha: BufferAttribute;
+  private readonly index: BufferAttribute;
+  private readonly maxVertices: number;
+  private readonly maxIndices: number;
+  private vertCount = 0;
+  private indexCount = 0;
+
+  constructor(maxCurves: number, segmentsPerCurve: number, width: number) {
+    this.maxVertices = Math.max(4, maxCurves * (segmentsPerCurve + 1) * 2);
+    this.maxIndices = Math.max(6, maxCurves * segmentsPerCurve * 6);
+    const geometry = new BufferGeometry();
+    this.position = new BufferAttribute(new Float32Array(this.maxVertices * 3), 3).setUsage(DynamicDrawUsage);
+    this.prev = new BufferAttribute(new Float32Array(this.maxVertices * 3), 3).setUsage(DynamicDrawUsage);
+    this.next = new BufferAttribute(new Float32Array(this.maxVertices * 3), 3).setUsage(DynamicDrawUsage);
+    this.side = new BufferAttribute(new Float32Array(this.maxVertices), 1).setUsage(DynamicDrawUsage);
+    this.color = new BufferAttribute(new Float32Array(this.maxVertices * 3), 3).setUsage(DynamicDrawUsage);
+    this.alpha = new BufferAttribute(new Float32Array(this.maxVertices), 1).setUsage(DynamicDrawUsage);
+    this.index = new BufferAttribute(new Uint32Array(this.maxIndices), 1).setUsage(DynamicDrawUsage);
+    geometry.setAttribute('position', this.position);
+    geometry.setAttribute('aPrev', this.prev);
+    geometry.setAttribute('aNext', this.next);
+    geometry.setAttribute('aSide', this.side);
+    geometry.setAttribute('aColor', this.color);
+    geometry.setAttribute('aAlpha', this.alpha);
+    geometry.setIndex(this.index);
+
+    const c = tuning.cosmos;
+    const material = new ShaderMaterial({
+      uniforms: {
+        uResolution: { value: new Vector2(1, 1) },
+        uWidth: { value: width },
+        uTanHalfFov: { value: Math.tan((tuning.camera.fovDeg * Math.PI) / 360) },
+        uFogNear: { value: c.fogNear },
+        uFogFar: { value: c.fogFar },
+      },
+      vertexShader: /* glsl */ `
+        attribute vec3 aPrev;
+        attribute vec3 aNext;
+        attribute float aSide;
+        attribute vec3 aColor;
+        attribute float aAlpha;
+        uniform vec2 uResolution;
+        uniform float uWidth;
+        uniform float uTanHalfFov;
+        uniform float uFogNear;
+        uniform float uFogFar;
+        varying float vSide;
+        varying vec3 vColor;
+        varying float vAlpha;
+
+        vec2 toViewPlane(vec4 mv) {
+          return mv.xy / max(-mv.z, 0.05);
+        }
+
+        void main() {
+          vec4 mvCurr = modelViewMatrix * vec4(position, 1.0);
+          vec4 mvPrev = modelViewMatrix * vec4(aPrev, 1.0);
+          vec4 mvNext = modelViewMatrix * vec4(aNext, 1.0);
+          vec2 sCurr = toViewPlane(mvCurr);
+          vec2 sPrev = toViewPlane(mvPrev);
+          vec2 sNext = toViewPlane(mvNext);
+          vec2 d1 = sCurr - sPrev;
+          vec2 d2 = sNext - sCurr;
+          float l1 = length(d1);
+          float l2 = length(d2);
+          vec2 t = vec2(1.0, 0.0);
+          if (l1 > 1e-6 && l2 > 1e-6) {
+            vec2 sum = d1 / l1 + d2 / l2;
+            t = length(sum) > 1e-5 ? normalize(sum) : d2 / l2;
+          } else if (l2 > 1e-6) {
+            t = d2 / l2;
+          } else if (l1 > 1e-6) {
+            t = d1 / l1;
+          }
+          vec2 perp = vec2(-t.y, t.x);
+          float worldPerPx = (2.0 * max(-mvCurr.z, 0.05) * uTanHalfFov) / max(uResolution.y, 1.0);
+          mvCurr.xy += perp * (uWidth * 0.5 * aSide * worldPerPx);
+          gl_Position = projectionMatrix * mvCurr;
+          vSide = aSide;
+          vColor = aColor;
+          vAlpha = aAlpha * (1.0 - smoothstep(uFogNear, uFogFar, -mvCurr.z) * 0.85);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        varying float vSide;
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          float d = abs(vSide);
+          float glow = exp(-d * d * 4.5);
+          float core = smoothstep(0.6, 0.0, d);
+          float a = (0.45 * glow + 0.55 * core) * vAlpha;
+          vec3 col = mix(vColor, vec3(1.0), 0.22 * core);
+          gl_FragColor = vec4(col, a);
+          #include <colorspace_fragment>
+        }
+      `,
+      blending: AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+    this.mesh = new Mesh(geometry, material);
+    this.mesh.frustumCulled = false;
+  }
+
+  setViewport(width: number, height: number, fovDeg: number): void {
+    this.mesh.material.uniforms.uResolution.value.set(width, height);
+    this.mesh.material.uniforms.uTanHalfFov.value = Math.tan((fovDeg * Math.PI) / 360);
+  }
+
+  begin(): void {
+    this.vertCount = 0;
+    this.indexCount = 0;
+  }
+
+  addCurve(points: readonly Vector3[], alphas: readonly number[], color: Color, alphaScale: number): void {
+    const n = points.length;
+    if (n < 2 || alphaScale < 0.005) return;
+    const needVerts = n * 2;
+    const needIndices = (n - 1) * 6;
+    if (this.vertCount + needVerts > this.maxVertices || this.indexCount + needIndices > this.maxIndices) return;
+    let anyVisible = false;
+    for (let i = 0; i < n; i++) {
+      if (alphas[i] * alphaScale >= 0.005) {
+        anyVisible = true;
+        break;
+      }
+    }
+    if (!anyVisible) return;
+
+    const baseVert = this.vertCount;
+    for (let i = 0; i < n; i++) {
+      const curr = points[i];
+      const pPrev = i > 0 ? points[i - 1] : curr;
+      const pNext = i < n - 1 ? points[i + 1] : curr;
+      const a = alphas[i] * alphaScale;
+      for (const s of [-1, 1]) {
+        const vi = this.vertCount++;
+        this.position.setXYZ(vi, curr.x, curr.y, curr.z);
+        this.prev.setXYZ(vi, pPrev.x, pPrev.y, pPrev.z);
+        this.next.setXYZ(vi, pNext.x, pNext.y, pNext.z);
+        this.side.setX(vi, s);
+        this.color.setXYZ(vi, color.r, color.g, color.b);
+        this.alpha.setX(vi, a);
+      }
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const v0 = baseVert + i * 2;
+      const v1 = v0 + 1;
+      const v2 = v0 + 2;
+      const v3 = v0 + 3;
+      this.index.setX(this.indexCount++, v0);
+      this.index.setX(this.indexCount++, v1);
+      this.index.setX(this.indexCount++, v2);
+      this.index.setX(this.indexCount++, v1);
+      this.index.setX(this.indexCount++, v3);
+      this.index.setX(this.indexCount++, v2);
+    }
+  }
+
+  end(): void {
+    this.position.needsUpdate = true;
+    this.prev.needsUpdate = true;
+    this.next.needsUpdate = true;
+    this.side.needsUpdate = true;
+    this.color.needsUpdate = true;
+    this.alpha.needsUpdate = true;
+    this.index.needsUpdate = true;
+    this.mesh.geometry.setDrawRange(0, this.indexCount);
+  }
+
+  dispose(): void {
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
   }
 }
 

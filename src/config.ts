@@ -94,7 +94,7 @@ export const tuning = {
      */
     holoFx: {
       stripeFreq: 42,
-      stripeStrength: 0.22,
+      stripeStrength: 0.11,
       stripeSpeed: 0.035,
       iridescence: 0.035,
       irisShift: 1.4,
@@ -292,21 +292,20 @@ export const tuning = {
      * hourColors: 노트가 찍힌 시각(4시간 단위)별 점 색
      */
     graph: {
-      branchWidth: 1.8,
-      branchSegments: 10,
-      branchCurve: 0.18,
+      branchWidth: 4.5,
+      branchSegments: 14,
       spokeWidth: 1.0,
       branchColor: '#7fd2ff',
       hubColor: '#e4f8ff',
-      nodeColor: { saturation: [0.65, 0.95], lightness: [0.55, 0.72], coreMix: 0.6 },
-      branchAlpha: 0.48,
+      nodeColor: { saturation: [0.65, 0.95], lightness: [0.55, 0.72], coreMix: 0.55 },
+      branchAlpha: 0.55,
       spokeAlpha: 0.55,
-      nodeSize: 0.075,
-      hubSize: 0.105,
+      nodeSize: 0.08,
+      hubSize: 0.11,
       dotSize: 0.055,
-      glowSize: 1.1,
-      hubGlowSize: 1.85,
-      glowAlpha: 0.22,
+      glowSize: 1.4,
+      hubGlowSize: 2.1,
+      glowAlpha: 0.26,
       /** 허브 글자 높이(CSS px) */
       hubLabelPx: 15,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
@@ -362,7 +361,7 @@ export const tuning = {
      */
     /** 먼지 색 두 가지(점마다 그 사이에서 고른다) */
     dustColors: ['#6fd6ff', '#4a6dff'],
-    dust: { count: 9000, armRadiusFloor: 0.35, haloRadius: [0.35, 1.2], haloElevation: 1.4, coreRadius: 0.3, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 3.2, opacity: 0.68 },
+    dust: { count: 9000, armRadiusFloor: 0.35, haloRadius: [0.35, 1.2], haloElevation: 1.4, coreRadius: 0.3, spread: 0.16, angleSpread: 0.18, halo: 0.14, maxArc: 5.0, size: 5.0, opacity: 0.78 },
     stars: { count: 2600, radius: 55, size: 1.8 },
     /**
      * 성운 배경. bakeSize 가 0 이면 매 프레임 화면 해상도로 계산하고, 양수면 그 크기(px)의 큐브맵에 구워 두고
@@ -407,7 +406,7 @@ export const tuning = {
     distance: 5.2,
     fitWidth: 0.88,
     /** 지층 보기 동안 은하 그래프의 밝기 배율 */
-    galaxyDim: 0.03,
+    galaxyDim: 0.008,
   },
 
   /**

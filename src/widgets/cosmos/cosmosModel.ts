@@ -163,28 +163,65 @@ export function hubPoint(childOffsets: readonly number[], time: number, out: Vec
   return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }
 
-const branchMid = new Vector3();
+const branchDir = new Vector3();
 
-/**
- * 두 노드 사이를 잇는 곡선 가지의 2차 베지어 제어점을 구한다.
- * 중점을 바깥(원점 반대 방향)으로 거리 × graph.branchCurve 만큼 밀어 완만한 아치를 만든다.
- */
-export function branchControl(a: Vector3, b: Vector3, out: Vector3): Vector3 {
-  const dist = a.distanceTo(b);
-  branchMid.copy(a).add(b).multiplyScalar(0.5);
-  if (branchMid.lengthSq() > 1e-8) branchMid.normalize();
-  else branchMid.set(0, 1, 0);
-  return out.copy(a).add(b).multiplyScalar(0.5).addScaledVector(branchMid, dist * tuning.cosmos.graph.branchCurve);
+/** Catmull-Rom 스플라인 위 t(0~1) 자리의 점. p1 에서 p2 까지 앞뒤 점(p0, p3)의 기울기로 매끄럽게 잇는다 */
+export function catmullRomPoint(
+  p0: Vector3,
+  p1: Vector3,
+  p2: Vector3,
+  p3: Vector3,
+  t: number,
+  out: Vector3,
+): Vector3 {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const x =
+    0.5 *
+    (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+  const y =
+    0.5 *
+    (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+  const z =
+    0.5 *
+    (2 * p1.z + (-p0.z + p2.z) * t + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3);
+  return out.set(x, y, z);
 }
 
-/** 2차 베지어 곡선 위 t(0~1) 자리의 점 */
-export function bezierPoint(a: Vector3, control: Vector3, b: Vector3, t: number, out: Vector3): Vector3 {
+/**
+ * 허브(hp)에서 척추 접선(tangent) 방향으로 부드럽게 갈라져 나와 자식 행성(child)에 닿는 3차 베지어 제어점 둘을 구한다.
+ * 접선 방향은 자식 쪽과 예각이 되도록 고른다.
+ */
+export function branchCubicControls(
+  hp: Vector3,
+  tangent: Vector3,
+  child: Vector3,
+  c1: Vector3,
+  c2: Vector3,
+): void {
+  branchDir.copy(child).sub(hp);
+  const d = branchDir.length();
+  if (d < 1e-6 || tangent.lengthSq() < 1e-8) {
+    c1.copy(hp).lerp(child, 1 / 3);
+    c2.copy(hp).lerp(child, 2 / 3);
+    return;
+  }
+  const sign = branchDir.dot(tangent) >= 0 ? 1 : -1;
+  c1.copy(hp).addScaledVector(tangent, sign * d * 0.38);
+  c2.copy(child).addScaledVector(branchDir, -0.28);
+}
+
+/** 3차 베지어 곡선 위 t(0~1) 자리의 점 */
+export function cubicBezierPoint(a: Vector3, c1: Vector3, c2: Vector3, b: Vector3, t: number, out: Vector3): Vector3 {
   const u = 1 - t;
+  const u2 = u * u;
+  const t2 = t * t;
   return out
     .set(0, 0, 0)
-    .addScaledVector(a, u * u)
-    .addScaledVector(control, 2 * u * t)
-    .addScaledVector(b, t * t);
+    .addScaledVector(a, u2 * u)
+    .addScaledVector(c1, 3 * u2 * t)
+    .addScaledVector(c2, 3 * u * t2)
+    .addScaledVector(b, t2 * t);
 }
 
 function clamp01(x: number): number {
