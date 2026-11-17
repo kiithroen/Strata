@@ -47,24 +47,21 @@ export const tuning = {
     /** 멀리서 쓰는 단순한 텍스처 폭(px). 글자 없이 틀·막대·모자이크만 그린다 */
     simpleTextureWidth: 96,
     /**
-     * 창 모양 카드: 제목 줄과 아래 상태 줄 높이, 안쪽 여백, 테두리 선 굵기, 모서리 꺾쇠 길이(모두 텍스처 폭 대비).
-     * 단순한 텍스처는 선이 뭉개지지 않게 simpleLineRatio 를 쓴다.
-     * chamferRatio 는 메모의 깎은 모서리 크기, tabRatio 는 문서 제목 탭 폭, gutterRatio 는 문서 줄 번호 칸 폭이다
+     * 카드 틀: 제목 줄과 아래 상태 줄 높이, 안쪽 여백, 테두리 선 굵기, 겉모양과 사진 칸의 모서리 둥글기(모두 텍스처 폭 대비).
+     * 단순한 텍스처는 선이 뭉개지지 않게 simpleLineRatio 를 쓴다
      */
     window: {
       titleRatio: 0.085,
       footerRatio: 0.075,
-      paddingRatio: 0.04,
+      paddingRatio: 0.045,
       lineRatio: 0.005,
       simpleLineRatio: 0.022,
-      bracketRatio: 0.07,
-      chamferRatio: 0.17,
-      tabRatio: 0.58,
-      gutterRatio: 0.1,
+      cornerRatio: 0.07,
+      innerCornerRatio: 0.035,
     },
     /**
      * 홀로그램 색. kinds 는 사진·문서의 선·글자 색, memoColors 는 메모가 고르는 포스트잇 색이다. 멀리서 흑백으로 바꿀 때도 그 카드 색으로 물든다.
-     * fill 은 창 바탕, 나머지는 선 색에서 낸 흐린 선·옅은 선·제목 띠·메모 띠의 불투명도, glowRatio 는 선과 글자의 빛 번짐(폭 대비)이다
+     * fill 은 카드 바탕, 나머지는 선 색에서 낸 흐린 선·옅은 선·빈 사진 칸의 불투명도, glowRatio 는 선과 글자의 빛 번짐(폭 대비)이다
      */
     holo: {
       kinds: { photo: '#48d6ff', doc: '#7fa4ff' },
@@ -73,7 +70,6 @@ export const tuning = {
       dimAlpha: 0.5,
       faintAlpha: 0.2,
       bandAlpha: 0.14,
-      stripAlpha: 0.34,
       glowRatio: 0.014,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */

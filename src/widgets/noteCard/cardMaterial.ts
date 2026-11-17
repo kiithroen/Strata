@@ -140,9 +140,8 @@ uniform float uIrisShift;
 uniform float uChroma;
 uniform vec2 uBorder;
 uniform vec3 uRunner;
-/** 카드 겉모양 꼭짓점(uv). 사각형 4, 메모 5, 문서 6개 */
-uniform vec2 uOutline[6];
-uniform int uOutlineCount;
+/** 카드 겉모양(둥근 사각형)의 모서리 반지름(카드 높이 단위) */
+uniform float uCorner;
 uniform float uBendPhase;
 uniform float uAspect;
 uniform float uDim;
@@ -156,20 +155,11 @@ varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
 
-// 카드 겉모양 선까지의 거리(카드 높이 단위). 가로는 uAspect 를 곱해 네 변의 거리 단위를 맞춘다
+// 카드 겉모양(둥근 사각형) 선까지의 거리(카드 높이 단위). 가로는 uAspect 를 곱해 네 변의 거리 단위를 맞춘다
 float outlineDistance(vec2 uv) {
-  vec2 p = vec2(uv.x * uAspect, uv.y);
-  float d = 1e9;
-  for (int i = 0; i < 6; i++) {
-    if (i >= uOutlineCount) break;
-    int j = i + 1 == uOutlineCount ? 0 : i + 1;
-    vec2 a = vec2(uOutline[i].x * uAspect, uOutline[i].y);
-    vec2 b = vec2(uOutline[j].x * uAspect, uOutline[j].y);
-    vec2 ab = b - a;
-    float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
-    d = min(d, length(p - a - ab * t));
-  }
-  return d;
+  vec2 p = vec2((uv.x - 0.5) * uAspect, uv.y - 0.5);
+  vec2 q = abs(p) - vec2(uAspect * 0.5, 0.5) + uCorner;
+  return abs(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uCorner);
 }
 
 // 얇은 막의 무지개빛: 위상 t 에 따라 색상이 돈다
@@ -231,10 +221,8 @@ void main() {
   color.rgb += uHoloTint * lit;
   color.a = max(color.a, min(1.0, lit));
 
-  // 펼친 카드의 테두리 빛. 가로 거리를 높이 단위로 맞춰 네 변의 두께를 같게 한다
-  vec2 edgeDist = min(vUv, 1.0 - vUv);
-  edgeDist.x *= uAspect;
-  float edge = (1.0 - smoothstep(0.0, uEdgeWidth, min(edgeDist.x, edgeDist.y))) * body;
+  // 펼친 카드의 테두리 빛. 둥근 겉모양 선을 따라 같은 두께로 두른다
+  float edge = (1.0 - smoothstep(0.0, uEdgeWidth, edgeD)) * body;
   color.rgb = mix(color.rgb, uHoloTint, edge * uFocus);
   color.a = max(color.a, edge * uFocus);
 
@@ -258,14 +246,11 @@ export interface CardMaterialOptions {
   height: number;
   /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다. 훑는 빛 띠의 때와 무지개빛 위상도 어긋낸다 */
   bendPhase: number;
-  /** 카드 겉모양 꼭짓점(uv, outlineUv). 테두리 빛이 이 선을 따른다 */
-  outline: readonly (readonly [number, number])[];
+  /** 카드 겉모양의 모서리 반지름(카드 높이 단위, cornerUv). 테두리 빛이 이 선을 따른다 */
+  corner: number;
   /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때 이 색으로 물들고, 테두리 빛·반짝임·훑는 띠도 이 색을 바탕으로 한다 */
   tint: string;
 }
-
-/** 셰이더가 받는 겉모양 꼭짓점 수의 상한 */
-const MAX_OUTLINE = 6;
 
 export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
   return new ShaderMaterial({
@@ -277,8 +262,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uAspect: { value: o.width / o.height },
       uCardSize: { value: new Vector2(o.width, o.height) },
       uBendPhase: { value: o.bendPhase },
-      uOutline: { value: Array.from({ length: MAX_OUTLINE }, (_, i) => new Vector2(...(o.outline[i] ?? [0, 0]))) },
-      uOutlineCount: { value: Math.min(o.outline.length, MAX_OUTLINE) },
+      uCorner: { value: o.corner },
       uDim: { value: 0 },
       uFocus: { value: 0 },
       uFade: { value: 1 },

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { formatStamp } from '../src/core/format';
 import { applyQuality, qualityDefaults } from '../src/core/quality';
-import { cardLayout, faceLayout, outlinePoints, outlineUv, type LayoutFace } from '../src/widgets/noteCard/cardLayout';
+import { cardLayout, cornerRadius, cornerUv, faceLayout, type LayoutFace } from '../src/widgets/noteCard/cardLayout';
 
 const FACES: LayoutFace[] = [
   { kind: 'photo', photo: { width: 640, height: 480 } },
@@ -44,41 +44,22 @@ describe('cardLayout', () => {
   });
 });
 
-describe('outlinePoints', () => {
-  const win = tuning.card.window;
-
-  it('사진은 사각형, 메모는 오른쪽 위를 깎은 오각형, 문서는 왼쪽 위 탭이 솟은 육각형이다', () => {
-    const photo = faceLayout({ kind: 'photo', photo: { width: 640, height: 480 } });
-    const memo = faceLayout({ kind: 'memo', title: '장보기', body: '우유' });
-    const doc = faceLayout({ kind: 'doc', title: '기록', body: '글' });
-    expect(outlinePoints(photo)).toEqual([
-      [0, 0],
-      [photo.textureWidth, 0],
-      [photo.textureWidth, photo.textureHeight],
-      [0, photo.textureHeight],
-    ]);
-    const cut = memo.unit * win.chamferRatio;
-    const m = outlinePoints(memo);
-    expect(m).toHaveLength(5);
-    expect(m[1]).toEqual([memo.textureWidth - cut, 0]);
-    expect(m[2]).toEqual([memo.textureWidth, cut]);
-    const d = outlinePoints(doc);
-    expect(d).toHaveLength(6);
-    expect(d[1]).toEqual([doc.unit * win.tabRatio, 0]);
-    expect(d[3]).toEqual([doc.textureWidth, doc.titleBar.height]);
+describe('cornerRadius', () => {
+  it('모서리 반지름은 기준 폭 대비 비율이고, 카드 반 크기를 넘지 않는다', () => {
+    for (const face of FACES) {
+      const l = faceLayout(face);
+      const r = cornerRadius(l);
+      expect(r).toBeCloseTo(Math.min(l.unit * tuning.card.window.cornerRatio, l.textureWidth / 2, l.textureHeight / 2), 9);
+      expect(r).toBeLessThanOrEqual(Math.min(l.textureWidth, l.textureHeight) / 2);
+      expect(cornerUv(l)).toBeCloseTo(r / l.textureHeight, 12);
+    }
   });
 
-  it('안쪽으로 들인 만큼 꼭짓점이 옮겨 가고, uv 는 0~1 에 아래쪽이 0 이다', () => {
-    const l = faceLayout({ kind: 'photo', photo: { width: 640, height: 480 } });
-    expect(outlinePoints(l, 2)[0]).toEqual([2, 2]);
-    const uv = outlineUv(l);
-    expect(uv[0]).toEqual([0, 1]);
-    expect(uv[2]).toEqual([1, 0]);
-    for (const face of FACES) for (const [u, v] of outlineUv(faceLayout(face))) {
-      expect(u).toBeGreaterThanOrEqual(0);
-      expect(u).toBeLessThanOrEqual(1);
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThanOrEqual(1);
+  it('텍스처 폭을 바꿔도 카드 대비 둥글기는 같다', () => {
+    for (const face of FACES) {
+      const a = faceLayout(face, tuning.card.simpleTextureWidth);
+      const b = faceLayout(face, tuning.card.detailTextureWidth);
+      expect(cornerRadius(a) / a.textureWidth).toBeCloseTo(cornerRadius(b) / b.textureWidth, 2);
     }
   });
 });

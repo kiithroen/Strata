@@ -16,16 +16,16 @@
 
 파일: `src/widgets/noteCard/`
 
-노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 카드 색(사진·문서는 `card.holo.kinds`, 메모는 `card.holo.memoColors` 가운데 하나)의 빛나는 선과 글자(`card.holo.glowRatio`)로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선·제목 띠는 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 사진만 제 색이다.
-- 세 종류는 겉모양·강조선·색으로 구분된다. 모두 제목 줄 왼쪽에 실을 묶는 고리가 있고, 상태 줄 왼쪽에 찍은 시각을 적는다.
-- **사진 (`photo`)**: 온전한 직사각 창. 네 모서리 꺾쇠(`card.window.bracketRatio`), 제목 줄 오른쪽의 접기·닫기 단추, 사진 귀퉁이 안쪽의 뷰파인더 꺾쇠, 상태 줄 오른쪽의 재생 막대 같은 눈금이 있다. 사진 비율 그대로 내용 칸을 채우고, 제목 줄 이름은 캡션, 없으면 `IMG_번호`다.
-- **짧은 노트 (`memo`)**: 오른쪽 위 모서리를 깎은(`card.window.chamferRatio`) 쪽지. 제목 줄이 진한 접착 띠(`card.holo.stripAlpha`)이고 `MEMO 번호`를 적는다. 깎은 모서리와 왼쪽 아래 꺾쇠가 밝다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다. 제목 줄 아래 구분선은 겉모양 안에서만 긋는다.
+노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 카드 색(사진·문서는 `card.holo.kinds`, 메모는 `card.holo.memoColors` 가운데 하나)의 가는 테두리와 글자(`card.holo.glowRatio`)로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선은 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 사진만 제 색이다.
+- 세 종류 모두 같은 둥근 사각형이고(`card.window.cornerRatio`, `cardLayout.ts`의 `cornerRadius`) 장식 없이 색과 내용으로 구분된다. 제목 줄 왼쪽에 실을 묶는 점과 작은 이름표(고정폭 글꼴, 흐린 색), 상태 줄 왼쪽에 찍은 시각을 적는다. 본문 글꼴은 산세리프다.
+- **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채우고 모서리를 둥글게 자른다(`card.window.innerCornerRatio`). 이름표는 캡션, 없으면 `IMG_번호`다.
+- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
 - 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기본 해상도(`qualityDefaults.tex`)에서 한 번 정해 품질 설정을 바꾸거나 단순·상세 텍스처를 써도 같은 모양이다.
-- **긴 문서 (`doc`)**: 왼쪽 위에 파일 탭(`card.window.tabRatio`)이 솟은 `1 : √2` 창. 탭에 `TXT_번호.txt`를 적고 탭 윤곽이 밝다. 왼쪽 줄 번호 칸(`card.window.gutterRatio`)에 제목과 문단 줄마다 번호를 붙이고, 오른쪽 스크롤 막대의 손잡이 길이가 보이는 줄 수 / 전체 줄 수다.
-- 겉모양 밖(깎은 모서리, 탭 옆)은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
+- **긴 문서 (`doc`)**: `1 : √2` 카드. 이름표는 `TXT_번호`이고, 굵은 제목과 촘촘한 문단이다.
+- 둥근 모서리 밖은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
 
 **멀고 가까움** (`cardMaterial.ts`, `createSimpleTexture`)
-- 카드마다 텍스처가 둘이다. 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`)다. 단순한 텍스처는 글자 없이 같은 겉모양에 사진은 굵은 모자이크(`card.simple.photoBlocks`)와 뷰파인더 꺾쇠, 메모는 굵은 막대 몇 줄, 문서는 줄 번호 칸 점과 가는 막대(`card.simple`)로만 그린다.
+- 카드마다 텍스처가 둘이다. 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`)다. 단순한 텍스처는 글자 없이 같은 겉모양에 사진은 둥글게 자른 굵은 모자이크(`card.simple.photoBlocks`), 메모는 굵은 막대 몇 줄, 문서는 가는 막대 여러 줄(`card.simple`)로만 그린다.
 - 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(그 카드 종류 색으로 물든 밝기)을 제 색으로 섞는다. 한 장 안에서는 같은 값이다. 펼치는 카드는 둘 다 1이다.
 - 단순한 모양일수록 옅어진다(`card.lod.farAlpha`). 펼친 카드는 바탕 불투명도를 `card.lod.focusAlpha` 이상으로 올려 뒤 카드가 글을 가리지 않게 한다.
 
@@ -58,7 +58,7 @@
   - 가로 줄무늬(`stripeFreq`, `stripeStrength`, `stripeSpeed`): 카드 세로 좌표로 만든 가는 줄이 천천히 위로 흐르고, 줄 사이가 조금 투명해진다(빛을 더하지 않는다). 화면에서 줄이 너무 촘촘해지는 먼 카드는 물결무늬가 생기지 않게 줄이 옅어진다.
   - 무지개빛 막(`iridescence`, `irisShift`): 보는 각도(면의 기울기와 시선)로 정한 위상에 따라 색이 돌고, 비스듬히 볼수록 짙다.
   - 색수차(`chroma`): 선의 빨강·파랑이 옆으로 살짝 갈라지고 비스듬할수록 더 갈라진다.
-- 테두리 빛(`card.border`): 셰이더가 카드 겉모양(`cardLayout.ts`의 `outlinePoints`·`outlineUv`, 텍스처의 바탕·테두리와 같은 꼭짓점)까지의 거리로 선을 따라 종류 색을 더한다(`width`, `strength`). 밝아진 선에 블룸이 걸린다. 그 위로 꼬리 달린 빛이 테두리를 따라 돈다(`runnerStrength`, `runnerSpeed`, `runnerTail`). 도는 위치는 카드 가운데에서 본 각도로 재고 카드마다 출발점이 다르다. 펼친 카드는 꺼진다.
+- 테두리 빛(`card.border`): 셰이더가 카드 겉모양(둥근 사각형, `cardLayout.ts`의 `cornerUv`로 텍스처와 같은 둥글기)까지의 거리로 선을 따라 종류 색을 더한다(`width`, `strength`). 밝아진 선에 블룸이 걸린다. 그 위로 꼬리 달린 빛이 테두리를 따라 돈다(`runnerStrength`, `runnerSpeed`, `runnerTail`). 도는 위치는 카드 가운데에서 본 각도로 재고 카드마다 출발점이 다르다. 펼친 카드는 꺼진다.
 - 휨(`CardLook.uBend`, 0~1): 메시를 `card.segments` 칸 격자로 나누고, 정점 셰이더가 카드 좌표의 가로·세로 물결과 가로 말림(`card.bend`)을 더한 높이만큼 앞뒤로 민다. 종이마다 노트 번호로 정한 위상만큼 어긋나게 출렁이고, 펼치는 동안에는 평평해진다.
 - 반짝임(`CardLook.uShade`, 0~1): 휜 면을 비스듬히 볼수록 가장자리가 종류 색과 무지개빛으로 밝아진다(`card.lod.glint`). 펼치는 동안에는 꺼진다. 우주 보기만 휨과 반짝임을 켠다.
 - `setBadge(text)`로 카드 오른쪽 위에 배지를 붙인다(높이 `axis.badgeHeight`). 글자 텍스처는 `widgets/common/labelCache.ts`가 구워 재사용한다.
