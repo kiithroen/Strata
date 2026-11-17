@@ -1275,6 +1275,95 @@ body.explorer-open .hud-bottom {
   overflow-wrap: anywhere;
 }
 
+/* 체크리스트: 노트 보기의 체크 칸 목록과 입력 화면의 항목 줄 */
+.note-viewer-checklist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.note-check-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text) 90%, transparent);
+  cursor: pointer;
+}
+
+.note-check-box,
+.note-editor-check-box {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--card-tint);
+  cursor: pointer;
+}
+
+.note-check-box:disabled {
+  cursor: default;
+}
+
+.note-check-label:has(.note-check-box:disabled) {
+  cursor: default;
+}
+
+.note-check-text {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-check.done .note-check-text {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.note-editor-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-editor-checklist[hidden] {
+  display: none;
+}
+
+.note-editor-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-editor-check-box {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.note-editor-check-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-editor-check.done .note-editor-check-text {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.note-editor-check-remove {
+  padding: 6px 10px;
+}
+
+.note-editor-check-add {
+  align-self: flex-start;
+}
+
 .note-viewer[data-kind="memo"] .note-viewer-page {
   padding: 16px;
   border: 1px solid color-mix(in srgb, var(--card-tint) 45%, transparent);

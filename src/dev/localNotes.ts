@@ -54,7 +54,7 @@ async function readEntry(file: File): Promise<Entry | null> {
   if (/\.json$/i.test(file.name) || file.type === 'application/json') {
     const keep = parseKeepNote(JSON.parse(await file.text()));
     if (!keep) return null;
-    return { note: { time: keep.time, kind: keep.kind, title: keep.title, body: keep.body, tags: keep.tags } };
+    return { note: { time: keep.time, kind: keep.kind, title: keep.title, body: keep.body, checklist: keep.checklist, tags: keep.tags } };
   }
   if (!file.type.startsWith('image/') && !IMAGE_EXT.test(file.name)) return null;
   const { photo, takenAt } = await readPhoto(file);

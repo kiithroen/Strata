@@ -64,6 +64,22 @@ export class Album {
     return record;
   }
 
+  /**
+   * 체크리스트 노트의 항목 하나를 끝냄(done)·안 끝냄으로 바꿔 바로 저장하고 기록을 돌려준다. 수정 시각도 바뀐다.
+   * 그런 항목이 없거나 이미 그 상태면 그대로 두고 지금 기록을 돌려준다
+   */
+  async check(id: string, index: number, done: boolean): Promise<NoteRecord | undefined> {
+    const r = this.record(id);
+    const item = r?.checklist?.[index];
+    if (!r || !item || item.done === done) return r;
+    const checklist = r.checklist!.map((it, i) => (i === index ? { text: it.text, done } : { ...it }));
+    const record: NoteRecord = { ...r, checklist, modified: this.now() };
+    await this.store.put(record);
+    this.records.set(id, record);
+    this.cached = null;
+    return record;
+  }
+
   /** 노트를 지운다. 기록은 지움 표시로 남기고 사진은 지운다 */
   async remove(id: string): Promise<void> {
     const r = this.records.get(id);

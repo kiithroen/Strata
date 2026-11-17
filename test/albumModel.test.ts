@@ -12,6 +12,7 @@ import {
   searchNotes,
   type NoteDraft,
 } from '../src/album/albumModel';
+import { checklistText } from '../src/core/checklist';
 import { parseNoteRecord } from '../src/sync/noteRecord';
 
 const base: NoteDraft = { time: new Date(2026, 10, 18, 9, 30).getTime(), title: '', body: '', tags: [] };
@@ -33,6 +34,14 @@ describe('noteKindOf', () => {
     // 앞뒤 빈칸은 세지 않는다
     expect(noteKindOf({ body: ` ${'가'.repeat(n - 1)} ` })).toBe('memo');
   });
+
+  it('체크리스트는 본문 대신 항목 글의 길이로 정한다', () => {
+    const text = '가'.repeat(tuning.album.docMinChars);
+    const long = [{ text, done: false }];
+    const kind = checklistText(long).length >= tuning.album.docMinChars ? 'doc' : 'memo';
+    expect(noteKindOf({ body: '', checklist: long })).toBe(kind);
+    expect(noteKindOf({ body: text, checklist: [{ text: '빵', done: false }] })).toBe('memo');
+  });
 });
 
 describe('draftHasContent', () => {
@@ -41,6 +50,11 @@ describe('draftHasContent', () => {
     expect(draftHasContent({ ...base, title: '  ' })).toBe(false);
     expect(draftHasContent({ ...base, body: '메모' })).toBe(true);
     expect(draftHasContent({ ...base, photo: { width: 1, height: 1 } })).toBe(true);
+  });
+
+  it('체크리스트는 빈 항목만 있으면 내용이 없고, 본문은 보지 않는다', () => {
+    expect(draftHasContent({ ...base, body: '메모', checklist: [{ text: ' ', done: true }] })).toBe(false);
+    expect(draftHasContent({ ...base, checklist: [{ text: '빵', done: false }] })).toBe(true);
   });
 });
 
@@ -66,6 +80,23 @@ describe('recordFromDraft', () => {
     expect(r.kind).toBe('photo');
     expect(r.tint).toBeUndefined();
     expect(r.photo).toEqual({ file: 'photo-n2.jpg', width: 400, height: 300 });
+  });
+
+  it('체크리스트 노트는 빈 항목을 빼고 본문을 적지 않으며, 드라이브 형식 검사를 통과한다', () => {
+    const checklist = [
+      { text: ' 우유 ', done: true },
+      { text: '', done: false },
+      { text: '빵', done: false },
+    ];
+    const r = recordFromDraft('c1', { ...base, body: '버릴 본문', checklist }, base.time);
+    expect(r.checklist).toEqual([
+      { text: '우유', done: true },
+      { text: '빵', done: false },
+    ]);
+    expect(r.body).toBeUndefined();
+    expect(parseNoteRecord(JSON.parse(JSON.stringify(r)))).toEqual(r);
+    expect(recordFromDraft('c1', draftFromRecord(r), r.modified)).toEqual(r);
+    expect(recordFromDraft('c2', { ...base, title: '빈 목록', checklist: [{ text: ' ', done: false }] }, base.time).checklist).toBeUndefined();
   });
 
   it('기록을 입력 내용으로 되돌리면 같은 기록이 된다', () => {

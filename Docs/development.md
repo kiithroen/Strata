@@ -29,7 +29,7 @@ npm run dev
 - **사진 표현**: 사진 카드의 사진 칸을 원본·홀로그램 선(`card.photoFx`)·선화(`card.photoSketch`) 가운데 하나로 바로 바꾼다. 기본은 홀로그램이다.
 - **실데이터**: `파일`·`폴더`로 고른 파일을 노트로 읽어 우주 보기를 그 노트로 다시 띄운다(`src/dev/localNotes.ts`). 메모리에만 두는 임시 주입이라 다시 불러오면 가짜 노트로 돌아간다.
   - 사진(JPEG·PNG 등): 파일 앞부분(`dev.headerBytes`)에서 크기·EXIF 방향·촬영 시각을 읽는다(`src/dev/imageHeader.ts`). 원본 촬영 시각, 없으면 EXIF 파일 시각, 그것도 없으면 파일 수정 시각에 놓는다. 앞부분으로 크기를 모르는 형식은 한 번 디코딩해서 잰다. 제목은 파일 이름이다.
-  - 구글 킵 테이크아웃 JSON: 제목·본문(체크리스트는 항목마다 한 줄)·라벨(태그)·만든 시각을 읽고, 본문이 `album.docMinChars`자 이상이면 긴 문서, 아니면 메모다(`src/dev/keepNote.ts`). 휴지통 노트는 버린다.
+  - 구글 킵 테이크아웃 JSON: 제목·본문·체크리스트(항목과 체크 상태, 빈 항목은 뺀다)·라벨(태그)·만든 시각을 읽고, 본문(체크리스트는 항목 글)이 `album.docMinChars`자 이상이면 긴 문서, 아니면 메모다(`src/dev/keepNote.ts`). 휴지통 노트는 버린다.
   - 사진 디코딩은 `createImageBitmap`을 `dev.decodeConcurrency`개씩만 돌리는 큐(`src/core/taskQueue.ts`)로 하고, 노트 순서(최근 것부터)대로 처리한다. 펼친 카드의 선명한 사진은 줄 맨 앞에 끼운다.
 - **품질**: 프리셋(`quality.presets`)이나 항목별 값(`quality.options`)을 고르고 적용하면 저장하고 다시 불러온다. 렌더러·텍스처·형상을 처음부터 다시 만들어야 해서다. 시작할 때 `main.ts`가 위젯보다 먼저 `tuning`에 적용한다(`src/core/quality.ts`). 기본값과 다른 항목만 저장하므로 고르지 않은 항목은 `config.ts` 기본값을 따른다.
 
@@ -103,7 +103,7 @@ npm run build
   - 노트 카드: `cards`, `focus(card | null)`, `focusedId()`
   - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
   - 우주 보기: 시간축에 더해 `hubs()`, `nodes()`(지난 프레임의 행성·허브 노드), `screenOf(월드 위치)`(탭할 화면 좌표, CSS px), `tapNode(노드)`(은하 탭 두 단계를 거친다)·`approachedKey()`(다가간 노드 키), `enterStrata(노드)`(바로 들어간다)·`exitStrata()`, `strataState()`, `pickStrataLayer(x, y)`, `openCardList()`(지층 보기의 카드 보기)·`setCardMode('space' | 'list')`·`cardListState()`
-  - 우주 보기(이어서): `noteScreens`(`viewer`, `editor`(`fill({ title, body, tags, tint })`, `setPhotoFile(File)`, `draft()`), `openNote(번호)`, `compose()`, `edit(id)`), `openSearch(검색어)`(찾은 수), `openNodeCards()`(다가간 노드의 카드 보기)
+  - 우주 보기(이어서): `noteScreens`(`viewer`, `editor`(`fill({ title, body, checklist, tags, tint })`, `setPhotoFile(File)`, `draft()`), `openNote(번호)`, `compose()`, `edit(id)`), `openSearch(검색어)`(찾은 수), `openNodeCards()`(다가간 노드의 카드 보기)
   - 로컬 탐색기: `openFiles(File[])`(파일 목록으로 원본을 연다. 폴더 고르기 창은 스크립트로 열 수 없어 확인 스크립트는 `webkitRelativePath`를 붙인 `File`로 폴더 구조를 넘긴다), `view.state()`(원본·폴더·항목 수·기다리는 썸네일·뷰어 파일), `view.navigate(경로)`, `view.openFile(경로)`, `view.viewer`(`step(±1)`, `close()`)
 - `importFiles(File[])`: 설정 화면의 실데이터 불러오기와 같다. 결과 글을 돌려준다. 확인 스크립트는 `OffscreenCanvas.convertToBlob`으로 만든 JPEG 바이트를 `File`로 감싸 넘긴다
 - `ready`: 메모 앨범 저장소를 열고 첫 화면을 띄우면 끝나는 약속. 확인 스크립트는 이것을 기다린 뒤 `demo`를 쓴다

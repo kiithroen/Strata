@@ -27,6 +27,15 @@ describe('parseNoteRecord', () => {
     expect(parseNoteRecord({ v: 1, id: 'x', time: 1, modified: 1, kind: 'memo', photo: { file: 'p', width: 0, height: 3 } })?.photo).toBeUndefined();
     expect(parseNoteRecord({ v: 1, id: 'x', time: 1, modified: 1, kind: 'memo', deleted: true })?.deleted).toBe(true);
   });
+
+  it('체크리스트는 글이 있는 항목만 읽고 체크가 아니면 끝내지 않은 항목이다. 남는 항목이 없으면 뺀다', () => {
+    const r = parseNoteRecord({ v: 1, id: 'x', time: 1, modified: 1, kind: 'memo', checklist: [{ text: '빵', done: true }, { text: '잼', done: 'y' }, { done: true }, 3] });
+    expect(r?.checklist).toEqual([
+      { text: '빵', done: true },
+      { text: '잼', done: false },
+    ]);
+    expect(parseNoteRecord({ v: 1, id: 'x', time: 1, modified: 1, kind: 'memo', checklist: [{ done: true }] })?.checklist).toBeUndefined();
+  });
 });
 
 describe('mergeRecords', () => {

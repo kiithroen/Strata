@@ -1,5 +1,6 @@
 import { tuning } from '../../config';
 import { DAY_MS, UNIT_DAYS, UNITS, addUnits, floorTo, type TimeUnit } from '../../core/calendar';
+import type { ChecklistItem } from '../../core/checklist';
 import { damp } from '../../core/motion';
 import type { NoteKind } from '../noteCard/cardLayout';
 
@@ -191,7 +192,10 @@ export interface NoteRef {
   tags?: readonly string[];
   kind?: NoteKind;
   title?: string;
+  /** 카드·목록에 쓰는 글. 체크리스트 노트는 항목을 줄마다 적은 글이다(checklistText) */
   body?: string;
+  /** 체크리스트 노트의 항목. 노트 보기가 체크 칸으로 그린다 */
+  checklist?: readonly ChecklistItem[];
   /** 메모 포스트잇 색 번호(card.holo.memoColors). 없으면 노트 번호로 고른다 */
   tint?: number;
 }

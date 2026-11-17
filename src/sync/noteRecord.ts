@@ -1,3 +1,4 @@
+import { checklistText, type ChecklistItem } from '../core/checklist';
 import type { NoteKind } from '../widgets/noteCard/cardLayout';
 import type { NoteRef } from '../widgets/timeAxis/axisModel';
 
@@ -16,6 +17,8 @@ export interface NoteRecord {
   kind: NoteKind;
   title?: string;
   body?: string;
+  /** 체크리스트 항목(있으면 체크리스트 노트이고 body 는 없다) */
+  checklist?: ChecklistItem[];
   tags?: string[];
   /** 메모 포스트잇 색 번호 */
   tint?: number;
@@ -52,6 +55,12 @@ export function parseNoteRecord(json: unknown): NoteRecord | null {
   const out: NoteRecord = { v: 1, id: r.id, time: r.time, modified: r.modified, kind: r.kind as NoteKind };
   if (isStr(r.title)) out.title = r.title;
   if (isStr(r.body)) out.body = r.body;
+  if (Array.isArray(r.checklist)) {
+    const items = r.checklist
+      .filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null && isStr((x as Record<string, unknown>).text))
+      .map((x) => ({ text: x.text as string, done: x.done === true }));
+    if (items.length > 0) out.checklist = items;
+  }
   if (Array.isArray(r.tags)) out.tags = r.tags.filter(isStr);
   if (isNum(r.tint)) out.tint = Math.trunc(r.tint);
   const p = r.photo as Record<string, unknown> | undefined;
@@ -118,11 +127,20 @@ export function mergeRecords(local: readonly NoteRecord[], remote: readonly Note
   return { merged, upload, download };
 }
 
-/** 은하에 띄울 노트: 지운 노트를 빼고 최근 것부터 */
+/** 은하에 띄울 노트: 지운 노트를 빼고 최근 것부터. 체크리스트 노트는 항목을 줄마다 적은 글을 body 로 넘겨 카드·목록·검색이 쓴다 */
 export function albumNotes(records: readonly NoteRecord[]): { notes: NoteRef[]; records: NoteRecord[] } {
   const live = records.filter((r) => !r.deleted).sort((a, b) => b.time - a.time || (a.id < b.id ? -1 : 1));
   return {
     records: live,
-    notes: live.map((r) => ({ id: r.id, time: r.time, kind: r.kind, title: r.title, body: r.body, tags: r.tags, tint: r.tint })),
+    notes: live.map((r) => ({
+      id: r.id,
+      time: r.time,
+      kind: r.kind,
+      title: r.title,
+      body: r.checklist ? checklistText(r.checklist) : r.body,
+      checklist: r.checklist,
+      tags: r.tags,
+      tint: r.tint,
+    })),
   };
 }

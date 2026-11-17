@@ -1,5 +1,6 @@
 import { tuning } from '../../config';
 import { draftHasContent, noteKindOf, parseTags, type NoteDraft } from '../../album/albumModel';
+import { checklistToLines, linesToChecklist, type ChecklistItem } from '../../core/checklist';
 import type { NoteKind } from '../noteCard/cardLayout';
 import { releasePhoto, type PhotoSource } from '../noteCard/cardTexture';
 import { button } from './NoteViewer';
@@ -35,6 +36,8 @@ function toLocalInput(time: number): string {
 /**
  * 노트 입력: 새 노트를 쓰거나 저장된 노트를 고치는 2D 화면. 3D 화면 위를 덮는다.
  * 제목, 본문, 태그(쉼표·띄어쓰기로 나눔), 메모 색, 사진, 시각을 받는다. 종류는 사진이 있으면 사진, 본문이 길면 긴 문서, 아니면 메모다.
+ * `체크리스트로`는 본문 줄을 항목으로 바꾸고, `글로 바꾸기`는 항목을 본문 줄로 되돌린다. 항목 칸에서 엔터는 아래에 새 항목을 만들고,
+ * 빈 항목에서 지우기 키는 그 항목을 지운다.
  * 방문 기록과 Esc 는 여는 쪽이 맡는다(hide 는 기록을 건드리지 않는다).
  */
 export class NoteEditor {
@@ -48,6 +51,11 @@ export class NoteEditor {
   private readonly fileInput: HTMLInputElement;
   private readonly titleInput: HTMLInputElement;
   private readonly bodyInput: HTMLTextAreaElement;
+  private readonly checklistBox: HTMLDivElement;
+  private readonly checklistRows: HTMLDivElement;
+  private readonly checklistButton: HTMLButtonElement;
+  /** 체크리스트 노트로 쓰는 중인지 */
+  private checklistMode = false;
   private readonly tagsInput: HTMLInputElement;
   private readonly tagChips: HTMLDivElement;
   private readonly tintRow: HTMLDivElement;
@@ -98,8 +106,9 @@ export class NoteEditor {
     });
     this.pickButton = button('note-button', '사진 고르기', () => this.fileInput.click());
     this.dropButton = button('note-button', '사진 빼기', () => this.dropPhoto());
+    this.checklistButton = button('note-button', '체크리스트로', () => this.setChecklistMode(!this.checklistMode, true));
     const photoRow = el('div', 'note-editor-row note-editor-photo-row');
-    photoRow.append(this.pickButton, this.dropButton, this.fileInput);
+    photoRow.append(this.pickButton, this.dropButton, this.checklistButton, this.fileInput);
 
     this.titleInput = el('input', 'note-editor-input note-editor-title');
     this.titleInput.type = 'text';
@@ -108,6 +117,11 @@ export class NoteEditor {
     this.bodyInput = el('textarea', 'note-editor-input note-editor-text');
     this.bodyInput.placeholder = '내용';
     this.bodyInput.rows = 6;
+    this.checklistBox = el('div', 'note-editor-checklist');
+    this.checklistBox.hidden = true;
+    this.checklistRows = el('div', 'note-editor-checklist');
+    const addItem = button('note-button note-editor-check-add', '+ 항목', () => this.addRow(undefined, null).focus());
+    this.checklistBox.append(this.checklistRows, addItem);
     this.tagsInput = el('input', 'note-editor-input note-editor-tags');
     this.tagsInput.type = 'text';
     this.tagsInput.placeholder = '태그 (쉼표나 띄어쓰기로 나눈다)';
@@ -140,7 +154,7 @@ export class NoteEditor {
     this.status = el('p', 'note-editor-status');
 
     for (const input of [this.titleInput, this.bodyInput, this.tagsInput]) input.addEventListener('input', () => this.refresh());
-    form.append(this.photoBox, photoRow, this.titleInput, this.bodyInput, this.tagsInput, this.tagChips, this.tintRow, timeRow, this.kindNote, this.status);
+    form.append(this.photoBox, photoRow, this.titleInput, this.bodyInput, this.checklistBox, this.tagsInput, this.tagChips, this.tintRow, timeRow, this.kindNote, this.status);
     this.root.append(head, form);
     document.body.appendChild(this.root);
     window.addEventListener('keydown', this.onKey);
@@ -163,6 +177,9 @@ export class NoteEditor {
     this.heading.textContent = initial ? '노트 고치기' : '새 노트';
     this.titleInput.value = d?.title ?? '';
     this.bodyInput.value = d?.body ?? '';
+    this.checklistRows.replaceChildren();
+    for (const item of d?.checklist ?? []) this.addRow(item, null);
+    this.setChecklistMode(d?.checklist !== undefined, false);
     this.tagsInput.value = (d?.tags ?? []).join(' ');
     this.timeInput.value = toLocalInput(d?.time ?? now);
     this.setTint(d?.tint ?? 0);
@@ -198,7 +215,8 @@ export class NoteEditor {
     return {
       time: Number.isFinite(parsed) ? parsed : Date.now(),
       title: this.titleInput.value,
-      body: this.bodyInput.value,
+      body: this.checklistMode ? '' : this.bodyInput.value,
+      checklist: this.checklistMode ? this.items() : undefined,
       tags: parseTags(this.tagsInput.value),
       tint: this.photoSize ? undefined : this.tint,
       photo: this.photoSize,
@@ -206,9 +224,14 @@ export class NoteEditor {
   }
 
   /** 확인 스크립트가 입력 칸을 채운다 */
-  fill(values: { title?: string; body?: string; tags?: string; tint?: number }): void {
+  fill(values: { title?: string; body?: string; checklist?: readonly ChecklistItem[]; tags?: string; tint?: number }): void {
     if (values.title !== undefined) this.titleInput.value = values.title;
     if (values.body !== undefined) this.bodyInput.value = values.body;
+    if (values.checklist !== undefined) {
+      this.checklistRows.replaceChildren();
+      for (const item of values.checklist) this.addRow(item, null);
+      this.setChecklistMode(true, false);
+    }
     if (values.tags !== undefined) this.tagsInput.value = values.tags;
     if (values.tint !== undefined) this.setTint(values.tint);
     this.refresh();
@@ -238,6 +261,99 @@ export class NoteEditor {
       const taken = await this.options.readTakenAt(file);
       if (taken !== undefined && gen === this.generation && !this.timeTouched) this.timeInput.value = toLocalInput(taken);
     }
+  }
+
+  /** 지금 항목 줄들(빈 항목 포함) */
+  private items(): ChecklistItem[] {
+    return [...this.checklistRows.querySelectorAll<HTMLElement>('.note-editor-check')].map((row) => ({
+      text: row.querySelector<HTMLInputElement>('.note-editor-check-text')?.value ?? '',
+      done: row.querySelector<HTMLInputElement>('.note-editor-check-box')?.checked ?? false,
+    }));
+  }
+
+  /**
+   * 체크리스트로 쓰거나 글로 되돌린다. convert 면 본문 줄을 항목으로(켤 때), 항목을 본문 줄로(끌 때) 옮긴다.
+   * 켰을 때 항목이 없으면 빈 항목 하나를 두고, 사람이 누른 것이면(convert) 마지막 항목에 입력 초점을 둔다
+   */
+  private setChecklistMode(on: boolean, convert: boolean): void {
+    if (convert && on && !this.checklistMode) {
+      this.checklistRows.replaceChildren();
+      for (const item of linesToChecklist(this.bodyInput.value)) this.addRow(item, null);
+      this.bodyInput.value = '';
+    } else if (convert && !on && this.checklistMode) {
+      this.bodyInput.value = checklistToLines(this.items());
+      this.checklistRows.replaceChildren();
+    }
+    this.checklistMode = on;
+    if (on && this.checklistRows.childElementCount === 0) this.addRow(undefined, null);
+    this.bodyInput.hidden = on;
+    this.checklistBox.hidden = !on;
+    this.checklistButton.textContent = on ? '글로 바꾸기' : '체크리스트로';
+    if (convert) {
+      const focusTarget = on
+        ? this.checklistRows.lastElementChild?.querySelector<HTMLInputElement>('.note-editor-check-text')
+        : this.bodyInput;
+      focusTarget?.focus({ preventScroll: true });
+    }
+    this.refresh();
+  }
+
+  /** after 줄 뒤에(null 이면 맨 끝에) 항목 줄을 더하고 그 글 칸을 돌려준다 */
+  private addRow(item: ChecklistItem | undefined, after: HTMLElement | null): HTMLInputElement {
+    const row = el('div', 'note-editor-check');
+    const box = el('input', 'note-editor-check-box');
+    box.type = 'checkbox';
+    box.checked = item?.done ?? false;
+    box.setAttribute('aria-label', '끝냄');
+    const text = el('input', 'note-editor-input note-editor-check-text');
+    text.type = 'text';
+    text.value = item?.text ?? '';
+    text.placeholder = '항목';
+    text.enterKeyHint = 'next';
+    const remove = button('note-button note-editor-check-remove', '✕', () => this.removeRow(row, false));
+    remove.setAttribute('aria-label', '항목 지우기');
+    box.addEventListener('change', () => {
+      row.classList.toggle('done', box.checked);
+      this.refresh();
+    });
+    text.addEventListener('input', () => this.refresh());
+    text.addEventListener('keydown', (e) => {
+      // 한글 조합 중의 엔터·지우기는 조합을 끝내는 입력이라 건드리지 않는다
+      if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this.addRow(undefined, row).focus();
+      } else if (e.key === 'Backspace' && text.value === '' && this.checklistRows.childElementCount > 1) {
+        e.preventDefault();
+        this.removeRow(row, true);
+      }
+    });
+    row.append(box, text, remove);
+    if (after) after.after(row);
+    else this.checklistRows.append(row);
+    row.classList.toggle('done', box.checked);
+    this.refresh();
+    return text;
+  }
+
+  /** 항목 줄을 지운다. focusPrev 면 위 줄(없으면 아래 줄) 끝에 입력 초점을 둔다. 마지막 한 줄은 비우기만 한다 */
+  private removeRow(row: HTMLElement, focusPrev: boolean): void {
+    const neighbor = (row.previousElementSibling ?? row.nextElementSibling) as HTMLElement | null;
+    if (!neighbor) {
+      const text = row.querySelector<HTMLInputElement>('.note-editor-check-text');
+      if (text) text.value = '';
+      this.refresh();
+      return;
+    }
+    row.remove();
+    if (focusPrev) {
+      const text = neighbor.querySelector<HTMLInputElement>('.note-editor-check-text');
+      if (text) {
+        text.focus({ preventScroll: true });
+        text.setSelectionRange(text.value.length, text.value.length);
+      }
+    }
+    this.refresh();
   }
 
   private dropPhoto(): void {

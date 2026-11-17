@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Album } from '../src/album/album';
 import type { NoteDraft } from '../src/album/albumModel';
 import { MemoryNoteStore } from '../src/album/noteStore';
+import { checklistText } from '../src/core/checklist';
 
 const t0 = new Date(2026, 10, 18, 9, 0).getTime();
 const draft = (title: string, time: number): NoteDraft => ({ time, title, body: '', tags: [] });
@@ -62,5 +63,43 @@ describe('Album', () => {
     await album.save(draft('사진 뺌', t0), null, a.id);
     expect(await store.photo(a.id)).toBeNull();
     expect(album.record(a.id)?.kind).toBe('memo');
+  });
+});
+
+describe('Album 체크리스트', () => {
+  it('항목을 체크하면 바로 저장하고 수정 시각이 늦어지며, 띄우는 노트 글도 바뀐다', async () => {
+    const { album, store, tick } = clockAlbum();
+    const a = await album.save({
+      ...draft('장보기', t0),
+      checklist: [
+        { text: '우유', done: false },
+        { text: '  ', done: false },
+        { text: '빵', done: false },
+      ],
+    });
+    expect(album.record(a.id)?.checklist).toEqual([
+      { text: '우유', done: false },
+      { text: '빵', done: false },
+    ]);
+    expect(album.record(a.id)?.body).toBeUndefined();
+    tick(300);
+    await album.check(a.id, 1, true);
+    const checked = [
+      { text: '우유', done: false },
+      { text: '빵', done: true },
+    ];
+    expect(album.record(a.id)).toMatchObject({ checklist: checked, modified: t0 + 300 });
+    expect(album.data()?.notes[0]).toMatchObject({ checklist: checked, body: checklistText(checked) });
+    const [stored] = await store.list();
+    expect(stored.checklist).toEqual(checked);
+  });
+
+  it('없는 항목이나 같은 상태로는 바꾸지 않는다', async () => {
+    const { album, tick } = clockAlbum();
+    const a = await album.save({ ...draft('목록', t0), checklist: [{ text: '하나', done: true }] });
+    tick(100);
+    await album.check(a.id, 0, true);
+    await album.check(a.id, 5, false);
+    expect(album.record(a.id)?.modified).toBe(t0);
   });
 });

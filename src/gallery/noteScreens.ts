@@ -1,11 +1,12 @@
 import type { NoteDraft } from '../album/albumModel';
+import { checklistText } from '../core/checklist';
 import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 import { NoteEditor, type EditorResult } from '../widgets/noteView/NoteEditor';
 import { NoteViewer } from '../widgets/noteView/NoteViewer';
 import { sequenceOf, stepSequence, type NoteSequence } from '../widgets/noteView/noteNav';
 import type { NoteRef } from '../widgets/timeAxis/axisModel';
 import type { CosmosView } from './cosmosDemo';
-import { OverlayStack } from './overlayStack';
+import { OverlayStack, type OverlayLayer } from './overlayStack';
 
 /** 앨범을 다시 띄울 때 보여 줄 것: 새로 쓴 노트의 묶음(focusNote) 또는 보던 화면(view), 그리고 노트 보기로 열 노트(openNote) */
 export interface AlbumReload {
@@ -23,6 +24,8 @@ export interface AlbumActions {
   /** 입력 내용을 저장하고 노트 번호를 돌려준다(id 가 없으면 새 노트). 화면은 바꾸지 않는다 */
   save(result: EditorResult, id?: string): Promise<string>;
   remove(id: string): Promise<void>;
+  /** 체크리스트 항목 하나의 체크를 바꿔 바로 저장한다. 화면은 바꾸지 않는다 */
+  check(id: string, index: number, done: boolean): Promise<void>;
   /** 앨범을 다시 띄운다 */
   reload(target: AlbumReload): void;
   readTakenAt?: (file: File) => Promise<number | undefined>;
@@ -34,6 +37,7 @@ export interface AlbumActions {
  * 보던 화면을 되살린다(고쳤으면 그 노트의 보기 화면도 다시 연다).
  * 보기 화면은 연 자리의 노트 묶음(카드 목록의 묶음, 검색 결과의 묶음, 은하의 행성) 안에서 이전·다음으로 넘긴다.
  * 넘겨도 방문 기록은 쌓지 않아 뒤로 한 번에 보기 화면을 닫는다.
+ * 보기 화면에서 체크리스트 항목을 체크하면 바로 저장하고, 보기 화면을 닫을 때 앨범을 다시 띄워 카드에도 반영한다(보던 화면은 되살린다).
  */
 export class NoteScreens {
   readonly viewer: NoteViewer;
@@ -43,9 +47,23 @@ export class NoteScreens {
   private editing: string | undefined;
   /** 보기 화면이 넘길 차례 */
   private sequence: NoteSequence | null = null;
+  /** 보기 화면에서 체크를 바꿨는지. 닫을 때 앨범을 다시 띄운다 */
+  private checked = false;
+  /** 저장·삭제·체크 반영으로 화면을 모두 닫는 중인지 */
+  private leaving = false;
+  /** 방문 기록에 쌓는 보기 화면. 닫힐 때 체크를 바꿨으면 앨범을 다시 띄운다 */
+  private readonly viewerLayer: OverlayLayer = {
+    hide: () => {
+      this.viewer.hide();
+      if (this.checked && !this.leaving) {
+        this.checked = false;
+        void this.refresh().catch((err) => console.error(err));
+      }
+    },
+  };
   /** 방향키는 보기 화면이 맨 위에 있을 때만 넘긴다(입력 화면의 글 칸에서는 커서를 옮긴다) */
   private readonly onKey = (e: KeyboardEvent) => {
-    if (this.stack.top !== this.viewer || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (this.stack.top !== this.viewerLayer || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
     this.step(e.key === 'ArrowRight' ? 1 : -1);
@@ -64,10 +82,11 @@ export class NoteScreens {
   ) {
     const editable = album !== undefined;
     this.viewer = new NoteViewer({
-      onClose: () => this.stack.back(),
+      onClose: () => void this.back(),
       onEdit: editable ? (id) => this.edit(id) : undefined,
       onDelete: editable ? (id) => void this.remove(id).catch((err) => console.error(err)) : undefined,
       onStep: (dir) => this.step(dir),
+      onCheck: editable ? (id, index, done) => void this.check(id, index, done) : undefined,
     });
     window.addEventListener('keydown', this.onKey);
     this.editor = album
@@ -87,7 +106,11 @@ export class NoteScreens {
   /** 맨 위 화면을 닫는다(Esc). 열린 화면이 없으면 false */
   back(): boolean {
     if (this.stack.depth === 0) return false;
-    this.stack.back();
+    // 체크를 바꾼 보기 화면은 그 기록까지 한꺼번에 되돌리고 앨범을 다시 띄운다
+    if (this.stack.top === this.viewerLayer && this.checked) {
+      this.checked = false;
+      void this.refresh().catch((err) => console.error(err));
+    } else this.stack.back();
     return true;
   }
 
@@ -121,6 +144,7 @@ export class NoteScreens {
         kind: note.kind ?? 'photo',
         title: note.title,
         body: note.body,
+        checklist: note.checklist,
         tags: note.tags ?? [],
         tint: note.tint,
         photo: this.photos[index],
@@ -129,7 +153,7 @@ export class NoteScreens {
       { position: seq.position, total: seq.members.length },
       enter,
     );
-    if (!this.stack.has(this.viewer)) this.stack.push(this.viewer);
+    if (!this.stack.has(this.viewerLayer)) this.stack.push(this.viewerLayer);
   }
 
   /** 새 노트 입력 화면을 연다 */
@@ -168,6 +192,38 @@ export class NoteScreens {
     album.reload(editing === undefined ? { focusNote: id } : { view, openNote: id });
   }
 
+  /** 체크를 저장하고 이 화면의 노트에도 적어 둔다(넘겼다 돌아와도 보이게). 실패하면 보기 화면을 저장된 상태로 다시 그린다 */
+  private async check(id: string, index: number, done: boolean): Promise<void> {
+    const album = this.album;
+    if (!album) return;
+    try {
+      await album.check(id, index, done);
+    } catch (err) {
+      console.error(err);
+      if (this.viewer.current === id && this.sequence) this.showSequence(this.sequence);
+      return;
+    }
+    const note = this.notes.find((n) => n.id === id);
+    const items = note?.checklist;
+    if (!note || !items?.[index]) return;
+    const next = items.map((item, i) => (i === index ? { text: item.text, done } : item));
+    note.checklist = next;
+    note.body = checklistText(next);
+    this.checked = true;
+  }
+
+  /**
+   * 체크를 바꾼 보기 화면을 닫는다(이미 뒤로 닫혔으면 그 아래부터): 열린 화면과 아래 화면을 닫고 기록을 되돌린 뒤
+   * 보던 화면으로 앨범을 다시 띄운다
+   */
+  private async refresh(): Promise<void> {
+    const album = this.album;
+    if (!album) return;
+    const view = this.snapshot();
+    await this.leave();
+    album.reload({ view });
+  }
+
   private async remove(id: string): Promise<void> {
     const album = this.album;
     if (!album) return;
@@ -179,6 +235,7 @@ export class NoteScreens {
 
   /** 열린 화면과 아래 화면을 닫고 그동안 쌓인 기록을 되돌린다 */
   private async leave(): Promise<void> {
+    this.leaving = true;
     const count = this.stack.hideAll() + this.dismissBelow();
     await this.stack.rewind(count);
   }

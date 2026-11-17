@@ -47,6 +47,9 @@ const actions: AlbumActions = {
     return (await album.save(next, blob, id)).id;
   },
   remove: (id) => album.remove(id),
+  check: async (id, index, done) => {
+    await album.check(id, index, done);
+  },
   reload: (target) => appHooks.showAlbum?.(target),
   readTakenAt,
 };

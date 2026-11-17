@@ -1,4 +1,5 @@
 import { tuning } from '../../config';
+import type { ChecklistItem } from '../../core/checklist';
 import { formatStamp } from '../../core/format';
 import type { NoteKind } from '../noteCard/cardLayout';
 import { holoTint, releasePhoto, type PhotoSource } from '../noteCard/cardTexture';
@@ -11,6 +12,8 @@ export interface ViewedNote {
   kind: NoteKind;
   title?: string;
   body?: string;
+  /** 있으면 체크리스트 노트다. 본문 대신 체크 칸 목록을 그린다 */
+  checklist?: readonly ChecklistItem[];
   tags: readonly string[];
   tint?: number;
   photo?: PhotoSource;
@@ -23,6 +26,8 @@ export interface NoteViewerOptions {
   onEdit?: (id: string) => void;
   /** 삭제 단추를 두 번 눌렀을 때(고칠 수 있는 노트만 보인다) */
   onDelete?: (id: string) => void;
+  /** 체크리스트 항목의 체크 칸을 눌렀을 때(고칠 수 있는 노트만 누를 수 있다) */
+  onCheck?: (id: string, index: number, done: boolean) => void;
   /** 이전(-1)·다음(1) 노트로 넘길 때(단추·가로 끌기). 방향키는 여는 쪽이 맡는다 */
   onStep?: (dir: 1 | -1) => void;
 }
@@ -130,7 +135,8 @@ export class NoteViewer {
       t.textContent = note.title;
       page.append(t);
     }
-    if (note.body) {
+    if (note.checklist) page.append(this.checklist(note.id, note.checklist, editable && this.options.onCheck !== undefined));
+    else if (note.body) {
       const b = el('p', 'note-viewer-text');
       b.textContent = note.body;
       page.append(b);
@@ -214,6 +220,30 @@ export class NoteViewer {
 
   private page(): HTMLElement | null {
     return this.body.querySelector<HTMLElement>('.note-viewer-page');
+  }
+
+  /** 체크 칸 목록. checkable 이 아니면 칸을 누를 수 없다 */
+  private checklist(id: string, items: readonly ChecklistItem[], checkable: boolean): HTMLElement {
+    const list = el('ul', 'note-viewer-checklist');
+    items.forEach((item, index) => {
+      const li = el('li', 'note-check');
+      li.classList.toggle('done', item.done);
+      const label = el('label', 'note-check-label');
+      const box = el('input', 'note-check-box');
+      box.type = 'checkbox';
+      box.checked = item.done;
+      box.disabled = !checkable;
+      box.addEventListener('change', () => {
+        li.classList.toggle('done', box.checked);
+        this.options.onCheck?.(id, index, box.checked);
+      });
+      const text = el('span', 'note-check-text');
+      text.textContent = item.text;
+      label.append(box, text);
+      li.append(label);
+      list.append(li);
+    });
+    return list;
   }
 
   private onDeleteClick(): void {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
+import { checklistText } from '../src/core/checklist';
 import { parseKeepNote } from '../src/dev/keepNote';
 
 describe('parseKeepNote', () => {
@@ -11,9 +12,14 @@ describe('parseKeepNote', () => {
     expect(n).toEqual({ time: created, kind: 'memo', title: '장보기', body: '우유, 계란', tags: ['일상'] });
   });
 
-  it('체크리스트는 항목마다 한 줄로 잇는다', () => {
-    const n = parseKeepNote({ ...base, listContent: [{ text: '빵', isChecked: false }, { text: '', isChecked: true }, { text: '잼' }] });
-    expect(n?.body).toBe('- 빵\n- 잼');
+  it('체크리스트는 빈 항목을 빼고 항목과 체크 상태를 읽으며, 본문은 항목 글이다', () => {
+    const n = parseKeepNote({ ...base, listContent: [{ text: '빵', isChecked: true }, { text: '', isChecked: true }, { text: ' 잼 ' }] });
+    const checklist = [
+      { text: '빵', done: true },
+      { text: '잼', done: false },
+    ];
+    expect(n?.checklist).toEqual(checklist);
+    expect(n?.body).toBe(checklistText(checklist));
   });
 
   it('본문이 기준 길이 이상이면 긴 문서다', () => {
