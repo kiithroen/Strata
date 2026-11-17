@@ -184,7 +184,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const palette = g.hourColors.map((hex) => new Color(hex));
   const noteColors = notes.map((n) => palette[hourColorIndex(n.time)]);
   const branchColor = new Color(g.branchColor);
-  const hubColor = new Color(g.hubColor);
 
   /** 3차원 구면 나선의 기준 시계열 공간(줌·이동 중에도 노드 배치와 묶음이 흔들리지 않도록 고정한다) */
   const spiralState: AxisState = { focusTime: newest, logScale: levelLogScale('month') };
@@ -211,7 +210,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       jitter: planetJitter(cluster.key),
       fade: 0,
       color,
-      coreColor: color.clone().lerp(hubColor, g.nodeColor.coreMix),
       radius: planetRadius(n),
       size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
       glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
@@ -232,7 +230,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       hub,
       childOffsets: hub.children.map((ci) => planets[ci].offsetS),
       color,
-      coreColor: color.clone().lerp(hubColor, g.nodeColor.coreMix),
       label: planetLabel(parent ?? unit, hub.bucket, hub.notes),
       node: { kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: new Vector3() } as CosmosNode,
     };
@@ -266,6 +263,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const branchC2 = new Vector3();
   const branchTangent = new Vector3();
   const branchSegs = g.branchSegments;
+  /** 노드 구슬의 가장 큰 화면 반지름(CSS px). 글자는 그 바깥에 놓는다 */
+  const orbRadiusPx = g.orbPx[1] / 2;
   const branchPoints = Array.from({ length: branchSegs + 1 }, () => new Vector3());
   const branchAlphas = new Array<number>(branchSegs + 1);
   const spineCount = Math.max(hubViews.length, planets.length);
@@ -649,11 +648,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
 
         const alpha = planet.fade * cosmosFade(dist);
         planetAlphas[pi] = alpha;
-        graph.dot(pos, planet.coreColor, planet.size, alpha);
+        graph.orb(pos, planet.color, planet.size, alpha);
         graph.glow(pos, planet.color, planet.glowSize * glowOf(planet.node.key), g.glowAlpha * alpha);
-        graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -c.planetLabelPx * 1.2);
+        graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -(orbRadiusPx + c.planetLabelPx * 0.8));
         const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
-        drawCloud(cloudLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition);
+        drawCloud(cloudLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition, planet.color);
 
         facingQuaternion(pos, cameraPosition, burstQuat);
         const r = planet.radius;
@@ -723,9 +722,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         const hp = hubPoint(view.childOffsets, orbitClock, view.node.position);
         const hubAlpha = cosmosFade(hp.distanceTo(cameraPosition));
         hubAlphas[hi] = hubAlpha;
-        graph.dot(hp, view.coreColor, g.hubSize, hubAlpha);
+        graph.orb(hp, view.color, g.hubSize, hubAlpha);
         graph.glow(hp, view.color, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
-        graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, g.hubLabelPx * 1.1);
+        graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, orbRadiusPx + g.hubLabelPx * 0.7);
       }
       const drawSpine = (spineNodes: readonly { node: CosmosNode }[], alphas: readonly number[]) => {
         const n = spineNodes.length;

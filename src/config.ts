@@ -288,26 +288,27 @@ export const tuning = {
     /**
      * 선 그래프. 선 굵기는 CSS px, 점·빛 크기는 월드 단위 지름이다.
      * branchBend: 허브에서 자식 행성으로 가는 곡선 가지의 제어점. 허브 쪽은 척추 접선 방향으로, 행성 쪽은 허브 쪽으로 허브-행성 거리의 이 비율만큼 당긴다.
-     * nodeColor: 노드(행성·허브)마다 키로 고르는 색의 채도·명도 범위와 중심 점을 hubColor 와 섞는 비율.
+     * nodeColor: 노드(행성·허브)마다 키로 고르는 색의 채도·명도 범위. 노드는 흰 코어를 그 색 테두리가 감싼 구슬이다.
      * burst: 노드에서 노트 점이 방사형으로 퍼지는 원판(안쪽 반지름, 간격, 앞뒤 흔들림, 회전 속도).
      * hourColors: 노트가 찍힌 시각(4시간 단위)별 점 색
      */
     graph: {
-      branchWidth: 5.2,
+      branchWidth: 2.8,
       branchSegments: 14,
       branchBend: [0.38, 0.28],
       spokeWidth: 1.0,
       branchColor: '#5cd8ff',
-      hubColor: '#e4f8ff',
-      nodeColor: { saturation: [0.82, 1.0], lightness: [0.46, 0.6], coreMix: 0.62 },
-      branchAlpha: 0.62,
+      nodeColor: { saturation: [0.82, 1.0], lightness: [0.46, 0.6] },
+      branchAlpha: 0.55,
       spokeAlpha: 0.55,
-      nodeSize: 0.08,
-      hubSize: 0.11,
+      nodeSize: 0.26,
+      hubSize: 0.34,
+      /** 노드 구슬이 화면에서 차지하는 지름의 하한·상한(CSS px). 가까이 가도 노드가 커지지 않는다 */
+      orbPx: [6, 18],
       dotSize: 0.055,
-      glowSize: 1.65,
-      hubGlowSize: 2.5,
-      glowAlpha: 0.24,
+      glowSize: 0.6,
+      hubGlowSize: 0.9,
+      glowAlpha: 0.4,
       /** 허브 글자 높이(CSS px) */
       hubLabelPx: 15,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
@@ -369,7 +370,7 @@ export const tuning = {
      * 성운 배경. bakeSize 가 0 이면 매 프레임 화면 해상도로 계산하고, 양수면 그 크기(px)의 큐브맵에 구워 두고
      * refreshSeconds(게임 시간)마다 다시 굽는다. intensity 는 성운 밝기 배율이다
      */
-    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, intensity: 0.72, colors: ['#0d2b80', '#075c7a', '#1e1894'] },
+    nebula: { visible: true, bakeSize: 0, refreshSeconds: 2, intensity: 0.26, colors: ['#0d2b80', '#075c7a', '#1e1894'] },
   },
 
   /**
@@ -426,7 +427,8 @@ export const tuning = {
    * 태그 워드 클라우드: 카드가 멀어 작아지면 그 묶음(은하의 행성, 지층의 층) 위에 많이 쓰인 태그가 낱말로 떠오른다.
    * show·hide 는 카드 높이가 화면 높이에서 차지하는 비율로, show 범위에서 작아질수록 낱말이 나타나고 hide 범위에서 카드가 사라진다.
    * maxWords 는 묶음마다 보이는 낱말 수, px 는 가장 적게~가장 많이 쓰인 태그의 글자 높이(CSS px), gapPx 는 낱말 사이 여백,
-   * liftPx 는 낱말 묶음 중심을 노드·층 판 위로 올리는 거리(CSS px), alpha 는 가장 또렷할 때의 불투명도다
+   * liftPx 는 낱말 묶음 중심을 노드·층 판 위로 올리는 거리(CSS px), alpha 는 가장 또렷할 때의 불투명도,
+   * tintLift 는 노드 색 낱말이 많이 쓰일수록 흰색 쪽으로 밝아지는 최대 비율이다
    */
   cloud: {
     maxWords: 5,
@@ -436,6 +438,7 @@ export const tuning = {
     hide: [0.04, 0.022],
     liftPx: 30,
     alpha: 0.92,
+    tintLift: 0.3,
   },
 
   dev: {

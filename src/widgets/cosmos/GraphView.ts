@@ -7,6 +7,7 @@ import {
   DynamicDrawUsage,
   Group,
   Mesh,
+  NormalBlending,
   Points,
   ShaderMaterial,
   Vector2,
@@ -21,7 +22,7 @@ import type { LabelCache } from '../common/labelCache';
 import { ScreenLabels } from '../common/screenLabels';
 
 /**
- * 우주 보기의 선 그래프: 가지(연속 발광 곡선 리본), 살(행성 → 카드/점 직선), 점, 빛 무리, 글자.
+ * 우주 보기의 선 그래프: 가지(연속 발광 곡선 리본), 살(행성 → 카드/점 직선), 점, 노드 구슬, 빛 무리, 글자.
  * 매 프레임 begin() 다음 그릴 것을 넣고 end() 로 한 번에 올린다. 모두 가산 합성이라 겹칠수록 밝다.
  */
 export class GraphView {
@@ -29,6 +30,7 @@ export class GraphView {
   private readonly branches: RibbonBatch;
   private readonly spokes: LineBatch;
   private readonly dots: PointBatch;
+  private readonly orbs: PointBatch;
   private readonly glows: PointBatch;
   private readonly labels: ScreenLabels;
   /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
@@ -41,9 +43,10 @@ export class GraphView {
     this.spokes = new LineBatch(maxSegments, g.spokeWidth);
     // 카드를 먼저 그린 뒤 살을 그려 카드 뒤로 들어가는 선 끝은 테두리에서 가려지고 앞의 선은 보인다
     this.spokes.line.renderOrder = 1;
-    this.dots = new PointBatch(maxPoints, false);
-    this.glows = new PointBatch(maxPoints, true);
-    this.group.add(this.glows.points, this.branches.mesh, this.spokes.line, this.dots.points, this.labels.group);
+    this.dots = new PointBatch(maxPoints, 'dot');
+    this.orbs = new PointBatch(maxPoints, 'orb');
+    this.glows = new PointBatch(maxPoints, 'glow');
+    this.group.add(this.glows.points, this.branches.mesh, this.spokes.line, this.dots.points, this.orbs.points, this.labels.group);
   }
 
   /** 화면 크기(CSS px)와 시야각이 바뀌면 다시 맞춘다 */
@@ -52,6 +55,9 @@ export class GraphView {
     this.spokes.setResolution(width, height);
     const scale = (height * pixelRatio) / (2 * Math.tan((fovDeg * Math.PI) / 360));
     this.dots.setScale(scale);
+    this.orbs.setScale(scale);
+    const [minPx, maxPx] = tuning.cosmos.graph.orbPx;
+    this.orbs.setSizeLimits(minPx * pixelRatio, maxPx * pixelRatio);
     this.glows.setScale(scale);
     this.labels.setViewport(height, fovDeg);
   }
@@ -60,6 +66,7 @@ export class GraphView {
     this.branches.begin();
     this.spokes.begin();
     this.dots.begin();
+    this.orbs.begin();
     this.glows.begin();
     this.labels.begin();
   }
@@ -77,19 +84,25 @@ export class GraphView {
     this.dots.add(p, color, size, alpha * this.alphaScale);
   }
 
+  /** 노드 구슬: 흰 코어를 color 테두리가 감싼다 */
+  orb(p: Vector3, color: Color, size: number, alpha: number): void {
+    this.orbs.add(p, color, size, alpha * this.alphaScale);
+  }
+
   glow(p: Vector3, color: Color, size: number, alpha: number): void {
     this.glows.add(p, color, size, alpha * this.alphaScale);
   }
 
   /** 카메라를 향한 글자. 거리와 상관없이 화면에서 heightPx(CSS px) 높이로 보이고, 화면 위쪽으로 offsetPx 만큼 옮겨 놓는다(음수면 아래) */
-  label(p: Vector3, text: string, heightPx: number, alpha: number, cameraPosition: Vector3, offsetPx = 0): void {
-    this.labels.add(p, text, heightPx, alpha * this.alphaScale, cameraPosition, 0, offsetPx);
+  label(p: Vector3, text: string, heightPx: number, alpha: number, cameraPosition: Vector3, offsetPx = 0, color?: Color): void {
+    this.labels.add(p, text, heightPx, alpha * this.alphaScale, cameraPosition, 0, offsetPx, color);
   }
 
   end(): void {
     this.branches.end();
     this.spokes.end();
     this.dots.end();
+    this.orbs.end();
     this.glows.end();
     this.labels.end();
   }
@@ -98,6 +111,7 @@ export class GraphView {
     this.branches.dispose();
     this.spokes.dispose();
     this.dots.dispose();
+    this.orbs.dispose();
     this.glows.dispose();
     this.labels.dispose();
   }
@@ -371,7 +385,7 @@ class PointBatch {
 
   constructor(
     private readonly max: number,
-    soft: boolean,
+    kind: 'dot' | 'orb' | 'glow',
   ) {
     const geometry = new BufferGeometry();
     this.position = new BufferAttribute(new Float32Array(max * 3), 3).setUsage(DynamicDrawUsage);
@@ -386,6 +400,7 @@ class PointBatch {
     const material = new ShaderMaterial({
       uniforms: {
         uScale: { value: 1 },
+        uSizeLimits: { value: new Vector2(1.5, 4096) },
         uFogNear: { value: c.fogNear },
         uFogFar: { value: c.fogFar },
       },
@@ -394,6 +409,7 @@ class PointBatch {
         attribute float aSize;
         attribute float aAlpha;
         uniform float uScale;
+        uniform vec2 uSizeLimits;
         uniform float uFogNear;
         uniform float uFogFar;
         varying vec3 vColor;
@@ -401,23 +417,38 @@ class PointBatch {
         void main() {
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = max(1.5, aSize * uScale / max(-mv.z, 0.1));
+          gl_PointSize = clamp(aSize * uScale / max(-mv.z, 0.1), uSizeLimits.x, uSizeLimits.y);
           vColor = aColor;
           vAlpha = aAlpha * (1.0 - smoothstep(uFogNear, uFogFar, -mv.z) * 0.85);
         }
       `,
-      fragmentShader: soft
-        ? /* glsl */ `
+      fragmentShader:
+        kind === 'glow'
+          ? /* glsl */ `
         varying vec3 vColor;
         varying float vAlpha;
         void main() {
           float d = length(gl_PointCoord - 0.5) * 2.0;
-          float a = (exp(-d * d * 5.2) + 0.35 * exp(-d * d * 1.8)) * vAlpha;
+          // 넓은 번짐도 원 가장자리에서 0 으로 끊어 점 사각형 경계가 드러나지 않게 한다
+          float a = (exp(-d * d * 5.2) + 0.35 * exp(-d * d * 1.8)) * (1.0 - smoothstep(0.7, 1.0, d)) * vAlpha;
           gl_FragColor = vec4(vColor, a);
           #include <colorspace_fragment>
         }
       `
-        : /* glsl */ `
+          : kind === 'orb'
+            ? /* glsl */ `
+        varying vec3 vColor;
+        varying float vAlpha;
+        void main() {
+          // 흰 코어, 노드 색 테두리, 가장자리는 부드럽게 끊는다
+          float d = length(gl_PointCoord - 0.5) * 2.0;
+          float core = smoothstep(0.42, 0.22, d);
+          float a = smoothstep(1.0, 0.82, d) * vAlpha;
+          gl_FragColor = vec4(mix(vColor, vec3(1.0), core), a);
+          #include <colorspace_fragment>
+        }
+      `
+            : /* glsl */ `
         varying vec3 vColor;
         varying float vAlpha;
         void main() {
@@ -427,17 +458,23 @@ class PointBatch {
           #include <colorspace_fragment>
         }
       `,
-      blending: AdditiveBlending,
+      // 구슬은 일반 합성이라 겹친 빛에 하얗게 포화되지 않고 테두리 색이 남는다. 나머지는 가산 합성이다
+      blending: kind === 'orb' ? NormalBlending : AdditiveBlending,
       transparent: true,
       depthWrite: false,
     });
     this.points = new Points(geometry, material);
     this.points.frustumCulled = false;
-    if (soft) this.points.renderOrder = -1;
+    if (kind === 'glow') this.points.renderOrder = -1;
   }
 
   setScale(scale: number): void {
     this.points.material.uniforms.uScale.value = scale;
+  }
+
+  /** 화면에 그리는 점 지름의 하한·상한(기기 px) */
+  setSizeLimits(min: number, max: number): void {
+    this.points.material.uniforms.uSizeLimits.value.set(min, max);
   }
 
   begin(): void {
