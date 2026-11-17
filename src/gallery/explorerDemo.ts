@@ -8,6 +8,7 @@ import {
   reopenDirectory,
 } from '../widgets/explorer/browserSources';
 import { ExplorerView } from '../widgets/explorer/ExplorerView';
+import { folderNotes } from '../widgets/explorer/explorerNotes';
 import type { FileSource } from '../widgets/explorer/fileSource';
 import { appHooks } from './appHooks';
 import type { Stage, WidgetDemo } from './stage';
@@ -31,7 +32,7 @@ function pickWithInput(): Promise<FileSource | null> {
   });
 }
 
-/** 로컬 탐색기 모드: 폴더를 골라 2D 격자로 훑고 사진·동영상·음악·텍스트를 뷰어로 연다 */
+/** 로컬 탐색기 모드: 폴더를 골라 2D 격자로 훑고 사진·동영상·음악·텍스트를 뷰어로 연다. 은하로 보기는 하위 폴더까지 폴더 축으로 띄운다 */
 export function mountExplorerDemo(_stage: Stage): ExplorerDemo {
   const view = new ExplorerView({
     pickSource: () => (canPickDirectory() ? pickDirectory() : pickWithInput()),
@@ -43,8 +44,17 @@ export function mountExplorerDemo(_stage: Stage): ExplorerDemo {
     onSource: (source) => {
       if (source instanceof HandleSource) void rememberDirectory(source.root);
     },
-    showInCosmos: appHooks.showInCosmos ?? undefined,
+    showInCosmos: async (source, dir, progress) => {
+      const show = appHooks.showNotes;
+      if (!show) return '';
+      const result = await folderNotes(source, dir, (done, total) => progress(`은하로 여는 중 ${done}/${total}`));
+      if (result.files === 0) return '은하에 띄울 파일이 없다';
+      return show(result.data, { source, dir });
+    },
   });
+  // 은하에서 돌아왔으면 보던 원본·폴더를 다시 연다
+  const resume = appHooks.explorerResume;
+  if (resume) void view.setSource(resume.source, resume.dir);
   return {
     title: 'EXPLORER',
     hint: '폴더: 들어가기 · 파일: 열기 · 백스페이스: 위로 · 방향키: 다음·이전',

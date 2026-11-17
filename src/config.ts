@@ -430,7 +430,9 @@ export const tuning = {
    * 로컬 탐색기. tileMinPx 는 썸네일 격자 칸의 최소 폭(CSS px), thumbPx 는 썸네일을 디코딩하는 폭(CSS px, 기기 픽셀 비율을 곱해 쓴다),
    * decodeConcurrency 는 동시에 디코딩하는 썸네일 수, preloadPx 는 화면 밖 얼마나 미리 썸네일을 만들지(CSS px),
    * textMaxBytes 는 텍스트 뷰어가 앞에서부터 읽는 최대 바이트, swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
-   * kindColors 는 칸 종류 색이다
+   * kindColors 는 칸 종류 색이다.
+   * 은하로 보기: cosmosMaxFiles 는 하위 폴더까지 카드로 만드는 파일 수 상한, readConcurrency 는 동시에 읽는 파일 수,
+   * cardTextBytes 는 텍스트 문서 카드에 담는 앞부분 바이트, videoThumbAt 은 동영상 카드에 쓰는 장면 자리(길이 대비)다
    */
   explorer: {
     tileMinPx: 150,
@@ -439,6 +441,10 @@ export const tuning = {
     preloadPx: 480,
     textMaxBytes: 2_000_000,
     swipePx: 60,
+    cosmosMaxFiles: 600,
+    readConcurrency: 8,
+    cardTextBytes: 4000,
+    videoThumbAt: 0.1,
     kindColors: { folder: '#38d4ff', image: '#48d6ff', video: '#ff7fbf', audio: '#ffcf5a', text: '#7fa4ff', other: '#5e8aa6' },
   },
 

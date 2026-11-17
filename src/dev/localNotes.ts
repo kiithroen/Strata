@@ -57,7 +57,16 @@ async function readEntry(file: File): Promise<Entry | null> {
     return { note: { time: keep.time, kind: keep.kind, title: keep.title, body: keep.body, tags: keep.tags } };
   }
   if (!file.type.startsWith('image/') && !IMAGE_EXT.test(file.name)) return null;
+  const { photo, takenAt } = await readPhoto(file);
+  const title = file.name.replace(/\.[^.]+$/, '');
+  return { note: { time: takenAt ?? file.lastModified, kind: 'photo', title, tags: [] }, photo };
+}
 
+/**
+ * 사진 파일을 카드 사진 원본으로 읽는다. 크기와 EXIF 촬영 시각은 앞부분만 읽어 알아내고(모르는 형식은 한 번 디코딩해 잰다),
+ * 그림은 카드가 그릴 때 photoQueue 로 필요한 폭만큼 디코딩한다
+ */
+export async function readPhoto(file: File): Promise<{ photo: PhotoSource; takenAt?: number }> {
   const head = new Uint8Array(await file.slice(0, tuning.dev.headerBytes).arrayBuffer());
   let info = readImageInfo(head);
   if (!info) {
@@ -76,6 +85,5 @@ async function readEntry(file: File): Promise<Entry | null> {
         urgent,
       ),
   };
-  const title = file.name.replace(/\.[^.]+$/, '');
-  return { note: { time: info.takenAt ?? file.lastModified, kind: 'photo', title, tags: [] }, photo };
+  return { photo, takenAt: info.takenAt };
 }

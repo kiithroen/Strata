@@ -2,8 +2,10 @@ import './style.css';
 import { tuning } from './config';
 import { applyQuality, readQuality } from './core/quality';
 import { importLocalNotes, photoQueue } from './dev/localNotes';
+import type { NoteData } from './dev/noteData';
 import { appHooks } from './gallery/appHooks';
-import { mountCosmosDemo } from './gallery/cosmosDemo';
+import { mountCosmosDemo, type CosmosAxis } from './gallery/cosmosDemo';
+import { mountExplorerDemo } from './gallery/explorerDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
 import { PerfOverlay } from './gallery/perfOverlay';
 import { loadSettings } from './gallery/settings';
@@ -47,8 +49,12 @@ const settings = loadSettings();
 applyQuality(settings.quality);
 
 const stage = new Stage(container);
-// 위젯 데모가 부르는 앱 동작은 데모를 만들기 전에 채운다(아래 importFiles 는 함수 선언이라 여기서 쓸 수 있다)
-appHooks.showInCosmos = (files) => importFiles(files);
+// 위젯 데모가 부르는 앱 동작은 데모를 만들기 전에 채운다(아래 함수들은 함수 선언이라 여기서 쓸 수 있다)
+appHooks.showNotes = (data, resume) => {
+  appHooks.explorerResume = resume ?? null;
+  showNotes(data);
+  return `노트 ${data.notes.length}개를 은하로 열었다`;
+};
 const picked = pickDemo(location.search);
 let id = picked.id;
 let demo: WidgetDemo = picked.factory(stage);
@@ -65,19 +71,40 @@ for (const widgetId of Object.keys(widgetDemos)) {
 // 탭 줄이 넘쳐 가로로 밀리면 지금 탭이 보이게 한다
 tabsEl.querySelector('a.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
+/** 지금 위젯을 걷고 다른 위젯을 띄운다. 탭과 주소도 그 위젯으로 맞춘다 */
+function switchDemo(nextId: string, mount: () => WidgetDemo): void {
+  demo.dispose();
+  photoQueue.clear();
+  demo = mount();
+  id = nextId;
+  hintEl.textContent = demo.hint;
+  for (const a of tabsEl.querySelectorAll('a')) a.className = a.textContent === id.toUpperCase() ? 'active' : '';
+  history.replaceState(null, '', `?w=${id}`);
+}
+
+/**
+ * 노트로 우주 보기를 다시 띄운다. 탐색기 폴더에서 온 노트(폴더 정보가 있는 노트)는 폴더별·날짜별을 전환할 수 있고,
+ * 탐색기에서 왔으면 탐색기로 돌아가는 단추가 생긴다
+ */
+function showNotes(data: NoteData, axis?: CosmosAxis): void {
+  const resume = appHooks.explorerResume;
+  switchDemo('cosmos', () =>
+    mountCosmosDemo(stage, data, {
+      axis,
+      onAxis: (next) => showNotes(data, next),
+      onBack: resume ? () => switchDemo('explorer', () => mountExplorerDemo(stage)) : undefined,
+    }),
+  );
+}
+
 /** 고른 파일을 노트로 읽어 우주 보기를 그 노트로 다시 띄운다. 다른 위젯을 보고 있었으면 우주 보기로 바꾼다 */
 async function importFiles(files: File[], progress?: (text: string) => void): Promise<string> {
   const result = await importLocalNotes(files, (done, total) => progress?.(`읽는 중 ${done}/${total}`));
   const { photos, memos, skipped } = result;
   const summary = `사진 ${photos}장 · 메모 ${memos}장${skipped > 0 ? ` · 건너뜀 ${skipped}` : ''}`;
   if (result.data.notes.length === 0) return `띄울 노트가 없다 (${summary})`;
-  demo.dispose();
-  photoQueue.clear();
-  demo = mountCosmosDemo(stage, result.data);
-  id = 'cosmos';
-  hintEl.textContent = demo.hint;
-  for (const a of tabsEl.querySelectorAll('a')) a.className = a.textContent === id.toUpperCase() ? 'active' : '';
-  history.replaceState(null, '', '?w=cosmos');
+  appHooks.explorerResume = null;
+  showNotes(result.data);
   return summary;
 }
 

@@ -125,6 +125,10 @@ export type CosmosAxis = 'date' | 'folder';
 export interface CosmosOptions {
   /** 폴더 정보가 있는 노트의 기본 축은 폴더다 */
   axis?: CosmosAxis;
+  /** 있으면 폴더 정보가 있는 노트에 폴더별·날짜별 전환 단추를 띄우고, 누르면 다른 축으로 부른다 */
+  onAxis?: (axis: CosmosAxis) => void;
+  /** 있으면 `← 탐색기로` 단추를 띄운다 */
+  onBack?: () => void;
 }
 
 /** data 를 넘기면 그 노트로 띄운다(실데이터 임시 주입). 비었거나 없으면 가짜 노트다 */
@@ -350,6 +354,22 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     onCards: () => openCardList(),
   });
   let strataWasActive = false;
+
+  // 탐색기에서 온 노트: 탐색기로 돌아가기와 폴더별·날짜별 전환 단추(지층 단추와 같은 자리·모양)
+  const actions = document.createElement('div');
+  actions.className = 'strata-actions cosmos-actions';
+  const actionButton = (text: string, onClick: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.addEventListener('click', onClick);
+    actions.append(b);
+  };
+  if (options.onBack) actionButton('← 탐색기로', options.onBack);
+  const onAxis = options.onAxis;
+  if (folders && onAxis) actionButton(axis === 'folder' ? '날짜별로 보기' : '폴더별로 보기', () => onAxis(axis === 'folder' ? 'date' : 'folder'));
+  actions.hidden = actions.childElementCount === 0;
+  document.body.appendChild(actions);
 
   /** 노드가 속한 위 묶음(허브)의 아래 묶음들을 층으로 쌓는다. 허브가 없으면 그 행성 하나가 층이다 */
   const enterStrata = (node: CosmosNode) => {
@@ -593,6 +613,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     }),
     strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
+      // 은하 단추는 지층 보기 동안 지층 단추에 자리를 내준다
+      const hideActions = strata.active || actions.childElementCount === 0;
+      if (actions.hidden !== hideActions) actions.hidden = hideActions;
       look.uTime.value = time;
       // 지층 원판은 손가락이 닿아 있거나 카드를 펼쳤거나 카드 보기를 열면 멈춘다
       strata.spinning = touchCount === 0 && !focus.focused && !cardList.open;
@@ -662,7 +685,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
           key: `${cluster.key}:date`,
         });
         if (planet.title) {
-          graph.label(pos, planet.title, c.planetTitlePx, alpha * (1 - far.words), cameraPosition, {
+          // 태그가 없어 워드 클라우드가 비면(폴더 축의 파일 등) 멀어져도 노드 위 글자를 남긴다
+          const titleFade = planet.words.length > 0 ? far.words : 0;
+          graph.label(pos, planet.title, c.planetTitlePx, alpha * (1 - titleFade), cameraPosition, {
             offsetYPx: orbRadiusPx + c.planetTitlePx * 0.75,
             color: planet.titleColor,
             style: 'title',
@@ -818,6 +843,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       scrubber.update();
     },
     dispose() {
+      actions.remove();
       stage.bloomScale = 1;
       stopFieldResize();
       cardList.dispose();

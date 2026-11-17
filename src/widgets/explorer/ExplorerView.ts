@@ -11,8 +11,8 @@ export interface ExplorerViewOptions {
   recent?: () => Promise<{ name: string; reopen: () => Promise<FileSource | null> } | null>;
   /** 원본을 새로 열었을 때(최근 폴더 기억 등) */
   onSource?: (source: FileSource) => void;
-  /** 지금 폴더의 사진을 3D 은하로 보는 단추. 없으면 단추를 숨긴다 */
-  showInCosmos?: (files: File[]) => Promise<string>;
+  /** 지금 폴더(하위 폴더 포함)를 3D 은하로 보는 단추. 없으면 단추를 숨긴다. progress 로 읽는 진행을 상태 줄에 보인다 */
+  showInCosmos?: (source: FileSource, dir: string, progress: (text: string) => void) => Promise<string>;
 }
 
 interface HistoryState {
@@ -140,11 +140,12 @@ export class ExplorerView {
   }
 
   /** 원본을 열고 원본 폴더로 간다 */
-  async setSource(source: FileSource): Promise<void> {
+  /** 원본을 열고 dir 폴더(기본은 원본 폴더)로 간다 */
+  async setSource(source: FileSource, dir = ''): Promise<void> {
     this.source = source;
     this.options.onSource?.(source);
-    history.replaceState({ explorer: true, path: '' } satisfies HistoryState, '');
-    await this.navigate('', false);
+    history.replaceState({ explorer: true, path: dir } satisfies HistoryState, '');
+    await this.navigate(dir, false);
   }
 
   /** 폴더로 간다. push 면 방문 기록을 쌓는다 */
@@ -205,11 +206,12 @@ export class ExplorerView {
     const source = this.source;
     const show = this.options.showInCosmos;
     if (!source || !show) return;
-    const images = this.entries.filter((e) => e.kind === 'image');
-    if (images.length === 0) return;
-    this.setStatus(`사진 ${images.length}장을 은하로 여는 중`);
-    const files = await Promise.all(images.map((e) => source.file(e.path)));
-    this.setStatus(await show(files));
+    this.cosmosButton.disabled = true;
+    try {
+      this.setStatus(await show(source, this.dir, (text) => this.setStatus(text)));
+    } finally {
+      this.cosmosButton.disabled = false;
+    }
   }
 
   private reset(): void {
@@ -275,8 +277,8 @@ export class ExplorerView {
       this.body.replaceChildren(p);
     } else this.body.replaceChildren(grid);
     const folders = sorted.filter((e) => e.kind === 'folder').length;
-    const images = sorted.filter((e) => e.kind === 'image').length;
-    this.cosmosButton.disabled = images === 0;
+    // 하위 폴더나 열 수 있는 파일이 있으면 은하로 볼 수 있다
+    this.cosmosButton.disabled = sorted.length === 0;
     const size = sorted.reduce((s, e) => s + e.size, 0);
     this.setStatus(`폴더 ${folders} · 파일 ${sorted.length - folders} · ${formatSize(size)}${hidden > 0 ? ` · 숨긴 파일 ${hidden}` : ''}`);
   }
