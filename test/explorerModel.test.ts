@@ -10,6 +10,7 @@ import {
   kindOf,
   parentPath,
   sortEntries,
+  visibleEntries,
 } from '../src/widgets/explorer/explorerModel';
 import type { FileEntry } from '../src/widgets/explorer/fileSource';
 
@@ -63,6 +64,16 @@ describe('sortEntries', () => {
     expect(sortEntries(list, 'modified').map((e) => e.name)).toEqual(['b', 'c', 'a']);
     expect(sortEntries(list, 'size').map((e) => e.name)).toEqual(['a', 'b', 'c']);
     expect(list.map((e) => e.name)).toEqual(['c', 'a', 'b']);
+  });
+});
+
+describe('visibleEntries', () => {
+  it('폴더와 뷰어로 여는 파일만 남기고 숨긴 수를 낸다', () => {
+    const list = [entry('a', 'folder'), entry('b.jpg', 'image'), entry('c.zip', 'other'), entry('d.mp3', 'audio'), entry('e.exe', 'other')];
+    const { shown, hidden } = visibleEntries(list);
+    expect(shown.map((e) => e.name)).toEqual(['a', 'b.jpg', 'd.mp3']);
+    expect(hidden).toBe(2);
+    expect(kindOf('old.avi')).toBe('other');
   });
 });
 

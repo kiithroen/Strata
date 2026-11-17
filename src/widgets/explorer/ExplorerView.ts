@@ -1,6 +1,6 @@
 import { tuning } from '../../config';
 import { TaskQueue } from '../../core/taskQueue';
-import { breadcrumbs, extensionOf, formatSize, isViewable, parentPath, sortEntries, type SortKey } from './explorerModel';
+import { breadcrumbs, extensionOf, formatSize, isViewable, parentPath, sortEntries, visibleEntries, type SortKey } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 import { MediaViewer } from './MediaViewer';
 
@@ -262,21 +262,23 @@ export class ExplorerView {
 
   private renderEntries(): void {
     this.reset();
-    const sorted = sortEntries(this.entries, this.sortKey);
+    // 폴더와 열 수 있는 파일만 보인다
+    const { shown, hidden } = visibleEntries(this.entries);
+    const sorted = sortEntries(shown, this.sortKey);
     const grid = document.createElement('div');
     grid.className = 'explorer-grid';
     for (const e of sorted) grid.append(this.tile(e));
     if (sorted.length === 0) {
       const p = document.createElement('p');
       p.className = 'explorer-empty-note';
-      p.textContent = '빈 폴더다';
+      p.textContent = hidden > 0 ? `열 수 있는 파일이 없다 (숨긴 파일 ${hidden}개)` : '빈 폴더다';
       this.body.replaceChildren(p);
     } else this.body.replaceChildren(grid);
     const folders = sorted.filter((e) => e.kind === 'folder').length;
     const images = sorted.filter((e) => e.kind === 'image').length;
     this.cosmosButton.disabled = images === 0;
     const size = sorted.reduce((s, e) => s + e.size, 0);
-    this.setStatus(`폴더 ${folders} · 파일 ${sorted.length - folders} · ${formatSize(size)}`);
+    this.setStatus(`폴더 ${folders} · 파일 ${sorted.length - folders} · ${formatSize(size)}${hidden > 0 ? ` · 숨긴 파일 ${hidden}` : ''}`);
   }
 
   private tile(e: FileEntry): HTMLButtonElement {
@@ -312,7 +314,6 @@ export class ExplorerView {
       if (e.kind === 'folder') void this.navigate(e.path);
       else if (isViewable(e.kind)) this.openFile(e.path);
     });
-    if (!isViewable(e.kind) && e.kind !== 'folder') b.classList.add('disabled');
     return b;
   }
 

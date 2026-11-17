@@ -1,7 +1,7 @@
 import type { FileEntry, FileKind } from './fileSource';
 
 const IMAGE = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'svg', 'ico']);
-const VIDEO = new Set(['mp4', 'm4v', 'webm', 'mov', 'mkv', 'ogv', 'avi']);
+const VIDEO = new Set(['mp4', 'm4v', 'webm', 'mov', 'mkv', 'ogv']);
 const AUDIO = new Set(['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'oga', 'opus', 'weba']);
 const TEXT = new Set([
   'txt', 'md', 'markdown', 'log', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf',
@@ -32,6 +32,12 @@ export function kindOf(name: string, mime = ''): FileKind {
 /** 뷰어로 여는 종류 */
 export function isViewable(kind: FileKind): boolean {
   return kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'text';
+}
+
+/** 탐색기에 보이는 항목: 폴더와 뷰어로 여는 파일. 나머지는 숨기고 그 수를 낸다 */
+export function visibleEntries(entries: readonly FileEntry[]): { shown: FileEntry[]; hidden: number } {
+  const shown = entries.filter((e) => e.kind === 'folder' || isViewable(e.kind));
+  return { shown, hidden: entries.length - shown.length };
 }
 
 export function joinPath(dir: string, name: string): string {

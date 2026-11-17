@@ -700,11 +700,6 @@ body.card-view-open .strata-actions {
   background: color-mix(in srgb, var(--tint) 14%, var(--bg));
 }
 
-.explorer-tile.disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
 .explorer-tile[data-kind="folder"] { --tint: var(--kind-folder); }
 .explorer-tile[data-kind="image"] { --tint: var(--kind-image); }
 .explorer-tile[data-kind="video"] { --tint: var(--kind-video); }
