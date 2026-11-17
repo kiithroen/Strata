@@ -154,10 +154,11 @@ export function strataPoint(frame: StrataFrame, x: number, y: number, z: number,
 
 /**
  * 층에 눕힌 창의 자세. 앞면이 위를 보고, 창의 위쪽이 판 안쪽(보는 쪽 반대)을 향해 앞에서 내려다보면 글이 바로 읽힌다.
+ * spin 은 원판(테이블)이 층 중심 둘레로 돈 각도다. 창은 원판에 놓인 채 함께 돈다
  */
-export function strataPose(frame: StrataFrame, layer: StrataLayer, tile: StrataTile, out: Pose): Pose {
-  strataPoint(frame, tile.x, layer.y, tile.z, out.position);
-  turn.setFromAxisAngle(AXIS_Y, frame.yaw + tile.yaw);
+export function strataPose(frame: StrataFrame, layer: StrataLayer, tile: StrataTile, out: Pose, spin = 0): Pose {
+  out.position.set(tile.x, layer.y, tile.z).applyAxisAngle(AXIS_Y, frame.yaw + spin).add(frame.origin);
+  turn.setFromAxisAngle(AXIS_Y, frame.yaw + spin + tile.yaw);
   out.quaternion.copy(turn).multiply(lay);
   out.scale = tile.scale;
   return out;

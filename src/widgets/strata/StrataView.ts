@@ -23,6 +23,8 @@ const RING_EXTENT = 1.18;
 
 interface LayerMeshes {
   root: Group;
+  /** 원판(테이블). 링이 여기에 붙어 창과 함께 돈다. 날짜는 돌지 않는다 */
+  table: Group;
   ring: Mesh<PlaneGeometry, ShaderMaterial>;
   label: Mesh<PlaneGeometry, MeshBasicMaterial>;
   labelText: string;
@@ -186,9 +188,11 @@ export class StrataView {
       const at = (Math.PI * 2) / 3;
       label.position.set(Math.cos(at) * r * RING_EXTENT, 0, Math.sin(at) * r * RING_EXTENT + lh);
 
-      root.add(ring, label);
+      const table = new Group();
+      table.add(ring);
+      root.add(table, label);
       this.group.add(root);
-      this.layers.push({ root, ring, label, labelText: layer.label, emphasis: 0 });
+      this.layers.push({ root, table, ring, label, labelText: layer.label, emphasis: 0 });
     }
 
     // 빛기둥: 가장 아래층 밑의 발광부에서 가장 위층 위까지
@@ -223,12 +227,13 @@ export class StrataView {
     this.group.add(this.beam, this.base);
   }
 
-  /** mix 는 지층 보기로 들어간 정도(0~1), focus 는 바라보는 층 번호다 */
-  update(dt: number, mix: number, focus: number): void {
+  /** mix 는 지층 보기로 들어간 정도(0~1), focus 는 바라보는 층 번호, spin 은 원판이 돈 각도다 */
+  update(dt: number, mix: number, focus: number, spin = 0): void {
     const s = tuning.strata;
     this.time.value += dt;
     this.group.visible = mix > 0.002 && this.layers.length > 0;
     this.layers.forEach((l, i) => {
+      l.table.rotation.y = spin;
       l.emphasis = damp(l.emphasis, i === focus ? 1 : s.otherLayerAlpha, s.transitionRate * 2, dt);
       const a = mix * l.emphasis;
       l.ring.material.uniforms.uOpacity.value = s.ring.alpha * a;

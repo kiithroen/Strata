@@ -82,6 +82,27 @@ describe('nearestLayer', () => {
   });
 });
 
+describe('strataPose 원판 회전', () => {
+  it('창은 원판에 놓인 채 층 중심 둘레로 함께 돌고, 한 바퀴 돌면 제자리다', () => {
+    const layer = layoutStrata(layers, 0)[2];
+    const frame = { origin: new Vector3(1, 2, 3), yaw: 0.4 };
+    const tile = layer.tiles[layer.tiles.length - 1];
+    const rest = strataPose(frame, layer, tile, createPose());
+    const center = new Vector3(frame.origin.x, frame.origin.y + layer.y, frame.origin.z);
+    for (const spin of [0.3, 1.7, -2.2]) {
+      const p = strataPose(frame, layer, tile, createPose(), spin);
+      expect(p.position.distanceTo(center)).toBeCloseTo(rest.position.distanceTo(center), 9);
+      expect(p.position.y).toBeCloseTo(rest.position.y, 9);
+      expect(p.quaternion.angleTo(rest.quaternion)).toBeCloseTo(Math.abs(spin), 6);
+      const before = rest.position.clone().sub(center);
+      const after = p.position.clone().sub(center);
+      expect(Math.atan2(-after.z, after.x) - Math.atan2(-before.z, before.x)).toBeCloseTo(spin, 6);
+    }
+    const full = strataPose(frame, layer, tile, createPose(), Math.PI * 2);
+    expect(full.position.distanceTo(rest.position)).toBeLessThan(1e-9);
+  });
+});
+
 describe('strataPose', () => {
   it('앞면이 위를 보고 창의 위쪽이 보는 쪽 반대를 향한다', () => {
     const out = layoutStrata(layers, 0);

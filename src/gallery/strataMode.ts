@@ -56,6 +56,11 @@ export class StrataMode {
   private layers: StrataLayer[] = [];
   private frame: StrataFrame = { origin: new Vector3(), yaw: 0 };
   private focus = 0;
+  /** 원판(테이블)이 돈 각도와 지금 빠르기 배율(0~1) */
+  private spin = 0;
+  private spinPace = 1;
+  /** 원판이 돌아도 되는지. 데모가 펼친 카드·손가락·카드 보기를 보고 정한다 */
+  spinning = true;
   private readonly placed = new Map<number, { layer: StrataLayer; tile: StrataTile }>();
   /** 층마다 카드가 멀어 사라진 정도(0~1). measure 가 매 프레임 구한다 */
   private readonly hidden = new Map<StrataLayer, number>();
@@ -223,7 +228,7 @@ export class StrataMode {
     if (this.mix <= 0) return fade;
     const p = this.placed.get(index);
     if (!p) return fade * (1 - this.mix);
-    strataPose(this.frame, p.layer, p.tile, this.pose);
+    strataPose(this.frame, p.layer, p.tile, this.pose, this.spin);
     const w = this.mix;
     home.position.lerp(this.pose.position, w);
     home.quaternion.slerp(this.pose.quaternion, w);
@@ -259,7 +264,10 @@ export class StrataMode {
         this.view.clear();
       }
     }
-    this.view.update(dt, this.mix * this.veil, this.focus);
+    const sp = s.spin;
+    this.spinPace = damp(this.spinPace, this.spinning ? 1 : 0, sp.rate, dt);
+    if (this.active) this.spin += sp.speed * this.spinPace * dt;
+    this.view.update(dt, this.mix * this.veil, this.focus, this.spin);
   }
 
   dispose(): void {

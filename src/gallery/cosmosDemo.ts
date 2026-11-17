@@ -563,6 +563,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
       look.uTime.value = time;
+      // 지층 원판은 손가락이 닿아 있거나 카드를 펼쳤거나 카드 보기를 열면 멈춘다
+      strata.spinning = touchCount === 0 && !focus.focused && !cardList.open;
       // 지층 보기 동안에는 은하가 멈춰 있어 돌아왔을 때 보던 자리 그대로다
       strata.update(dt);
       const mix = strata.mix;
