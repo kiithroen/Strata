@@ -16,6 +16,7 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 import { tuning } from '../../config';
 import type { LabelCache } from '../common/labelCache';
 import { ScreenLabels } from '../common/screenLabels';
+import { bezierPoint, branchControl } from './cosmosModel';
 
 /**
  * 우주 보기의 선 그래프: 가지(허브 ↔ 행성, 허브끼리), 살(행성 → 노트 점), 점, 빛 무리, 글자.
@@ -28,13 +29,16 @@ export class GraphView {
   private readonly dots: PointBatch;
   private readonly glows: PointBatch;
   private readonly labels: ScreenLabels;
+  private readonly curveControl = new Vector3();
+  private readonly curvePrev = new Vector3();
+  private readonly curveNext = new Vector3();
   /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
   alphaScale = 1;
 
   constructor(labelCache: LabelCache, maxSegments: number, maxPoints: number) {
     this.labels = new ScreenLabels(labelCache);
     const g = tuning.cosmos.graph;
-    this.branches = new LineBatch(maxSegments, g.branchWidth);
+    this.branches = new LineBatch(maxSegments * g.branchSegments, g.branchWidth);
     this.spokes = new LineBatch(maxSegments, g.spokeWidth);
     // 카드를 먼저 그린 뒤 살을 그려 카드 뒤로 들어가는 선 끝은 테두리에서 가려지고 앞의 선은 보인다
     this.spokes.line.renderOrder = 1;
@@ -61,8 +65,17 @@ export class GraphView {
     this.labels.begin();
   }
 
-  branch(a: Vector3, b: Vector3, color: Color, alpha: number): void {
-    this.branches.add(a, b, color, alpha * this.alphaScale);
+  branch(a: Vector3, b: Vector3, color: Color, alphaA: number, alphaB = alphaA): void {
+    const segs = tuning.cosmos.graph.branchSegments;
+    const ctrl = branchControl(a, b, this.curveControl);
+    this.curvePrev.copy(a);
+    for (let i = 1; i <= segs; i++) {
+      const t = i / segs;
+      bezierPoint(a, ctrl, b, t, this.curveNext);
+      const alpha = alphaA + (alphaB - alphaA) * ((i - 0.5) / segs);
+      this.branches.add(this.curvePrev, this.curveNext, color, alpha * this.alphaScale);
+      this.curvePrev.copy(this.curveNext);
+    }
   }
 
   spoke(a: Vector3, b: Vector3, color: Color, alpha: number): void {
@@ -219,7 +232,7 @@ class PointBatch {
         varying float vAlpha;
         void main() {
           float d = length(gl_PointCoord - 0.5) * 2.0;
-          float a = exp(-d * d * 4.0) * vAlpha;
+          float a = (exp(-d * d * 5.2) + 0.35 * exp(-d * d * 1.8)) * vAlpha;
           gl_FragColor = vec4(vColor, a);
           #include <colorspace_fragment>
         }
@@ -229,7 +242,7 @@ class PointBatch {
         varying float vAlpha;
         void main() {
           float d = length(gl_PointCoord - 0.5) * 2.0;
-          float a = (smoothstep(1.0, 0.55, d) + 0.6 * smoothstep(0.35, 0.0, d)) * vAlpha;
+          float a = (smoothstep(0.95, 0.45, d) + 0.85 * smoothstep(0.38, 0.0, d)) * vAlpha;
           gl_FragColor = vec4(vColor, a);
           #include <colorspace_fragment>
         }

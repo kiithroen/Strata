@@ -163,6 +163,30 @@ export function hubPoint(childOffsets: readonly number[], time: number, out: Vec
   return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }
 
+const branchMid = new Vector3();
+
+/**
+ * 두 노드 사이를 잇는 곡선 가지의 2차 베지어 제어점을 구한다.
+ * 중점을 바깥(원점 반대 방향)으로 거리 × graph.branchCurve 만큼 밀어 완만한 아치를 만든다.
+ */
+export function branchControl(a: Vector3, b: Vector3, out: Vector3): Vector3 {
+  const dist = a.distanceTo(b);
+  branchMid.copy(a).add(b).multiplyScalar(0.5);
+  if (branchMid.lengthSq() > 1e-8) branchMid.normalize();
+  else branchMid.set(0, 1, 0);
+  return out.copy(a).add(b).multiplyScalar(0.5).addScaledVector(branchMid, dist * tuning.cosmos.graph.branchCurve);
+}
+
+/** 2차 베지어 곡선 위 t(0~1) 자리의 점 */
+export function bezierPoint(a: Vector3, control: Vector3, b: Vector3, t: number, out: Vector3): Vector3 {
+  const u = 1 - t;
+  return out
+    .set(0, 0, 0)
+    .addScaledVector(a, u * u)
+    .addScaledVector(control, 2 * u * t)
+    .addScaledVector(b, t * t);
+}
+
 function clamp01(x: number): number {
   return Math.max(0, Math.min(1, x));
 }

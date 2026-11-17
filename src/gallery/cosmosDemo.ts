@@ -707,11 +707,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         const hubAlpha = cosmosFade(hp.distanceTo(cameraPosition));
         for (const ci of hub.children) {
           const child = planets[ci].node.position;
-          const childAlpha = Math.min(hubAlpha, cosmosFade(child.distanceTo(cameraPosition)));
-          graph.branch(hp, child, branchColor, g.branchAlpha * childAlpha);
+          const childAlpha = cosmosFade(child.distanceTo(cameraPosition));
+          graph.branch(hp, child, branchColor, g.branchAlpha * hubAlpha, g.branchAlpha * childAlpha);
         }
         if (prevHub) {
-          graph.branch(prevHub, hp, branchColor, g.branchAlpha * Math.min(hubAlpha, cosmosFade(prevHub.distanceTo(cameraPosition))));
+          const prevAlpha = cosmosFade(prevHub.distanceTo(cameraPosition));
+          graph.branch(prevHub, hp, branchColor, g.branchAlpha * prevAlpha, g.branchAlpha * hubAlpha);
         }
         graph.dot(hp, view.coreColor, g.hubSize, hubAlpha);
         graph.glow(hp, view.color, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
@@ -723,8 +724,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         for (let i = 1; i < planets.length; i++) {
           const a = planets[i - 1].node.position;
           const b = planets[i].node.position;
-          const linkAlpha = Math.min(cosmosFade(a.distanceTo(cameraPosition)), cosmosFade(b.distanceTo(cameraPosition)));
-          graph.branch(a, b, branchColor, g.branchAlpha * linkAlpha);
+          const alphaA = cosmosFade(a.distanceTo(cameraPosition));
+          const alphaB = cosmosFade(b.distanceTo(cameraPosition));
+          graph.branch(a, b, branchColor, g.branchAlpha * alphaA, g.branchAlpha * alphaB);
         }
       }
 

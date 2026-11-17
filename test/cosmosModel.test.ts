@@ -4,6 +4,8 @@ import { tuning } from '../src/config';
 import {
   PLANET_UNITS,
   RegroupBlend,
+  bezierPoint,
+  branchControl,
   buildHubs,
   burstOffset,
   clusterAffinities,
@@ -535,5 +537,19 @@ describe('nodeColor', () => {
       hues.add(Math.round(hsl.h * 20));
     }
     expect(hues.size).toBeGreaterThan(8);
+  });
+});
+
+describe('branchControl · bezierPoint', () => {
+  it('가지 제어점은 중점보다 원점 바깥으로 휘고 베지어 양 끝은 두 노드와 일치한다', () => {
+    const a = new Vector3(2, 0, -2);
+    const b = new Vector3(0, 1, -4);
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    const ctrl = branchControl(a, b, new Vector3());
+    expect(ctrl.length()).toBeGreaterThan(mid.length());
+    expect(ctrl.distanceTo(mid)).toBeCloseTo(a.distanceTo(b) * c.graph.branchCurve, 9);
+    expect(bezierPoint(a, ctrl, b, 0, new Vector3()).distanceTo(a)).toBeLessThan(1e-12);
+    expect(bezierPoint(a, ctrl, b, 1, new Vector3()).distanceTo(b)).toBeLessThan(1e-12);
+    expect(bezierPoint(a, ctrl, b, 0.5, new Vector3()).length()).toBeGreaterThan(mid.length());
   });
 });

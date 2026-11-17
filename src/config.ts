@@ -290,18 +290,20 @@ export const tuning = {
      */
     graph: {
       branchWidth: 1.8,
+      branchSegments: 10,
+      branchCurve: 0.18,
       spokeWidth: 1.0,
       branchColor: '#7fd2ff',
       hubColor: '#e4f8ff',
-      nodeColor: { saturation: [0.65, 0.95], lightness: [0.55, 0.72], coreMix: 0.45 },
-      branchAlpha: 0.5,
+      nodeColor: { saturation: [0.65, 0.95], lightness: [0.55, 0.72], coreMix: 0.6 },
+      branchAlpha: 0.48,
       spokeAlpha: 0.55,
-      nodeSize: 0.09,
-      hubSize: 0.13,
+      nodeSize: 0.075,
+      hubSize: 0.105,
       dotSize: 0.055,
-      glowSize: 1.3,
-      hubGlowSize: 2.4,
-      glowAlpha: 0.16,
+      glowSize: 1.1,
+      hubGlowSize: 1.85,
+      glowAlpha: 0.22,
       /** 허브 글자 높이(CSS px) */
       hubLabelPx: 15,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
@@ -423,12 +425,12 @@ export const tuning = {
    */
   cloud: {
     maxWords: 5,
-    px: [11, 19],
+    px: [10, 16],
     gapPx: 4,
     show: [0.075, 0.045],
     hide: [0.04, 0.022],
     liftPx: 30,
-    alpha: 0.9,
+    alpha: 0.78,
   },
 
   dev: {
