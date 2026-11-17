@@ -12,7 +12,7 @@ export interface KeepNote {
 
 /**
  * 구글 킵 테이크아웃의 노트 JSON 하나를 읽는다. 휴지통 노트, 시각이 없거나 글이 비었으면 null 이다.
- * 체크리스트는 항목마다 한 줄로 잇는다. 본문이 dev.docMinChars 자 이상이면 긴 문서, 아니면 메모다.
+ * 체크리스트는 항목마다 한 줄로 잇는다. 본문이 album.docMinChars 자 이상이면 긴 문서, 아니면 메모다.
  */
 export function parseKeepNote(json: unknown): KeepNote | null {
   if (!json || typeof json !== 'object') return null;
@@ -38,6 +38,6 @@ export function parseKeepNote(json: unknown): KeepNote | null {
         .filter((n): n is string => typeof n === 'string' && n.trim() !== '')
         .map((n) => n.trim())
     : [];
-  const kind: NoteKind = body.length >= tuning.dev.docMinChars ? 'doc' : 'memo';
+  const kind: NoteKind = body.length >= tuning.album.docMinChars ? 'doc' : 'memo';
   return { time: Math.floor(usec / 1000), kind, title, body: body || undefined, tags };
 }

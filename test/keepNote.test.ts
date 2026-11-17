@@ -17,8 +17,8 @@ describe('parseKeepNote', () => {
   });
 
   it('본문이 기준 길이 이상이면 긴 문서다', () => {
-    expect(parseKeepNote({ ...base, textContent: '가'.repeat(tuning.dev.docMinChars) })?.kind).toBe('doc');
-    expect(parseKeepNote({ ...base, textContent: '가'.repeat(tuning.dev.docMinChars - 1) })?.kind).toBe('memo');
+    expect(parseKeepNote({ ...base, textContent: '가'.repeat(tuning.album.docMinChars) })?.kind).toBe('doc');
+    expect(parseKeepNote({ ...base, textContent: '가'.repeat(tuning.album.docMinChars - 1) })?.kind).toBe('memo');
   });
 
   it('휴지통 노트, 빈 노트, 시각 없는 노트는 버린다', () => {

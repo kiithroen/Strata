@@ -29,7 +29,7 @@ npm run dev
 - **사진 표현**: 사진 카드의 사진 칸을 원본·홀로그램 선(`card.photoFx`)·선화(`card.photoSketch`) 가운데 하나로 바로 바꾼다. 기본은 홀로그램이다.
 - **실데이터**: `파일`·`폴더`로 고른 파일을 노트로 읽어 우주 보기를 그 노트로 다시 띄운다(`src/dev/localNotes.ts`). 메모리에만 두는 임시 주입이라 다시 불러오면 가짜 노트로 돌아간다.
   - 사진(JPEG·PNG 등): 파일 앞부분(`dev.headerBytes`)에서 크기·EXIF 방향·촬영 시각을 읽는다(`src/dev/imageHeader.ts`). 원본 촬영 시각, 없으면 EXIF 파일 시각, 그것도 없으면 파일 수정 시각에 놓는다. 앞부분으로 크기를 모르는 형식은 한 번 디코딩해서 잰다. 제목은 파일 이름이다.
-  - 구글 킵 테이크아웃 JSON: 제목·본문(체크리스트는 항목마다 한 줄)·라벨(태그)·만든 시각을 읽고, 본문이 `dev.docMinChars`자 이상이면 긴 문서, 아니면 메모다(`src/dev/keepNote.ts`). 휴지통 노트는 버린다.
+  - 구글 킵 테이크아웃 JSON: 제목·본문(체크리스트는 항목마다 한 줄)·라벨(태그)·만든 시각을 읽고, 본문이 `album.docMinChars`자 이상이면 긴 문서, 아니면 메모다(`src/dev/keepNote.ts`). 휴지통 노트는 버린다.
   - 사진 디코딩은 `createImageBitmap`을 `dev.decodeConcurrency`개씩만 돌리는 큐(`src/core/taskQueue.ts`)로 하고, 노트 순서(최근 것부터)대로 처리한다. 펼친 카드의 선명한 사진은 줄 맨 앞에 끼운다.
 - **품질**: 프리셋(`quality.presets`)이나 항목별 값(`quality.options`)을 고르고 적용하면 저장하고 다시 불러온다. 렌더러·텍스처·형상을 처음부터 다시 만들어야 해서다. 시작할 때 `main.ts`가 위젯보다 먼저 `tuning`에 적용한다(`src/core/quality.ts`). 기본값과 다른 항목만 저장하므로 고르지 않은 항목은 `config.ts` 기본값을 따른다.
 
@@ -43,6 +43,14 @@ npm run dev
 | 카드 텍스처 | 떠 있는 카드 텍스처 폭(`card.textureWidth`) |
 
 `quality.options`에는 기본값과 모든 프리셋 값이 들어 있어야 한다(테스트가 확인한다). 맞는 값을 찾으면 `src/config.ts`의 기본값과 프리셋을 고친다.
+
+## 메모 앨범 저장
+
+- 우주 보기(`cosmos`)는 메모 앨범이다. 저장된 노트가 하나라도 있으면 그 노트만 띄우고, 없으면 가짜 노트를 미리보기로 띄운다. 실데이터 임시 주입과 탐색기 은하는 앨범이 아니라 `+ 노트`가 없다.
+- 브라우저에서는 IndexedDB `strata` 데이터베이스에 둔다. `notes`에 노트 기록(드라이브와 같은 `NoteRecord` 형식, 지움 표시 포함), `photos`에 노트 번호를 열쇠로 사진 사본(JPEG Blob)을 둔다(`src/album/noteStore.ts`). 열 때 브라우저에 저장소 영구화를 요청한다.
+- IndexedDB를 못 쓰면(사생활 보호 창 등) 메모리 저장소로 대신해 이번 실행에만 남고, 콘솔에 경고를 남긴다.
+- 앨범을 비우려면 브라우저 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다.
+- 앱 시작은 저장소를 연 뒤 첫 화면을 띄운다(`main.ts`의 `ready`).
 
 ## 배포
 
@@ -61,6 +69,7 @@ npm run dev
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
 | `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 블룸 후처리(`bloom.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
+| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`) |
 | `src/dev/` | 개발용 가짜 데이터(`noteData.ts`)와 실데이터 임시 불러오기(`localNotes.ts`, `imageHeader.ts`, `keepNote.ts`) |
 | `test/` | vitest 단위 테스트(노드 환경) |
 
@@ -94,8 +103,11 @@ npm run build
   - 노트 카드: `cards`, `focus(card | null)`, `focusedId()`
   - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
   - 우주 보기: 시간축에 더해 `hubs()`, `nodes()`(지난 프레임의 행성·허브 노드), `screenOf(월드 위치)`(탭할 화면 좌표, CSS px), `tapNode(노드)`(은하 탭 두 단계를 거친다)·`approachedKey()`(다가간 노드 키), `enterStrata(노드)`(바로 들어간다)·`exitStrata()`, `strataState()`, `pickStrataLayer(x, y)`, `openCardList()`(지층 보기의 카드 보기)·`setCardMode('space' | 'list')`·`cardListState()`
+  - 우주 보기(이어서): `noteScreens`(`viewer`, `editor`(`fill({ title, body, tags, tint })`, `setPhotoFile(File)`, `draft()`), `openNote(번호)`, `compose()`, `edit(id)`), `openSearch(검색어)`(찾은 수), `openNodeCards()`(다가간 노드의 카드 보기)
   - 로컬 탐색기: `openFiles(File[])`(파일 목록으로 원본을 연다. 폴더 고르기 창은 스크립트로 열 수 없어 확인 스크립트는 `webkitRelativePath`를 붙인 `File`로 폴더 구조를 넘긴다), `view.state()`(원본·폴더·항목 수·기다리는 썸네일·뷰어 파일), `view.navigate(경로)`, `view.openFile(경로)`, `view.viewer`(`step(±1)`, `close()`)
 - `importFiles(File[])`: 설정 화면의 실데이터 불러오기와 같다. 결과 글을 돌려준다. 확인 스크립트는 `OffscreenCanvas.convertToBlob`으로 만든 JPEG 바이트를 `File`로 감싸 넘긴다
+- `ready`: 메모 앨범 저장소를 열고 첫 화면을 띄우면 끝나는 약속. 확인 스크립트는 이것을 기다린 뒤 `demo`를 쓴다
+- `albumCount()`: 메모 앨범에 저장된 노트 수
 - `time()`: 지금 게임 시간(초)
 - `advance(seconds, hz = 60)`: 게임 시간을 고정 간격으로 진행하고 한 번 그린다
 

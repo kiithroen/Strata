@@ -1,4 +1,4 @@
-import { CardListView, type CardLayerInfo, type CardViewMode } from '../widgets/cardList/CardListView';
+import { CardListView, type CardLayerInfo, type CardListOptions, type CardViewMode } from '../widgets/cardList/CardListView';
 import type { CardListSection } from '../widgets/cardList/cardListModel';
 
 function isCardListHistoryState(state: unknown): boolean {
@@ -24,13 +24,37 @@ export class CardListMode {
     closeLabel: string,
     onModeChange?: (mode: CardViewMode) => void,
     private readonly onClose?: () => void,
+    extra: Pick<CardListOptions, 'onOpen' | 'search'> = {},
   ) {
-    this.view = new CardListView({ closeLabel, onClose: () => this.close(), onModeChange });
+    this.view = new CardListView({ closeLabel, onClose: () => this.close(), onModeChange, ...extra });
     window.addEventListener('popstate', this.onPop);
   }
 
   get open(): boolean {
     return this.view.open;
+  }
+
+  /** 열 때 쌓은 방문 기록이 남아 있는지 */
+  get historyPushed(): boolean {
+    return this.pushed;
+  }
+
+  /** 검색 칸(있을 때) */
+  get query(): string {
+    return this.view.query;
+  }
+
+  setQuery(query: string): void {
+    this.view.setQuery(query);
+  }
+
+  focusSearch(): void {
+    this.view.focusSearch();
+  }
+
+  /** 닫기 단추 글자를 바꾼다(지층에서 열 때와 은하에서 열 때가 다르다) */
+  setCloseLabel(text: string): void {
+    this.view.setCloseLabel(text);
   }
 
   get mode(): CardViewMode {

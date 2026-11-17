@@ -1040,3 +1040,319 @@ body.explorer-open .hud-bottom {
   bottom: calc(env(safe-area-inset-bottom) + 24px);
   transform: none;
 }
+
+/* 검색 화면: 카드 목록 머리의 검색 칸과 찾은 것이 없을 때의 안내 */
+.card-list-search {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--bg) 80%, black);
+  color: var(--text);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 14px;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.card-list-search:focus {
+  border-color: var(--accent);
+}
+
+.card-list.searching .card-list-title {
+  flex: 0 0 auto;
+}
+
+.card-list-empty {
+  margin: 32px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.card-item.openable {
+  cursor: pointer;
+}
+
+.card-item.openable:hover {
+  border-color: var(--card-tint);
+}
+
+/* 노트 보기·입력: 3D 화면과 카드 목록 위를 덮는 2D 전체 화면 */
+.note-viewer,
+.note-editor {
+  --card-tint: var(--accent);
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--bg) 97%, black);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+}
+
+.note-editor {
+  z-index: 61;
+}
+
+.note-viewer[hidden],
+.note-editor[hidden] {
+  display: none;
+}
+
+.note-viewer-head,
+.note-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--card-tint) 30%, transparent);
+}
+
+.note-viewer-kind,
+.note-editor-heading {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: var(--card-tint);
+}
+
+.note-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 36%, transparent);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.note-button[hidden] {
+  display: none;
+}
+
+.note-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.note-save:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.note-delete.armed {
+  border-color: #ff6b8a;
+  color: #ff9cb0;
+}
+
+.note-viewer-body,
+.note-editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 16px 16px calc(env(safe-area-inset-bottom) + 32px);
+}
+
+.note-viewer-page,
+.note-editor-body > * {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.note-viewer-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.note-viewer-photo,
+.note-editor-photo {
+  display: flex;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card-tint) 8%, var(--bg));
+}
+
+.note-editor-photo[hidden] {
+  display: none;
+}
+
+.note-viewer-canvas,
+.note-editor-canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 72dvh;
+  width: auto;
+  height: auto;
+}
+
+.note-viewer-canvas {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.note-viewer-canvas.loaded {
+  opacity: 1;
+}
+
+.note-viewer-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.note-viewer-text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--text) 90%, transparent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-viewer[data-kind="memo"] .note-viewer-page {
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--card-tint) 45%, transparent);
+  background: color-mix(in srgb, var(--card-tint) 12%, var(--bg));
+}
+
+.note-viewer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.note-viewer-tag {
+  color: var(--card-tint);
+}
+
+.note-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.note-editor-body > * {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.note-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-editor-row[hidden] {
+  display: none;
+}
+
+.note-editor-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.note-editor-input {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--bg) 80%, black);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 16px;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.note-editor-input:focus {
+  border-color: var(--accent);
+}
+
+.note-editor-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.note-editor-text {
+  min-height: 9em;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.note-editor-time {
+  flex: 1;
+  min-width: 200px;
+  color-scheme: dark;
+  font-family: var(--mono);
+  font-size: 14px;
+}
+
+.note-editor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.note-editor-chips:empty {
+  display: none;
+}
+
+.note-editor-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 3px var(--bg);
+  cursor: pointer;
+}
+
+.note-editor-swatch.active {
+  border-color: var(--swatch);
+  box-shadow: inset 0 0 0 3px var(--bg), 0 0 10px var(--swatch);
+}
+
+.note-editor-note {
+  margin-top: 0;
+  margin-bottom: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.note-editor-status {
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: 13px;
+  color: #ff9cb0;
+}
+
+.note-editor-status:empty {
+  display: none;
+}

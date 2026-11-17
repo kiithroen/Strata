@@ -469,17 +469,26 @@ export const tuning = {
     kindColors: { folder: '#38d4ff', image: '#48d6ff', video: '#ff7fbf', audio: '#ffcf5a', text: '#7fa4ff', other: '#5e8aa6' },
   },
 
+  /**
+   * 메모 앨범의 노트 입력·보기. docMinChars 는 사진 없는 노트가 긴 문서가 되는 본문 글자 수(킵 노트 읽기도 같다),
+   * photoMaxPx 는 저장하는 사진 사본의 긴 변(px), photoQuality 는 그 JPEG 품질(0~1),
+   * viewerPhotoMaxPx 는 보기 화면이 사진을 그리는 최대 폭(기기 px), editorPhotoPx 는 입력 화면의 사진 미리보기 폭(CSS px)이다
+   */
+  album: {
+    docMinChars: 160,
+    photoMaxPx: 2048,
+    photoQuality: 0.88,
+    viewerPhotoMaxPx: 2400,
+    editorPhotoPx: 640,
+  },
+
   dev: {
     /** 시간축 데모의 가짜 노트 */
     noteCount: 110,
     noteSeed: 1115,
     spanDays: 600,
     bursts: 22,
-    /**
-     * 실데이터 임시 불러오기: 킵 노트 본문이 docMinChars 자 이상이면 긴 문서,
-     * 사진 디코딩 동시 작업 수(decodeConcurrency)와 크기·EXIF 를 찾을 때 읽는 파일 앞부분 바이트(headerBytes)
-     */
-    docMinChars: 160,
+    /** 실데이터 임시 불러오기: 사진 디코딩 동시 작업 수(decodeConcurrency)와 크기·EXIF 를 찾을 때 읽는 파일 앞부분 바이트(headerBytes) */
     decodeConcurrency: 2,
     headerBytes: 262144,
   },

@@ -164,6 +164,18 @@ export class StrataMode {
     }
   }
 
+  /** 들어갈 때 쌓은 방문 기록이 남아 있는지 */
+  get historyPushed(): boolean {
+    return this.pushed;
+  }
+
+  /** 방문 기록은 건드리지 않고 은하로 돌아간다. 부르는 쪽이 기록을 한꺼번에 되돌릴 때 쓴다 */
+  dismiss(): void {
+    if (!this.active) return;
+    this.pushed = false;
+    this.leave();
+  }
+
   hasCard(index: number): boolean {
     return this.placed.has(index);
   }

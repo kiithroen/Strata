@@ -4,6 +4,7 @@ import { applyQuality, readQuality } from './core/quality';
 import { importLocalNotes, photoQueue } from './dev/localNotes';
 import type { NoteData } from './dev/noteData';
 import { appHooks, type ExplorerResume } from './gallery/appHooks';
+import { albumCount, mountAlbumDemo, openAlbum } from './gallery/albumDemo';
 import { mountCosmosDemo, type CosmosAxis } from './gallery/cosmosDemo';
 import { mountExplorerDemo } from './gallery/explorerDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
@@ -25,6 +26,10 @@ declare global {
       advance: (seconds: number, hz?: number) => number;
       /** 설정 화면의 실데이터 불러오기와 같다. 결과 글을 돌려준다 */
       importFiles: (files: File[]) => Promise<string>;
+      /** 메모 앨범 저장소를 열고 첫 화면을 띄웠으면 끝나는 약속 */
+      ready: Promise<void>;
+      /** 메모 앨범에 저장된 노트 수 */
+      albumCount: () => number;
     };
   }
 }
@@ -59,10 +64,21 @@ appHooks.showNotes = (data, resume) => {
   showNotes(data, undefined, resume ? { push: { cosmos: true } } : 'reset');
   return `노트 ${data.notes.length}개를 은하로 열었다`;
 };
+appHooks.showAlbum = (focusId) => {
+  appHooks.explorerResume = null;
+  switchDemo('cosmos', () => mountAlbumDemo(stage, focusId), 'keep');
+};
 const picked = pickDemo(location.search);
 let id = picked.id;
-let demo: WidgetDemo = picked.factory(stage);
-hintEl.textContent = demo.hint;
+/** 메모 앨범 저장소를 여는 동안 띄워 두는 빈 화면 */
+const idleDemo: WidgetDemo = { title: '', hint: '', update: () => undefined, dispose: () => undefined };
+let demo: WidgetDemo = idleDemo;
+// 첫 화면은 저장소를 연 뒤에 띄운다(그동안 뒤로·앞으로로 다른 화면이 떴으면 그대로 둔다)
+const ready = openAlbum().then(() => {
+  if (demo !== idleDemo) return;
+  demo = picked.factory(stage);
+  hintEl.textContent = demo.hint;
+});
 
 // 위젯 사이를 오가는 탭
 for (const widgetId of Object.keys(widgetDemos)) {
@@ -136,7 +152,7 @@ window.addEventListener('popstate', (e) => {
     if (lastExplorerCosmos) {
       appHooks.explorerResume = lastExplorerCosmos.resume;
       showNotes(lastExplorerCosmos.data, lastExplorerCosmos.axis, 'keep');
-    } else switchDemo('cosmos', () => mountCosmosDemo(stage), 'keep');
+    } else switchDemo('cosmos', () => mountAlbumDemo(stage), 'keep');
   }
 });
 
@@ -198,6 +214,8 @@ if (import.meta.env.DEV) {
     },
     time: () => time,
     importFiles: (files) => importFiles(files),
+    ready,
+    albumCount,
     advance(seconds, hz = 60) {
       const steps = Math.round(seconds * hz);
       for (let i = 0; i < steps; i++) {

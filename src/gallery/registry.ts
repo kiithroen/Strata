@@ -1,16 +1,18 @@
+import { mountAlbumDemo } from './albumDemo';
 import { mountCardListDemo } from './cardListDemo';
-import { mountCosmosDemo } from './cosmosDemo';
 import { mountExplorerDemo } from './explorerDemo';
 import { mountNoteCardDemo } from './noteCardDemo';
+import { mountNoteViewDemo } from './noteViewDemo';
 import type { WidgetDemoFactory } from './stage';
 import { mountTimeAxisDemo } from './timeAxisDemo';
 
 /** 갤러리 주소의 ?w= 값과 위젯 데모를 잇는다. 첫 항목이 기본값이다. */
 export const widgetDemos: Record<string, WidgetDemoFactory> = {
-  cosmos: mountCosmosDemo,
+  cosmos: (stage) => mountAlbumDemo(stage),
   'time-axis': mountTimeAxisDemo,
   'note-card': mountNoteCardDemo,
   'card-list': mountCardListDemo,
+  note: mountNoteViewDemo,
   explorer: mountExplorerDemo,
 };
 

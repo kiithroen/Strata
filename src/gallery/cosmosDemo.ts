@@ -52,6 +52,8 @@ import { createTimeReadout } from './timeReadout';
 import { createTimeScrubber } from './timeScrubber';
 import { CardFocus } from './cardFocus';
 import { CardListMode } from './cardListMode';
+import { NoteScreens, type AlbumActions } from './noteScreens';
+import { searchNotes } from '../album/albumModel';
 import { buildCardSections } from '../widgets/cardList/cardListModel';
 import type { CardLayerInfo, CardViewMode } from '../widgets/cardList/CardListView';
 import { StrataMode } from './strataMode';
@@ -94,6 +96,12 @@ export interface CosmosDemo extends WidgetDemo {
   openCardList(): void;
   /** 카드 보기의 공간(3D)/목록(2D) 모드를 바꾼다(머리의 토글과 같다) */
   setCardMode(mode: CardViewMode): void;
+  /** 노트 보기·입력 화면 */
+  readonly noteScreens: NoteScreens;
+  /** 검색 화면을 열고 query 로 찾는다(`검색` 단추와 같다). 찾은 노트 수를 돌려준다 */
+  openSearch(query?: string): number;
+  /** 은하에서 다가간 노드의 묶음을 카드 보기로 연다(`카드 보기` 단추와 같다) */
+  openNodeCards(): void;
   /** 카드 보기 상태: 열림, 모드, 공간 모드로 들어간 정도·앞으로 들어간 거리, 목록 카드 수, 사진을 아직 받지 않은 칸 수 */
   cardListState(): {
     open: boolean;
@@ -129,6 +137,10 @@ export interface CosmosOptions {
   onAxis?: (axis: CosmosAxis) => void;
   /** 있으면 `← 탐색기로` 단추를 띄운다 */
   onBack?: () => void;
+  /** 메모 앨범: 있으면 `+ 노트` 단추를 띄우고, 저장된 노트는 보기 화면에서 고치고 지울 수 있다 */
+  album?: AlbumActions;
+  /** 띄운 뒤 이 번호의 노트가 속한 묶음으로 다가간다(저장한 노트를 보여 줄 때) */
+  focusNote?: string;
 }
 
 /** data 를 넘기면 그 노트로 띄운다(실데이터 임시 주입). 비었거나 없으면 가짜 노트다 */
@@ -303,11 +315,48 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   });
 
   // 카드 보기: 지층에 깔린 노트만 3D 카드 공간(field 배치) 또는 2D 카드 목록으로 본다
+  const noteIndex = new Map(notes.map((n, i) => [n.id, i]));
+  const openNoteById = (id: string) => {
+    const i = noteIndex.get(id);
+    if (i !== undefined) screens.openNote(i);
+  };
   const cardList = new CardListMode(
     '← 지층으로',
     () => focus.set(null),
     () => focus.set(null),
+    { onOpen: openNoteById },
   );
+  // 검색: 제목·본문·태그로 찾은 노트를 묶음(행성)별 2D 목록으로 펼친다
+  const runSearch = (query: string): number => {
+    const found = searchNotes(notes, query);
+    const byPlanet = new Map<number, number[]>();
+    for (const m of found) {
+      const pi = planetOfNote[m];
+      const list = byPlanet.get(pi);
+      if (list) list.push(m);
+      else byPlanet.set(pi, [m]);
+    }
+    const groups = [...byPlanet.keys()]
+      .sort((a, b) => a - b)
+      .map((pi) => ({ key: planets[pi].cluster.key, label: planets[pi].date, members: byPlanet.get(pi) ?? [] }));
+    searchList.show(buildCardSections(groups, notes, photos));
+    return found.length;
+  };
+  const searchList = new CardListMode('← 은하로', undefined, undefined, {
+    onOpen: openNoteById,
+    search: {
+      placeholder: '제목·본문·#태그',
+      empty: (q) => (q.trim() ? `'${q.trim()}'에 맞는 노트가 없다` : '제목·본문·태그로 찾는다. #태그는 태그만 찾는다'),
+      onQuery: (q) => void runSearch(q),
+    },
+  });
+  const openSearch = (query?: string): number => {
+    focus.set(null);
+    const n = runSearch(query ?? searchList.query);
+    if (query !== undefined) searchList.setQuery(query);
+    searchList.focusSearch();
+    return n;
+  };
   let field: CardField | null = null;
   /** 카드 공간의 층들(최근 것부터)과 자리 번호 → 층 번호. 공간 모드 머리에 맨 앞 카드의 층을 적는다 */
   let fieldLayers: CardLayerInfo[] = [];
@@ -329,11 +378,15 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     field.offset = field.goalOffset;
   });
   const fieldOn = (): boolean => field !== null && cardList.open && cardList.mode === 'space';
-  /** 목록은 층별로 펼치고 바라보는 층을 맨 위에 둔다 */
-  const openCardList = () => {
-    if (!strata.active) return;
+  /** 카드 보기를 연다. 목록은 묶음(층)별로 펼치고 focusKey 묶음을 맨 위에 둔다 */
+  const showCards = (
+    groups: readonly { key: string; label: string; members: readonly number[]; words: CardLayerInfo['words'] }[],
+    focusKey: string | undefined,
+    closeLabel: string,
+  ) => {
+    if (groups.length === 0) return;
     focus.set(null);
-    const groups = strata.groups().map((g) => ({ ...g, label: planetByKey.get(g.key)?.date ?? g.label }));
+    cardList.setCloseLabel(closeLabel);
     const members = groups.flatMap((g) => g.members).sort((a, b) => notes[b].time - notes[a].time);
     field = buildField(members.length);
     fieldSlotOf.fill(-1);
@@ -347,9 +400,66 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       count: grp.members.length,
       words: grp.words,
     }));
-    cardList.show(buildCardSections(groups, notes, photos), strata.focusKey ?? undefined);
+    cardList.show(buildCardSections(groups, notes, photos), focusKey);
     shownLayer = -1;
   };
+  /** 지층 보기의 층들 */
+  const openCardList = () => {
+    if (!strata.active) return;
+    const groups = strata.groups().map((g) => ({ ...g, label: planetByKey.get(g.key)?.date ?? g.label }));
+    showCards(groups, strata.focusKey ?? undefined, '← 지층으로');
+  };
+  /** 행성들의 카드 보기 묶음 */
+  const planetGroups = (indices: readonly number[]) =>
+    indices.map((pi) => ({ key: planets[pi].cluster.key, label: planets[pi].date, members: planets[pi].cluster.members, words: planets[pi].words }));
+  /** 은하에서 다가간 노드: 그 노드가 속한 위 묶음의 행성들(지층 보기에 깔릴 노트와 같다) */
+  const openNodeCards = () => {
+    const key = approach.approached;
+    if (strata.active || !key) return;
+    const hubView = hubViews.find((h) => h.hub.key === key);
+    if (hubView) {
+      showCards(planetGroups(hubView.hub.children), undefined, '← 은하로');
+      return;
+    }
+    const pi = planets.findIndex((p) => p.cluster.key === key);
+    if (pi < 0) return;
+    const hub = hubs.find((h) => h.children.includes(pi));
+    showCards(planetGroups(hub ? hub.children : [pi]), planets[pi].cluster.key, '← 은하로');
+  };
+  /**
+   * 노트 보기·입력 화면. 저장·삭제 뒤 앨범을 다시 띄우기 전에 카드 보기·검색·지층 보기를 기록은 둔 채 닫고,
+   * 그 화면들이 쌓았던 기록 수를 알려 한꺼번에 되돌리게 한다
+   */
+  const screens = new NoteScreens(notes, photos, options.album, () => {
+    let pushed = 0;
+    for (const list of [cardList, searchList]) {
+      if (list.historyPushed) pushed++;
+      list.dismiss();
+    }
+    if (strata.historyPushed) pushed++;
+    strata.dismiss();
+    return pushed;
+  });
+  // Esc 는 맨 위 화면부터 닫는다. 지층 보기의 Esc 처리보다 먼저 받는다(창의 캡처 단계)
+  const onEscapeKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    let handled = screens.back();
+    if (!handled && !strata.active) {
+      if (searchList.open) {
+        searchList.close();
+        handled = true;
+      } else if (cardList.open) {
+        if (focus.focused) focus.set(null);
+        else cardList.close();
+        handled = true;
+      }
+    }
+    if (handled) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  };
+  window.addEventListener('keydown', onEscapeKey, true);
   const strata = new StrataMode(stage, cameraRig, labels, {
     onEscape: () => {
       if (focus.focused) {
@@ -383,7 +493,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   if (options.onBack) actionButton('← 탐색기로', options.onBack);
   const onAxis = options.onAxis;
   if (folders && onAxis) actionButton(axis === 'folder' ? '날짜별로 보기' : '폴더별로 보기', () => onAxis(axis === 'folder' ? 'date' : 'folder'));
-  actions.hidden = actions.childElementCount === 0;
+  if (options.album) actionButton('+ 노트', () => screens.compose());
+  actionButton('검색', () => void openSearch());
+  // 다가간 노드가 있을 때만 보인다
+  actionButton('카드 보기', () => openNodeCards());
+  const nodeCardsButton = actions.lastElementChild as HTMLButtonElement;
+  nodeCardsButton.hidden = true;
   document.body.appendChild(actions);
 
   /** 노드가 속한 위 묶음(허브)의 아래 묶음들을 층으로 쌓는다. 허브가 없으면 그 행성 하나가 층이다 */
@@ -509,8 +624,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       cameraRig.zoomByFactor(Math.exp((e.deltaY / 100) * tuning.gesture.wheelZoomSpeed));
     },
     onTap: ({ x, y }) => {
+      // 펼친 카드를 다시 누르면 노트 보기로 열고, 다른 곳을 누르면 닫는다
       if (focus.focused) {
-        focus.set(null);
+        const opened = focus.focused;
+        const hit = focus.pickHit(x, y, (card) => card === opened);
+        if (hit) screens.openNote(cardIndex.get(opened) ?? -1);
+        else focus.set(null);
         return;
       }
       // 카드 공간 보기에서는 공간의 카드만 펼친다
@@ -594,6 +713,14 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     },
   });
 
+  // 저장한 노트를 보여 줄 때는 그 노트의 묶음으로 다가간다(노드 자리는 첫 프레임 전이라 여기서 구한다)
+  const focusNoteIndex = options.focusNote === undefined ? undefined : noteIndex.get(options.focusNote);
+  if (focusNoteIndex !== undefined && planetOfNote[focusNoteIndex] >= 0) {
+    const planet = planets[planetOfNote[focusNoteIndex]];
+    spiralPoint(planet.offsetS, orbitClock, planet.jitter, planet.node.position);
+    tapNode(planet.node);
+  }
+
   return {
     title: 'COSMOS',
     hint: '끌기: 회전 · 핀치/휠: 줌 · 우클릭/두손가락: 이동 · 탭: 노드/카드',
@@ -613,6 +740,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     exitStrata: () => strata.exit(),
     pickStrataLayer: (x, y) => strata.pickLayer(x, y),
     openCardList,
+    noteScreens: screens,
+    openSearch,
+    openNodeCards,
     setCardMode: (mode) => {
       if (!cardList.open || cardList.mode === mode) return;
       focus.set(null);
@@ -629,8 +759,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
       // 은하 단추는 지층 보기 동안 지층 단추에 자리를 내준다
-      const hideActions = strata.active || actions.childElementCount === 0;
-      if (actions.hidden !== hideActions) actions.hidden = hideActions;
+      const hideNodeCards = approach.approached === null;
+      if (nodeCardsButton.hidden !== hideNodeCards) nodeCardsButton.hidden = hideNodeCards;
+      if (actions.hidden !== strata.active) actions.hidden = strata.active;
       look.uTime.value = time;
       // 지층 원판은 손가락이 닿아 있거나 카드를 펼쳤거나 카드 보기를 열면 멈춘다
       strata.spinning = touchCount === 0 && !focus.focused && !cardList.open;
@@ -651,7 +782,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
         pinnedTime = null;
       }
       strataWasActive = strata.active;
-      orbitPace = damp(orbitPace, touchCount > 0 || scrubbing || panning || strata.active ? 0 : 1, c.holdRate, dt);
+      const hold = touchCount > 0 || scrubbing || panning || strata.active || cardList.open || searchList.open;
+      orbitPace = damp(orbitPace, hold ? 0 : 1, c.holdRate, dt);
       const clockStep = dt * orbitPace;
       orbitClock += clockStep;
       // 은하가 도는 만큼 피벗도 함께 돌아 포커스한 노드·시점이 화면 가운데에 머문다
@@ -863,6 +995,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       scrubber.update();
     },
     dispose() {
+      window.removeEventListener('keydown', onEscapeKey, true);
+      screens.dispose();
+      searchList.dispose();
       actions.remove();
       stage.bloomScale = 1;
       stopFieldResize();

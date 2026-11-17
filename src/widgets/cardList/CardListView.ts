@@ -21,6 +21,10 @@ export interface CardListOptions {
   onClose: () => void;
   /** 있으면 머리에 공간/목록 토글을 띄우고, 바꿀 때 부른다 */
   onModeChange?: (mode: CardViewMode) => void;
+  /** 있으면 카드를 누를 때 그 노트 번호로 부른다 */
+  onOpen?: (id: string) => void;
+  /** 있으면 머리에 검색 칸을 띄우고, 글을 고칠 때마다 검색어로 부른다. empty 는 보여 줄 카드가 없을 때의 안내 글이다 */
+  search?: { placeholder: string; empty: (query: string) => string; onQuery: (query: string) => void };
 }
 
 /**
@@ -31,6 +35,8 @@ export interface CardListOptions {
 export class CardListView {
   private readonly root: HTMLDivElement;
   private readonly title: HTMLSpanElement;
+  private readonly closeButton: HTMLButtonElement;
+  private readonly searchInput: HTMLInputElement | null = null;
   private readonly layer: HTMLDivElement;
   private readonly body: HTMLDivElement;
   private readonly observer: IntersectionObserver;
@@ -52,8 +58,21 @@ export class CardListView {
     close.type = 'button';
     close.textContent = options.closeLabel;
     close.addEventListener('click', () => this.options.onClose());
+    this.closeButton = close;
     this.title = el('span', 'card-list-title');
-    head.append(close, this.title);
+    head.append(close);
+    const search = options.search;
+    if (search) {
+      const input = el('input', 'card-list-search');
+      input.type = 'search';
+      input.placeholder = search.placeholder;
+      input.enterKeyHint = 'search';
+      input.addEventListener('input', () => search.onQuery(input.value));
+      this.searchInput = input;
+      this.root.classList.add('searching');
+      head.append(input);
+    }
+    head.append(this.title);
     if (options.onModeChange) {
       const toggle = el('div', 'card-list-toggle');
       for (const [mode, text] of [
@@ -88,6 +107,27 @@ export class CardListView {
 
   get open(): boolean {
     return !this.root.hidden;
+  }
+
+  setCloseLabel(text: string): void {
+    this.closeButton.textContent = text;
+  }
+
+  /** 검색 칸의 글. 검색 칸이 없으면 빈 글 */
+  get query(): string {
+    return this.searchInput?.value ?? '';
+  }
+
+  /** 검색 칸에 글을 넣고 검색어로 부른다(확인 스크립트용) */
+  setQuery(query: string): void {
+    if (!this.searchInput) return;
+    this.searchInput.value = query;
+    this.options.search?.onQuery(query);
+  }
+
+  /** 검색 칸에 입력 초점을 둔다 */
+  focusSearch(): void {
+    this.searchInput?.focus();
   }
 
   get mode(): CardViewMode {
@@ -170,6 +210,11 @@ export class CardListView {
       this.body.append(sec);
       if (section.key === focusKey) focusEl = sec;
     }
+    if (sections.length === 0 && this.options.search) {
+      const p = el('p', 'card-list-empty');
+      p.textContent = this.options.search.empty(this.query);
+      this.body.append(p);
+    }
     this.focusSection = focusEl;
     this.root.hidden = false;
     document.body.classList.add('card-view-open');
@@ -202,6 +247,16 @@ export class CardListView {
   private card(item: CardListItem, gen: number): HTMLElement {
     const card = el('article', `card-item card-${item.kind}`);
     card.style.setProperty('--card-tint', holoTint(item));
+    card.dataset.id = item.id;
+    const onOpen = this.options.onOpen;
+    if (onOpen) {
+      card.classList.add('openable');
+      card.addEventListener('click', () => {
+        // 글을 끌어 고르는 중이면 열지 않는다
+        if (window.getSelection()?.toString()) return;
+        onOpen(item.id);
+      });
+    }
     if (item.photo) {
       const box = el('div', 'card-item-photo');
       box.style.aspectRatio = `1 / ${photoBoxRatio(item.photo, tuning.cardList.photoAspect)}`;
