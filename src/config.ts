@@ -374,7 +374,7 @@ export const tuning = {
    * minColumnPx 는 칸의 최소 폭(CSS px), photoAspect 는 사진 칸 높이/폭 비율의 범위, preloadPx 는 화면 밖 얼마나 미리 사진을 디코딩할지(CSS px)다
    */
   cardList: {
-    minColumnPx: 168,
+    minColumnPx: 200,
     photoAspect: [0.6, 1.4],
     preloadPx: 480,
   },
