@@ -480,6 +480,9 @@ export const tuning = {
     photoQuality: 0.88,
     viewerPhotoMaxPx: 2400,
     editorPhotoPx: 640,
+    /** 노트 보기의 가로 끌기: 이 거리(CSS px) 이상, 가로가 세로의 swipeRatio 배 이상 움직이면 이전·다음 노트로 넘긴다 */
+    swipePx: 60,
+    swipeRatio: 1.5,
   },
 
   dev: {

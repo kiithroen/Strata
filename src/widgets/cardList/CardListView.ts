@@ -21,8 +21,8 @@ export interface CardListOptions {
   onClose: () => void;
   /** 있으면 머리에 공간/목록 토글을 띄우고, 바꿀 때 부른다 */
   onModeChange?: (mode: CardViewMode) => void;
-  /** 있으면 카드를 누를 때 그 노트 번호로 부른다 */
-  onOpen?: (id: string) => void;
+  /** 있으면 카드를 누를 때 그 노트 번호와 카드가 속한 묶음의 노트 번호들(목록 순서)로 부른다 */
+  onOpen?: (id: string, group: readonly string[]) => void;
   /** 있으면 머리에 검색 칸을 띄우고, 글을 고칠 때마다 검색어로 부른다. empty 는 보여 줄 카드가 없을 때의 안내 글이다 */
   search?: { placeholder: string; empty: (query: string) => string; onQuery: (query: string) => void };
 }
@@ -205,7 +205,8 @@ export class CardListView {
       count.textContent = `${section.items.length}장`;
       h.append(count);
       const grid = el('div', 'card-list-grid');
-      for (const item of section.items) grid.append(this.card(item, gen));
+      const ids = section.items.map((item) => item.id);
+      for (const item of section.items) grid.append(this.card(item, gen, ids));
       sec.append(h, grid);
       this.body.append(sec);
       if (section.key === focusKey) focusEl = sec;
@@ -244,7 +245,8 @@ export class CardListView {
     this.body.replaceChildren();
   }
 
-  private card(item: CardListItem, gen: number): HTMLElement {
+  /** group 은 카드가 속한 묶음의 노트 번호들(목록 순서)이다. 노트 보기에서 그 안을 넘긴다 */
+  private card(item: CardListItem, gen: number, group: readonly string[]): HTMLElement {
     const card = el('article', `card-item card-${item.kind}`);
     card.style.setProperty('--card-tint', holoTint(item));
     card.dataset.id = item.id;
@@ -254,7 +256,7 @@ export class CardListView {
       card.addEventListener('click', () => {
         // 글을 끌어 고르는 중이면 열지 않는다
         if (window.getSelection()?.toString()) return;
-        onOpen(item.id);
+        onOpen(item.id, group);
       });
     }
     if (item.photo) {

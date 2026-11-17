@@ -2,6 +2,7 @@ import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import type { NoteKind } from '../noteCard/cardLayout';
 import { holoTint, releasePhoto, type PhotoSource } from '../noteCard/cardTexture';
+import { swipeStep } from './noteNav';
 
 /** 보기 화면에 띄우는 노트 하나 */
 export interface ViewedNote {
@@ -22,12 +23,22 @@ export interface NoteViewerOptions {
   onEdit?: (id: string) => void;
   /** 삭제 단추를 두 번 눌렀을 때(고칠 수 있는 노트만 보인다) */
   onDelete?: (id: string) => void;
+  /** 이전(-1)·다음(1) 노트로 넘길 때(단추·가로 끌기). 방향키는 여는 쪽이 맡는다 */
+  onStep?: (dir: 1 | -1) => void;
+}
+
+/** 넘길 차례 안의 지금 자리(0부터)와 노트 수 */
+export interface ViewerNav {
+  position: number;
+  total: number;
 }
 
 const KIND_LABEL: Record<NoteKind, string> = { photo: '사진', memo: '메모', doc: '문서' };
 
 /**
  * 노트 보기: 노트 하나의 사진 전체와 글 전체를 읽는 2D 전체 화면. 3D 화면 위를 덮는다.
+ * 넘길 차례(nav)를 주면 머리의 ‹ › 단추와 손가락 가로 끌기로 이전·다음 노트로 넘긴다. 끄는 동안 쪽이 손가락을 따라오고,
+ * 넘기지 않으면 제자리로 돌아간다.
  * 사진은 화면 폭 × 기기 픽셀 배율(album.viewerPhotoMaxPx 이하)로 그려 받는다. 고칠 수 있는 노트는 편집·삭제 단추가 있고,
  * 삭제는 한 번 더 눌러야 지운다. 방문 기록과 Esc 는 여는 쪽이 맡는다(hide 는 기록을 건드리지 않는다).
  */
@@ -36,7 +47,13 @@ export class NoteViewer {
   private readonly kindLabel: HTMLSpanElement;
   private readonly editButton: HTMLButtonElement;
   private readonly deleteButton: HTMLButtonElement;
+  private readonly prevButton: HTMLButtonElement;
+  private readonly nextButton: HTMLButtonElement;
+  private readonly counter: HTMLSpanElement;
   private readonly body: HTMLDivElement;
+  private nav: ViewerNav | null = null;
+  /** 끌고 있는 손가락과 시작 자리 */
+  private drag: { id: number; x: number; y: number } | null = null;
   private note: ViewedNote | null = null;
   private armed = false;
   /** 보여 줄 때마다 늘린다. 다른 노트로 바뀐 뒤 도착한 사진을 가려낸다 */
@@ -52,8 +69,17 @@ export class NoteViewer {
       if (this.note) this.options.onEdit?.(this.note.id);
     });
     this.deleteButton = button('note-button note-delete', '삭제', () => this.onDeleteClick());
-    head.append(close, this.kindLabel, this.editButton, this.deleteButton);
+    this.prevButton = button('note-button note-step', '‹', () => this.options.onStep?.(-1));
+    this.prevButton.setAttribute('aria-label', '이전 노트');
+    this.nextButton = button('note-button note-step', '›', () => this.options.onStep?.(1));
+    this.nextButton.setAttribute('aria-label', '다음 노트');
+    this.counter = el('span', 'note-viewer-count');
+    head.append(close, this.kindLabel, this.prevButton, this.counter, this.nextButton, this.editButton, this.deleteButton);
     this.body = el('div', 'note-viewer-body');
+    this.body.addEventListener('pointerdown', this.onPointerDown);
+    this.body.addEventListener('pointermove', this.onPointerMove);
+    this.body.addEventListener('pointerup', this.onPointerUp);
+    this.body.addEventListener('pointercancel', this.onPointerCancel);
     this.root.append(head, this.body);
     document.body.appendChild(this.root);
   }
@@ -67,9 +93,28 @@ export class NoteViewer {
     return this.open ? this.note?.id ?? null : null;
   }
 
-  /** 노트를 연다. editable 이면 편집·삭제 단추를 보인다 */
-  show(note: ViewedNote, editable: boolean): void {
+  /** 넘길 차례 안의 지금 자리. 넘길 차례가 없으면 null */
+  get position(): ViewerNav | null {
+    return this.open ? this.nav : null;
+  }
+
+  /**
+   * 노트를 연다. editable 이면 편집·삭제 단추를 보인다. nav 의 노트가 둘 이상이면 넘기기 단추와 자리를 보인다.
+   * enter 는 넘겨 들어온 방향으로, 새 쪽이 그쪽에서 밀려 들어온다
+   */
+  show(note: ViewedNote, editable: boolean, nav?: ViewerNav, enter?: 1 | -1): void {
     this.note = note;
+    this.nav = nav && nav.total > 1 ? nav : null;
+    this.drag = null;
+    const navigable = this.nav !== null && this.options.onStep !== undefined;
+    this.prevButton.hidden = !navigable;
+    this.nextButton.hidden = !navigable;
+    this.counter.hidden = !navigable;
+    if (this.nav) {
+      this.prevButton.disabled = this.nav.position <= 0;
+      this.nextButton.disabled = this.nav.position >= this.nav.total - 1;
+      this.counter.textContent = `${this.nav.position + 1} / ${this.nav.total}`;
+    }
     const gen = ++this.generation;
     this.disarm();
     this.editButton.hidden = !editable || !this.options.onEdit;
@@ -100,6 +145,7 @@ export class NoteViewer {
       foot.append(t);
     }
     page.append(foot);
+    if (enter) page.classList.add(enter > 0 ? 'enter-next' : 'enter-prev');
     this.body.append(page);
     this.root.hidden = false;
     this.body.scrollTop = 0;
@@ -112,12 +158,62 @@ export class NoteViewer {
     this.root.hidden = true;
     this.body.replaceChildren();
     this.note = null;
+    this.nav = null;
+    this.drag = null;
     document.body.classList.remove('note-viewer-open');
   }
 
   dispose(): void {
     this.hide();
     this.root.remove();
+  }
+
+  private readonly onPointerDown = (e: PointerEvent) => {
+    // 마우스는 글을 끌어 고르므로 넘기지 않는다(단추·방향키로 넘긴다)
+    if (e.pointerType === 'mouse' || !this.nav || !this.options.onStep || this.drag) return;
+    this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  };
+
+  private readonly onPointerMove = (e: PointerEvent) => {
+    const drag = this.drag;
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    const page = this.page();
+    if (!page) return;
+    // 세로로 더 움직이면 브라우저가 쪽을 굴린다(pan-y). 가로로 움직일 때만 쪽이 손가락을 따라온다
+    if (Math.abs(dx) > Math.abs(e.clientY - drag.y)) {
+      page.classList.add('dragging');
+      page.style.transform = `translateX(${dx}px)`;
+    }
+  };
+
+  private readonly onPointerUp = (e: PointerEvent) => {
+    const drag = this.drag;
+    if (!drag || e.pointerId !== drag.id) return;
+    this.drag = null;
+    const dir = swipeStep(e.clientX - drag.x, e.clientY - drag.y);
+    const nav = this.nav;
+    const canStep = nav !== null && (dir > 0 ? nav.position < nav.total - 1 : nav.position > 0);
+    if (dir !== 0 && canStep) this.options.onStep?.(dir);
+    else this.settle();
+  };
+
+  private readonly onPointerCancel = (e: PointerEvent) => {
+    if (!this.drag || e.pointerId !== this.drag.id) return;
+    this.drag = null;
+    this.settle();
+  };
+
+  /** 끌다 만 쪽을 제자리로 돌린다 */
+  private settle(): void {
+    const page = this.page();
+    if (!page) return;
+    page.classList.remove('dragging');
+    page.style.transform = '';
+  }
+
+  private page(): HTMLElement | null {
+    return this.body.querySelector<HTMLElement>('.note-viewer-page');
   }
 
   private onDeleteClick(): void {

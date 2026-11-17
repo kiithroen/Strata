@@ -2,6 +2,7 @@ import type { NoteDraft } from '../album/albumModel';
 import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 import { NoteEditor, type EditorResult } from '../widgets/noteView/NoteEditor';
 import { NoteViewer } from '../widgets/noteView/NoteViewer';
+import { sequenceOf, stepSequence, type NoteSequence } from '../widgets/noteView/noteNav';
 import type { NoteRef } from '../widgets/timeAxis/axisModel';
 import type { CosmosView } from './cosmosDemo';
 import { OverlayStack } from './overlayStack';
@@ -31,6 +32,8 @@ export interface AlbumActions {
  * 우주 보기 위에 겹쳐 여는 노트 보기·입력 화면과 그 방문 기록. 저장·삭제 뒤에는 열린 화면과 아래 화면(카드 보기·지층 보기)이
  * 쌓은 기록을 한꺼번에 되돌린 다음 앨범을 다시 띄운다. 새 노트는 그 노트의 묶음으로 다가가고, 고치거나 지웠으면
  * 보던 화면을 되살린다(고쳤으면 그 노트의 보기 화면도 다시 연다).
+ * 보기 화면은 연 자리의 노트 묶음(카드 목록의 묶음, 검색 결과의 묶음, 은하의 행성) 안에서 이전·다음으로 넘긴다.
+ * 넘겨도 방문 기록은 쌓지 않아 뒤로 한 번에 보기 화면을 닫는다.
  */
 export class NoteScreens {
   readonly viewer: NoteViewer;
@@ -38,6 +41,15 @@ export class NoteScreens {
   private readonly stack = new OverlayStack();
   /** 입력 화면이 고치는 노트 번호(새 노트면 undefined) */
   private editing: string | undefined;
+  /** 보기 화면이 넘길 차례 */
+  private sequence: NoteSequence | null = null;
+  /** 방향키는 보기 화면이 맨 위에 있을 때만 넘긴다(입력 화면의 글 칸에서는 커서를 옮긴다) */
+  private readonly onKey = (e: KeyboardEvent) => {
+    if (this.stack.top !== this.viewer || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    this.step(e.key === 'ArrowRight' ? 1 : -1);
+  };
 
   constructor(
     private readonly notes: readonly NoteRef[],
@@ -47,13 +59,17 @@ export class NoteScreens {
     private readonly snapshot: () => CosmosView,
     /** 아래 화면을 기록은 그대로 두고 닫고, 그 화면들이 쌓았던 기록 수를 돌려준다 */
     private readonly dismissBelow: () => number,
+    /** 연 쪽이 넘길 차례를 주지 않았을 때 노트가 속한 묶음의 노트 번호들(최근 것부터) */
+    private readonly groupOf: (index: number) => readonly number[] = (index) => [index],
   ) {
     const editable = album !== undefined;
     this.viewer = new NoteViewer({
       onClose: () => this.stack.back(),
       onEdit: editable ? (id) => this.edit(id) : undefined,
       onDelete: editable ? (id) => void this.remove(id).catch((err) => console.error(err)) : undefined,
+      onStep: (dir) => this.step(dir),
     });
+    window.addEventListener('keydown', this.onKey);
     this.editor = album
       ? new NoteEditor({
           onCancel: () => this.stack.back(),
@@ -75,10 +91,29 @@ export class NoteScreens {
     return true;
   }
 
-  /** 노트 번호(notes 안의 순서)를 보기 화면으로 연다 */
-  openNote(index: number): void {
+  /**
+   * 노트 번호(notes 안의 순서)를 보기 화면으로 연다. members 는 넘길 차례의 노트 번호들(최근 것부터)이고,
+   * 없으면 노트가 속한 묶음이다
+   */
+  openNote(index: number, members?: readonly number[]): void {
+    if (!this.notes[index]) return;
+    this.showSequence(sequenceOf(members ?? this.groupOf(index), index));
+  }
+
+  /** 보기 화면에서 이전(-1)·다음(1) 노트로 넘긴다. 끝이면 그대로다 */
+  step(dir: 1 | -1): boolean {
+    if (!this.viewer.open || !this.sequence) return false;
+    const next = stepSequence(this.sequence, dir);
+    if (!next) return false;
+    this.showSequence(next, dir);
+    return true;
+  }
+
+  private showSequence(seq: NoteSequence, enter?: 1 | -1): void {
+    const index = seq.members[seq.position];
     const note = this.notes[index];
     if (!note) return;
+    this.sequence = seq;
     this.viewer.show(
       {
         id: note.id,
@@ -91,6 +126,8 @@ export class NoteScreens {
         photo: this.photos[index],
       },
       this.album?.editable(note.id) ?? false,
+      { position: seq.position, total: seq.members.length },
+      enter,
     );
     if (!this.stack.has(this.viewer)) this.stack.push(this.viewer);
   }
@@ -114,6 +151,7 @@ export class NoteScreens {
   }
 
   dispose(): void {
+    window.removeEventListener('keydown', this.onKey);
     this.stack.dispose();
     this.viewer.dispose();
     this.editor?.dispose();

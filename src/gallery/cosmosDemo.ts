@@ -54,6 +54,7 @@ import { CardFocus } from './cardFocus';
 import { CardListMode } from './cardListMode';
 import { NoteScreens, type AlbumActions } from './noteScreens';
 import { searchNotes } from '../album/albumModel';
+import { newestFirst } from '../widgets/noteView/noteNav';
 import { buildCardSections } from '../widgets/cardList/cardListModel';
 import type { CardLayerInfo, CardViewMode } from '../widgets/cardList/CardListView';
 import { StrataMode } from './strataMode';
@@ -338,9 +339,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
 
   // 카드 보기: 지층에 깔린 노트만 3D 카드 공간(field 배치) 또는 2D 카드 목록으로 본다
   const noteIndex = new Map(notes.map((n, i) => [n.id, i]));
-  const openNoteById = (id: string) => {
+  /** group 은 넘길 차례의 노트 번호들(목록 순서). 없으면 노트가 속한 행성이다 */
+  const openNoteById = (id: string, group?: readonly string[]) => {
     const i = noteIndex.get(id);
-    if (i !== undefined) screens.openNote(i);
+    if (i === undefined) return;
+    const members = group?.map((g) => noteIndex.get(g)).filter((m): m is number => m !== undefined);
+    screens.openNote(i, members);
   };
   const cardList = new CardListMode(
     '← 지층으로',
@@ -466,6 +470,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     if (strata.historyPushed) pushed++;
     strata.dismiss();
     return pushed;
+  }, (index) => {
+    const pi = planetOfNote[index];
+    return pi >= 0 ? newestFirst(planets[pi].cluster.members, (m) => notes[m].time) : [index];
   });
   // Esc 는 맨 위 화면부터 닫는다. 지층 보기의 Esc 처리보다 먼저 받는다(창의 캡처 단계)
   const onEscapeKey = (e: KeyboardEvent) => {

@@ -1156,6 +1156,54 @@ body.explorer-open .hud-bottom {
   color: #ff9cb0;
 }
 
+/* 노트 보기의 이전·다음 넘기기 */
+.note-step {
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.note-viewer-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.note-viewer-count[hidden] {
+  display: none;
+}
+
+.note-viewer-page {
+  transition: transform 180ms ease;
+}
+
+.note-viewer-page.dragging {
+  transition: none;
+}
+
+.note-viewer-page.enter-next {
+  animation: note-enter-next 200ms ease-out;
+}
+
+.note-viewer-page.enter-prev {
+  animation: note-enter-prev 200ms ease-out;
+}
+
+@keyframes note-enter-next {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+}
+
+@keyframes note-enter-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+  }
+}
+
 .note-viewer-body,
 .note-editor-body {
   flex: 1;
