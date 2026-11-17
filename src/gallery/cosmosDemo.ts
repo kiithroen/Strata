@@ -1,6 +1,6 @@
 import { Color, Quaternion, Vector3, type Fog } from 'three';
 import { tuning } from '../config';
-import { DAY_MS, floorTo } from '../core/calendar';
+import { DAY_MS } from '../core/calendar';
 import { damp } from '../core/motion';
 import { createRng, range } from '../core/random';
 import { createFakeNoteData, type NoteData } from '../dev/noteData';
@@ -13,34 +13,27 @@ import { ScreenLabels } from '../widgets/common/screenLabels';
 import {
   RegroupBlend,
   branchCubicControls,
-  buildHubs,
-  bucketLabel,
   burstOffset,
   catmullRomPoint,
-  clusterAffinities,
   cubicBezierPoint,
   facingQuaternion,
   hubPoint,
   pickNearest,
-  choosePlanetUnit,
   cosmosFade,
   flightOffset,
   flightParams,
   hourColorIndex,
   nodeColor,
-  parentUnit,
   planetJitter,
-  planetLabel,
   planetRadius,
   galaxySpinAngle,
   spiralPoint,
-  swarmCapacity,
   timeOffsetDepth,
-  type Hub,
   type PlanetJitter,
   type TapTarget,
 } from '../widgets/cosmos/cosmosModel';
 import { GraphView } from '../widgets/cosmos/GraphView';
+import { dateGrouping, folderGrouping, type GroupHub, type Grouping } from '../widgets/cosmos/grouping';
 import { TapApproach, approachDistance } from '../widgets/cosmos/tapApproach';
 import { Universe } from '../widgets/cosmos/Universe';
 import { createCardLook } from '../widgets/noteCard/cardMaterial';
@@ -50,7 +43,6 @@ import { NoteCard } from '../widgets/noteCard/NoteCard';
 import { cardEdgePoint } from '../widgets/noteCard/cardEdge';
 import {
   AxisController,
-  clusterNotes,
   depthPerDay,
   levelLogScale,
   type AxisState,
@@ -78,7 +70,9 @@ export interface CosmosDemo extends WidgetDemo {
   readonly cameraRig: CameraRig;
   readonly cards: readonly NoteCard[];
   clusters(): readonly Cluster[];
-  hubs(): readonly Hub[];
+  hubs(): readonly GroupHub[];
+  /** 노트를 묶은 축 */
+  readonly axis: CosmosAxis;
   /** 지난 프레임에 그린 행성·허브 노드 */
   nodes(): readonly CosmosNode[];
   focus(card: NoteCard | null): void;
@@ -125,8 +119,16 @@ const LABEL_PRIORITY = { hub: 3, title: 2, date: 1 } as const;
 /** 가짜 노트의 가장 최근 시각 */
 const FAKE_NEWEST = new Date(2026, 10, 15, 21, 30).getTime();
 
+/** 은하가 노트를 묶는 축. 폴더 축은 탐색기 폴더에서 온 노트만 쓸 수 있다 */
+export type CosmosAxis = 'date' | 'folder';
+
+export interface CosmosOptions {
+  /** 폴더 정보가 있는 노트의 기본 축은 폴더다 */
+  axis?: CosmosAxis;
+}
+
 /** data 를 넘기면 그 노트로 띄운다(실데이터 임시 주입). 비었거나 없으면 가짜 노트다 */
-export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
+export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOptions = {}): CosmosDemo {
   const c = tuning.cosmos;
   const g = c.graph;
   stage.grid.visible = false;
@@ -196,14 +198,13 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const homes = notes.map(createPose);
 
   // 시계열 공간이 고정돼 있어 묶음·허브·관련도·글자는 한 번만 구하고, 노드 위치 벡터도 재사용한다
-  const unit = choosePlanetUnit(spiralState);
-  const parent = parentUnit(unit);
-  const capacity = swarmCapacity(unit);
-  const clusters: Cluster[] = clusterNotes(notes, unit);
-  const hubs: Hub[] = buildHubs(clusters, parent);
-  const planets = clusters.map((cluster) => {
+  const folders = data?.folders && data.notes.length > 0 ? data.folders : null;
+  const axis: CosmosAxis = folders && options.axis !== 'date' ? 'folder' : 'date';
+  const grouping: Grouping = axis === 'folder' && folders ? folderGrouping(notes, folders.paths, folders.rootName) : dateGrouping(notes, spiralState);
+  const { capacity, hubs } = grouping;
+  const planets = grouping.planets.map((group) => {
+    const { cluster, affinities } = group;
     const n = cluster.members.length;
-    const affinities = clusterAffinities(notes, cluster.members, unit);
     const color = nodeColor(cluster.key);
     const tags = topTags(cluster.members.map((m) => notes[m].tags), tuning.cloud.maxWords);
     return {
@@ -217,11 +218,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       radius: planetRadius(n),
       size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
       glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
-      label: planetLabel(unit, floorTo(unit, cluster.anchorTime), n),
-      /** 2D 카드 목록의 묶음 머리 글자(장수는 목록이 따로 붙인다) */
-      date: bucketLabel(unit, floorTo(unit, cluster.anchorTime)),
-      /** 노드 위에 뜨는 대표 태그(가장 많이 쓰인 태그)와 멀리서 보이는 태그 워드 클라우드 */
-      title: tags[0]?.text ?? null,
+      label: group.label,
+      /** 지층 층 이름과 2D 카드 목록의 묶음 머리 글자(장수는 목록이 따로 붙인다) */
+      date: group.heading,
+      /** 노드 위에 뜨는 글자(폴더 축은 폴더 이름, 날짜 축은 가장 많이 쓰인 태그)와 멀리서 보이는 태그 워드 클라우드 */
+      title: group.title ?? tags[0]?.text ?? null,
       words: layoutCloud(tags),
       affinities,
       /** 관련도 높은 순서의 묶음 안 번호 */
@@ -235,7 +236,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       hub,
       childOffsets: hub.children.map((ci) => planets[ci].offsetS),
       color,
-      label: planetLabel(parent ?? unit, hub.bucket, hub.notes),
+      label: hub.label,
       node: { kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: new Vector3() } as CosmosNode,
     };
   });
@@ -564,7 +565,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     controller,
     cameraRig,
     cards,
-    clusters: () => clusters,
+    clusters: () => planets.map((p) => p.cluster),
+    axis,
     hubs: () => hubs,
     nodes: () => nodes,
     focus: (card) => focus.set(card),

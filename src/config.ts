@@ -318,6 +318,8 @@ export const tuning = {
       burst: { inner: 0.06, spacing: 0.055, pullSpread: 0.85, pullCurve: 1.5, depthJitter: 0.05, spin: 0.06 },
       hourColors: ['#2a5cff', '#2f9dff', '#38d4ff', '#7fe9ff', '#5a7dff', '#8fb4ff'],
     },
+    /** 폴더 축(탐색기 폴더를 은하로 볼 때): 행성(폴더)마다 카드로 도는 파일 수, 폴더에서 가장 오래된 파일의 관련도 */
+    folderAxis: { capacity: 8, minAffinity: 0.25 },
     /**
      * 노드 둘레를 도는 카드(위성). 카드는 기운 원 궤도를 일정한 빠르기로 돌고 늘 카메라를 바라본다.
      * capacityByUnit: 행성 단위별 카드 수(넘친 노트는 점으로만 보인다).
