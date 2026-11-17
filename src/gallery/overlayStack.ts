@@ -18,10 +18,11 @@ export class OverlayStack {
   private readonly layers: OverlayLayer[] = [];
   private waiters: Array<() => void> = [];
   private readonly onPop = (e: PopStateEvent) => {
-    const depth = depthOf(e.state);
-    while (this.layers.length > depth) this.layers.pop()?.hide();
+    // 화면을 닫다가 새로 기다리기 시작한 되돌리기(rewind)는 이 popstate 가 아니라 다음 것을 기다려야 하므로 먼저 떼어 둔다
     const waiters = this.waiters;
     this.waiters = [];
+    const depth = depthOf(e.state);
+    while (this.layers.length > depth) this.layers.pop()?.hide();
     for (const w of waiters) w();
   };
 
