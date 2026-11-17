@@ -127,8 +127,10 @@ export class NoteCard {
     u.uFocus.value = m.focus;
     u.uFade.value = opacity;
     this.mesh.visible = opacity > HIDDEN;
-    // 펼치는 카드는 다른 카드보다 나중에 그려 가려지지 않게 한다
-    this.mesh.renderOrder = m.focused || m.focus > HIDDEN ? 10 : 0;
+    // 펼치는 카드는 다른 카드보다 나중에, 깊이 검사 없이 그려 카메라에 더 가까운 카드에도 가려지지 않고 맨 위에 보인다
+    const opening = m.focused || m.focus > HIDDEN;
+    this.mesh.renderOrder = opening ? 10 : 0;
+    this.mesh.material.depthTest = !opening;
     this.updateDetail();
     if (this.badge) this.badge.material.opacity = opacity * (1 - m.focus);
   }
