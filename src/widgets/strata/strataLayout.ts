@@ -21,12 +21,11 @@ export interface StrataLayerInput {
   words?: readonly PlacedWord[];
 }
 
-/** 층 판 위 자리. x 는 판의 오른쪽, z 는 판의 앞쪽(보는 쪽)이다. radius 는 비튼 창이 차지하는 원의 반지름 */
+/** 층 판 위 자리. x 는 판의 오른쪽, z 는 판의 앞쪽(보는 쪽)이다. radius 는 창이 차지하는 원(대각선)의 반지름 */
 export interface StrataTile {
   index: number;
   x: number;
   z: number;
-  yaw: number;
   scale: number;
   radius: number;
 }
@@ -102,7 +101,6 @@ export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: nu
         index: t.index,
         x: slots[k].x,
         z: slots[k].z,
-        yaw: 0,
         scale,
         radius: diag / 2,
       };
@@ -173,7 +171,7 @@ export function strataPoint(frame: StrataFrame, x: number, y: number, z: number,
  */
 export function strataPose(frame: StrataFrame, layer: StrataLayer, tile: StrataTile, out: Pose, spin = 0): Pose {
   out.position.set(tile.x, layer.y, tile.z).applyAxisAngle(AXIS_Y, frame.yaw + spin).add(frame.origin);
-  turn.setFromAxisAngle(AXIS_Y, frame.yaw + spin + tile.yaw);
+  turn.setFromAxisAngle(AXIS_Y, frame.yaw + spin);
   out.quaternion.copy(turn).multiply(lay);
   out.scale = tile.scale;
   return out;

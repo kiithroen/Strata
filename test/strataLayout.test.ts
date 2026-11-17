@@ -47,7 +47,6 @@ describe('layoutStrata', () => {
       expect(layer.radius).toBeCloseTo(outer + s.margin, 9);
       for (let i = 0; i < t.length; i++) {
         expect(Math.hypot(t[i].x, t[i].z) + t[i].radius).toBeLessThanOrEqual(layer.radius - s.margin + 1e-9);
-        expect(Math.abs(t[i].yaw)).toBeLessThanOrEqual(s.yawJitter);
         for (let j = i + 1; j < t.length; j++) {
           expect(Math.hypot(t[i].x - t[j].x, t[i].z - t[j].z)).toBeGreaterThanOrEqual(t[i].radius + t[j].radius - 1e-9);
         }
@@ -142,7 +141,7 @@ describe('strataPose', () => {
     for (const yaw of [0, 0.7, -2.1]) {
       const frame = { origin: new Vector3(1, 2, 3), yaw };
       for (const tile of layer.tiles) {
-        const pose = strataPose(frame, layer, { ...tile, yaw: 0 }, createPose());
+        const pose = strataPose(frame, layer, tile, createPose());
         const normal = new Vector3(0, 0, 1).applyQuaternion(pose.quaternion);
         const up = new Vector3(0, 1, 0).applyQuaternion(pose.quaternion);
         const toViewer = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));

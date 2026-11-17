@@ -73,8 +73,8 @@ export const tuning = {
       faintAlpha: 0.24,
       bandAlpha: 0.18,
       glowRatio: 0.016,
-      /** 메모 바탕에 까는 메모 색의 불투명도, 문서 괘선의 불투명도 */
-      washAlpha: 0.22,
+      /** 메모 바탕에 까는 메모 색 그라데이션의 위·아래 불투명도(문서는 아래 값에서 투명으로), 문서 괘선의 불투명도 */
+      washAlpha: [0.275, 0.1],
       ruleAlpha: 0.18,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
@@ -285,8 +285,9 @@ export const tuning = {
     planetMaxRadius: 0.34,
     /** 행성 글자 높이(CSS px). 화면에 늘 같은 크기로 보인다 */
     planetLabelPx: 12,
-     /**
+    /**
      * 선 그래프. 선 굵기는 CSS px, 점·빛 크기는 월드 단위 지름이다.
+     * branchBend: 허브에서 자식 행성으로 가는 곡선 가지의 제어점. 허브 쪽은 척추 접선 방향으로, 행성 쪽은 허브 쪽으로 허브-행성 거리의 이 비율만큼 당긴다.
      * nodeColor: 노드(행성·허브)마다 키로 고르는 색의 채도·명도 범위와 중심 점을 hubColor 와 섞는 비율.
      * burst: 노드에서 노트 점이 방사형으로 퍼지는 원판(안쪽 반지름, 간격, 앞뒤 흔들림, 회전 속도).
      * hourColors: 노트가 찍힌 시각(4시간 단위)별 점 색
@@ -294,6 +295,7 @@ export const tuning = {
     graph: {
       branchWidth: 5.2,
       branchSegments: 14,
+      branchBend: [0.38, 0.28],
       spokeWidth: 1.0,
       branchColor: '#5cd8ff',
       hubColor: '#e4f8ff',
@@ -305,7 +307,7 @@ export const tuning = {
       dotSize: 0.055,
       glowSize: 1.65,
       hubGlowSize: 2.5,
-      glowAlpha: 0.34,
+      glowAlpha: 0.24,
       /** 허브 글자 높이(CSS px) */
       hubLabelPx: 15,
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
@@ -379,9 +381,10 @@ export const tuning = {
     layerGap: 1.65,
     /** 노트 창 배율(card.width 기준 크기 대비). 관련도가 낮은 노트부터 높은 노트까지 */
     cardScale: [0.42, 0.62],
-    /** 칸 사이 여백(가장 큰 창 대각선 대비)과 칸 안에서 비트는 요의 최대각(라디안) */
+    /** 창 사이·고리 사이 여백(가장 큰 창 대각선 대비) */
     cellGap: 0.16,
-    yawJitter: 0,
+    /** 지층에 깔리지 않는 카드가 들어가는 동안 사라지는 빠르기(들어간 정도 대비 배율) */
+    leaveFade: 2.5,
     /** 층 원판이 가장 바깥 창보다 넓게 두르는 여백(월드)과 날짜 글자 높이(월드) */
     margin: 0.35,
     labelHeight: 0.14,

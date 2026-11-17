@@ -64,9 +64,9 @@ export class GraphView {
     this.labels.begin();
   }
 
-  /** 정점을 공유하는 연속 곡선 가지를 그린다. 각 점마다 alpha 를 주면 깊이에 따라 부드럽게 옅어진다 */
-  branchCurve(points: readonly Vector3[], alphas: readonly number[], color: Color): void {
-    this.branches.addCurve(points, alphas, color, this.alphaScale);
+  /** 정점을 공유하는 연속 곡선 가지를 그린다. 앞의 count 개 점을 쓰고, 각 점마다 alpha 를 주면 깊이에 따라 부드럽게 옅어진다 */
+  branchCurve(points: readonly Vector3[], alphas: readonly number[], color: Color, count = points.length): void {
+    this.branches.addCurve(points, alphas, color, this.alphaScale, count);
   }
 
   spoke(a: Vector3, b: Vector3, color: Color, alpha: number): void {
@@ -230,8 +230,8 @@ class RibbonBatch {
     this.indexCount = 0;
   }
 
-  addCurve(points: readonly Vector3[], alphas: readonly number[], color: Color, alphaScale: number): void {
-    const n = points.length;
+  addCurve(points: readonly Vector3[], alphas: readonly number[], color: Color, alphaScale: number, count: number): void {
+    const n = count;
     if (n < 2 || alphaScale < 0.005) return;
     const needVerts = n * 2;
     const needIndices = (n - 1) * 6;
@@ -251,7 +251,7 @@ class RibbonBatch {
       const pPrev = i > 0 ? points[i - 1] : curr;
       const pNext = i < n - 1 ? points[i + 1] : curr;
       const a = alphas[i] * alphaScale;
-      for (const s of [-1, 1]) {
+      for (let s = -1; s <= 1; s += 2) {
         const vi = this.vertCount++;
         this.position.setXYZ(vi, curr.x, curr.y, curr.z);
         this.prev.setXYZ(vi, pPrev.x, pPrev.y, pPrev.z);

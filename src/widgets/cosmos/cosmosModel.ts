@@ -206,9 +206,10 @@ export function branchCubicControls(
     c2.copy(hp).lerp(child, 2 / 3);
     return;
   }
+  const [out, pull] = tuning.cosmos.graph.branchBend;
   const sign = branchDir.dot(tangent) >= 0 ? 1 : -1;
-  c1.copy(hp).addScaledVector(tangent, sign * d * 0.38);
-  c2.copy(child).addScaledVector(branchDir, -0.28);
+  c1.copy(hp).addScaledVector(tangent, sign * d * out);
+  c2.copy(child).addScaledVector(branchDir, -pull);
 }
 
 /** 3차 베지어 곡선 위 t(0~1) 자리의 점 */

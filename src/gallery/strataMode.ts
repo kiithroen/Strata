@@ -231,7 +231,7 @@ export class StrataMode {
   blendCard(index: number, home: Pose, fade: number): number {
     if (this.mix <= 0) return fade;
     const p = this.placed.get(index);
-    if (!p) return fade * Math.max(0, 1 - this.mix * 2.5);
+    if (!p) return fade * Math.max(0, 1 - this.mix * tuning.strata.leaveFade);
     strataPose(this.frame, p.layer, p.tile, this.pose, this.spin);
     const w = this.mix;
     home.position.lerp(this.pose.position, w);

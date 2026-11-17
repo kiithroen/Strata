@@ -746,7 +746,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
             idx++;
           }
         }
-        graph.branchCurve(spinePoints.slice(0, idx), spineAlphas.slice(0, idx), branchColor);
+        graph.branchCurve(spinePoints, spineAlphas, branchColor, idx);
       };
       if (hubViews.length > 0) {
         drawSpine(hubViews, hubAlphas);

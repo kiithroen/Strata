@@ -19,7 +19,7 @@
 노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 카드 색(사진·문서는 `card.holo.kinds`, 메모는 `card.holo.memoColors` 가운데 하나)의 가는 테두리와 글자(`card.holo.glowRatio`)로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선은 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 사진만 제 색이다.
 - 세 종류 모두 같은 둥근 사각형이고(`card.window.cornerRatio`, `cardLayout.ts`의 `cornerRadius`) 색과 내용, 주제에 맞는 작은 요소로 구분된다. 제목 줄 왼쪽에 종류 아이콘(사진은 조리개, 메모는 접착 메모지, 문서는 귀퉁이 접힌 페이지)과 작은 이름표(고정폭 글꼴, 흐린 색), 상태 줄 왼쪽에 찍은 시각을 적는다. 멀리서 보는 단순한 텍스처는 아이콘 대신 점이다. 본문 글꼴은 산세리프다.
 - **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채우고 모서리를 둥글게 자른다(`card.window.innerCornerRatio`). 이름표는 캡션, 없으면 `IMG_번호`다.
-- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색 그라데이션을 깔고(`card.holo.washAlpha`) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
+- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색 그라데이션을 깔고(`card.holo.washAlpha`의 위·아래 불투명도) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
 - 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기본 해상도(`qualityDefaults.tex`)에서 한 번 정해 품질 설정을 바꾸거나 단순·상세 텍스처를 써도 같은 모양이다.
 - **긴 문서 (`doc`)**: `1 : √2` 카드. 이름표는 `TXT_번호`이고, 옅은 푸른 유리 바탕 위에 굵은 제목과 공책처럼 본문 줄마다 옅은 괘선(`card.holo.ruleAlpha`)을 긋고 촘촘한 문단을 쓴다.
 - 둥근 모서리 밖은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
@@ -131,7 +131,7 @@
 
 **허브와 가지** (`parentUnit`, `buildHubs`, `hubPoint`)
 - 허브 단위는 행성 단위의 한 단계 위다(연이면 허브가 없다). 같은 허브 칸의 행성이 한 허브에 이어진다.
-- 허브는 자식 행성들의 평균 시간 오프셋(`s`)과 평균 나선 반지름에 `graph.hubRadius` 비율을 곱한 안쪽 구면 껍질 위에 놓인다. 허브끼리는 Catmull-Rom 스플라인 한 줄로 매끄럽게 잇고, 허브에서 자식 행성으로는 척추 접선을 따라 갈라져 나오는 3차 베지어 곡선 가지(`graph.branchWidth`, `graph.branchSegments`, `graph.branchColor`, `graph.branchAlpha`)를 뻗는다. 허브가 없으면 행성끼리 스플라인 한 줄로 잇는다.
+- 허브는 자식 행성들의 평균 시간 오프셋(`s`)과 평균 나선 반지름에 `graph.hubRadius` 비율을 곱한 안쪽 구면 껍질 위에 놓인다. 허브끼리는 Catmull-Rom 스플라인 한 줄로 매끄럽게 잇고, 허브에서 자식 행성으로는 척추 접선을 따라 갈라져 나오는 3차 베지어 곡선 가지(`graph.branchWidth`, `graph.branchSegments`, 제어점 `graph.branchBend`, `graph.branchColor`, `graph.branchAlpha`)를 뻗는다. 허브가 없으면 행성끼리 스플라인 한 줄로 잇는다.
 - 허브는 묶음 키로 정한 각기 다른 색의 큰 점(`graph.hubSize`, 중심은 `graph.hubColor`와 섞는다)과 같은 색의 빛 무리(`graph.hubGlowSize`), 위쪽 글자(`graph.hubLabelPx`)로 그린다. 은하의 글자는 카메라를 향하고 거리와 상관없이 화면에서 정한 CSS px 높이로 보인다(`GraphView.label`).
 - 가지는 정점을 공유하는 화면 공간 발광 리본(`RibbonBatch`)으로 그려 이음매에 점이 찍히지 않고, 살은 `LineSegments2`, 점과 빛 무리는 거리에 따라 작아지는 점 묶음이다. 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
 
@@ -169,7 +169,7 @@
 - 고른 층 판의 중심은 고른 노드 자리이고, 판은 들어갈 때의 카메라 요만큼 돌아 앞에서 보면 창의 글이 바로 읽힌다. 카메라는 그 자리로 피벗을 옮기며 `strata.pitch` 각도로 내려다본다. 거리는 `strata.distance`이고, 바라보는 층 원판이 화면 폭에 안 들어오면 원판 앞 가장자리에서 반지름이 화면 반폭 × `strata.fitWidth` 안에 들 만큼 물러난다(`strataDistance`). 층을 바꾸거나 화면 비율이 바뀌면 다시 잡는다.
 - 나올 때는 들어가기 전 피벗·거리·각도로 돌아간다. 지층 보기 동안 은하는 멈춰 있어(공전 시계 정지) 돌아오면 보던 자리 그대로다.
 - 왼쪽 아래 `← 은하로` 단추, 층 판 바깥 탭, 브라우저·안드로이드 뒤로, `Esc`로 나온다(펼친 카드가 있으면 `Esc`는 카드를 먼저 닫고, 나올 때는 펼친 카드도 함께 닫는다). 들어갈 때 방문 기록을 하나 쌓고, 단추·`Esc`로 나올 때는 그 기록을 되돌린다.
-- 들어간 정도(`mix`, 0~1)는 `strata.transitionRate`로 지수 접근한다. 층에 깔리는 노트 창은 은하 자세와 지층 자세를 `mix`로 섞어 날아가 눕고 또렷해진다. 나머지 창은 옅어진다. 은하 그래프는 `strata.galaxyDim` 배로 옅어지고 노드에서 창으로 가는 실은 걷힌다. 종이 휨(`uBend`)과 떠 있는 흔들림(`floatScale`)은 `1 − mix`를 곱해, 다 들어가면 창이 판 위에 평평하게 가만히 놓인다.
+- 들어간 정도(`mix`, 0~1)는 `strata.transitionRate`로 지수 접근한다. 층에 깔리는 노트 창은 은하 자세와 지층 자세를 `mix`로 섞어 날아가 눕고 또렷해진다. 나머지 창은 `mix` × `strata.leaveFade`만큼 빨리 옅어진다. 은하 그래프는 `strata.galaxyDim` 배로 옅어지고 노드에서 창으로 가는 실은 걷힌다. 종이 휨(`uBend`)과 떠 있는 흔들림(`floatScale`)은 `1 − mix`를 곱해, 다 들어가면 창이 판 위에 평평하게 가만히 놓인다.
 
 **배치** (`layoutStrata`, `strataPose`)
 - 층마다 그 행성의 태그 워드 클라우드를 함께 넘긴다. 멀어지면 층 위에 낱말이 뜨고 카드가 사라진다(아래 "태그 워드 클라우드").

@@ -64,8 +64,8 @@ function palette(face: CardFace): Palette {
     dim: rgba(h.dimAlpha),
     faint: rgba(h.faintAlpha),
     band: rgba(h.bandAlpha),
-    washTop: rgba(h.washAlpha * 1.25),
-    washBottom: rgba(h.washAlpha * 0.45),
+    washTop: rgba(h.washAlpha[0]),
+    washBottom: rgba(h.washAlpha[1]),
     rule: rgba(h.ruleAlpha),
   };
 }
@@ -259,7 +259,7 @@ function drawBody(ctx: CanvasRenderingContext2D, layout: CardLayout, p: Palette,
     if (layout.kind === 'memo') drawFold(ctx, layout, p, line);
   }
 
-  // 실을 묶는 자리에 종류 아이콘(멀리서는 점)
+  // 제목 줄 왼쪽에 종류 아이콘(멀리서는 점)
   ctx.fillStyle = p.line;
   ctx.strokeStyle = p.line;
   if (simple) {
