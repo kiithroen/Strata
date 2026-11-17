@@ -265,7 +265,7 @@
 - 칸은 썸네일 격자(`explorer.tileMinPx`)다. 칸 색은 종류 색(`explorer.kindColors`)이고, 폴더는 폴더 그림, 파일은 확장자 글자다. 사진은 화면 근처(`explorer.preloadPx`)에 들어온 칸만 디코딩 큐(`explorer.decodeConcurrency`)로 `explorer.thumbPx` 폭(기기 픽셀 비율, 최대 2배)의 썸네일을 만든다. 폴더를 옮기면 기다리던 썸네일은 버린다.
 - 폴더를 옮길 때마다 방문 기록을 쌓아 브라우저·안드로이드 뒤로가 지난 폴더로 간다. `Backspace`·`Alt+↑`는 위 폴더로 간다.
 - `은하로 보기`는 지금 폴더와 하위 폴더의 열 수 있는 파일을 폴더 축 은하로 띄운다(`explorerNotes.ts`의 `folderNotes`, 우주 보기의 "묶는 축"). 가까운 폴더부터 너비 우선으로 훑어 `explorer.cosmosMaxFiles` 개에서 멈추고, 파일 앞부분은 `explorer.readConcurrency` 개씩 겹쳐 읽는다. 사진은 사진 카드(EXIF 촬영 시각, 없으면 수정 시각), 동영상은 길이의 `explorer.videoThumbAt` 비율 자리 장면을 그리는 사진 카드(크기·장면을 읽을 때마다 숨은 video 요소와 객체 URL 을 만들고 끝나면 바로 비운다. `explorer.videoTimeoutMs` 안에 끝나지 않으면 실패로 친다), 음악은 메모 카드, 텍스트는 앞 `explorer.cardTextBytes` 바이트를 담은 문서 카드다. 읽는 동안 상태 줄에 진행을 적는다.
-- 은하에서 `← 탐색기로`를 누르면 같은 원본의 보던 폴더로 돌아온다(`appHooks.explorerResume`).
+- 은하로 갈 때 방문 기록을 하나 쌓는다(`{ cosmos: true }`, `main.ts`). 은하에서 뒤로(안드로이드 뒤로 포함)나 `← 탐색기로`(같은 기록을 되돌린다)를 누르면 같은 원본의 보던 폴더로 돌아오고(`appHooks.explorerResume`), 앞으로 가면 같은 은하를 다시 띄운다. 지층·카드 보기의 기록은 그 위에 쌓여 뒤로가 먼저 그것을 닫는다. 위젯을 바꿀 때 주소는 띄우기 전에 바꾸고, 뒤로·앞으로로 온 항목의 상태는 그대로 둔다(탐색기가 마운트하며 적은 폴더 상태를 덮지 않는다).
 
 **뷰어** (`MediaViewer`)
 - 전체 화면 2D다. 지금 폴더의 뷰어로 여는 파일을 지금 정렬 순서로 넘긴다(`‹ ›` 단추, 방향키, 사진은 가로로 `explorer.swipePx` 이상 끌기). `Esc`·닫기·뒤로로 닫는다. 열 때 방문 기록을 하나 쌓고, 닫기·`Esc`로 닫으면 되돌린다.
