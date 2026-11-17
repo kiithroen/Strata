@@ -40,8 +40,6 @@ export class NoteCard {
   readonly layout: CardLayout;
   readonly motion: CardMotion;
   readonly mesh: Mesh<PlaneGeometry, ShaderMaterial>;
-  /** 종이마다 다르게 출렁이도록 어긋낸 휨 위상. 휜 높이를 셰이더 밖에서 구할 때(paperBend) 쓴다 */
-  readonly bendPhase: number;
   /** 펼치지 않았을 때의 그리는 차례. 지층에 깔리면 그 층 판 바로 다음 차례를 받는다 */
   layerOrder = 0;
 
@@ -90,14 +88,12 @@ export class NoteCard {
       look: opts.look,
       width: this.layout.worldWidth,
       height: this.layout.worldHeight,
-      bendPhase: phase / 1000,
+      phase: phase / 1000,
       corner: cornerUv(this.layout),
       runner: runnerVariation(this.id),
       tint: holoTint(opts.face),
     });
-    this.bendPhase = phase / 1000;
-    const seg = tuning.card.segments;
-    this.mesh = new Mesh(new PlaneGeometry(this.layout.worldWidth, this.layout.worldHeight, seg, seg), material);
+    this.mesh = new Mesh(new PlaneGeometry(this.layout.worldWidth, this.layout.worldHeight), material);
     this.mesh.name = `note-card-${this.id}`;
     this.mesh.userData.card = this;
     this.motion = new CardMotion(opts.float);

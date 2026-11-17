@@ -7,7 +7,6 @@ import { tuning } from '../config';
  * - bloom: 블룸 후처리(render.bloom)
  * - dust, stars: 먼지·별 개수(cosmos.dust.count, cosmos.stars.count)
  * - nebula: 'off' 면 성운을 끄고, 0 이면 매 프레임 계산, 양수면 그 크기 큐브맵에 굽는다(cosmos.nebula)
- * - seg: 종이 휨 격자 칸 수(card.segments)
  * - tex: 떠 있는 카드 텍스처 폭(card.textureWidth)
  */
 export interface QualityValues {
@@ -17,14 +16,13 @@ export interface QualityValues {
   dust: number;
   stars: number;
   nebula: number | 'off';
-  seg: number;
   tex: number;
 }
 
 export type QualityKey = keyof QualityValues;
 export type QualityPreset = keyof typeof tuning.quality.presets;
 
-export const qualityKeys: readonly QualityKey[] = ['pr', 'aa', 'bloom', 'dust', 'stars', 'nebula', 'seg', 'tex'];
+export const qualityKeys: readonly QualityKey[] = ['pr', 'aa', 'bloom', 'dust', 'stars', 'nebula', 'tex'];
 export const qualityPresets = Object.keys(tuning.quality.presets) as QualityPreset[];
 
 /** target 의 지금 품질 값을 읽는다 */
@@ -37,7 +35,6 @@ export function readQuality(target: typeof tuning = tuning): QualityValues {
     dust: target.cosmos.dust.count,
     stars: target.cosmos.stars.count,
     nebula: n.visible ? n.bakeSize : 'off',
-    seg: target.card.segments,
     tex: target.card.textureWidth,
   };
 }
@@ -63,8 +60,6 @@ export function sanitizeQuality(raw: unknown): Partial<QualityValues> {
     const n = int(r.nebula);
     if (n !== undefined && n >= 0) out.nebula = n;
   }
-  const seg = int(r.seg);
-  if (seg !== undefined && seg >= 1) out.seg = seg;
   const tex = int(r.tex);
   if (tex !== undefined && tex >= 1) out.tex = tex;
   return out;
@@ -112,7 +107,6 @@ export function applyQuality(o: Partial<QualityValues>, target: typeof tuning = 
     set(target.cosmos.nebula, 'visible', true);
     set(target.cosmos.nebula, 'bakeSize', o.nebula);
   }
-  if (o.seg !== undefined) set(target.card, 'segments', o.seg);
   if (o.tex !== undefined) set(target.card, 'textureWidth', o.tex);
 }
 

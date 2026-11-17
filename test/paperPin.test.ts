@@ -1,7 +1,6 @@
 import { Euler, Quaternion, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
-import { bendHeight } from '../src/widgets/noteCard/paperBend';
 import { pinPoint } from '../src/widgets/noteCard/paperPin';
 
 describe('pinPoint', () => {
@@ -26,21 +25,5 @@ describe('pinPoint', () => {
       expect(local.length()).toBeCloseTo(Math.abs(lift) * w * s, 9);
       expect(local.dot(new Vector3(0, 0, 1).applyQuaternion(q))).toBeCloseTo(lift * w * s, 9);
     });
-  });
-});
-
-describe('bendHeight', () => {
-  it('종이 휨 높이는 물결 두 개와 말림의 최대 높이를 넘지 않고 시간에 따라 출렁인다', () => {
-    const b = tuning.card.bend;
-    const max = b.waveAmp[0] + b.waveAmp[1] + b.curl * 0.25;
-    const seen = new Set<number>();
-    for (let t = 0; t < 10; t += 0.13) {
-      for (const [x, y] of [[-0.5, 0.5], [0, 0], [0.3, -0.2], [0.5, -0.5]]) {
-        const z = bendHeight(x, y, t, 1.234);
-        expect(Math.abs(z)).toBeLessThanOrEqual(max + 1e-12);
-        seen.add(Math.round(z * 1000));
-      }
-    }
-    expect(seen.size).toBeGreaterThan(10);
   });
 });

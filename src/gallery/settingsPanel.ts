@@ -19,7 +19,6 @@ const KEY_LABEL: Record<QualityKey, string> = {
   dust: '먼지',
   stars: '별',
   nebula: '성운',
-  seg: '종이 격자',
   tex: '카드 텍스처',
 };
 

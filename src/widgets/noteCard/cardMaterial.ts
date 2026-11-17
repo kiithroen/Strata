@@ -12,13 +12,6 @@ export interface CardLook {
   uFogFar: { value: number };
   /** 0이면 각도와 상관없이 같은 밝기, 1이면 비스듬히 볼수록 홀로그램 가장자리가 밝아진다(card.lod.glint 배) */
   uShade: { value: number };
-  /** 0이면 평평한 카드, 1이면 바람에 휘고 출렁이는 종이 */
-  uBend: { value: number };
-  uWaveFreq: { value: Vector2 };
-  uWaveAmp: { value: Vector2 };
-  uWaveSpeed: { value: Vector2 };
-  uCurl: { value: number };
-  uCurlSpeed: { value: number };
   /** 홀로그램 선 색의 기본값. 재질마다 노트 종류 색(CardMaterialOptions.tint)으로 바꿔 쓴다 */
   uHoloTint: { value: Color };
   uDetailRange: { value: Vector2 };
@@ -40,7 +33,6 @@ export interface CardLook {
 
 export function createCardLook(): CardLook {
   const l = tuning.look;
-  const b = tuning.card.bend;
   const lod = tuning.card.lod;
   const h = tuning.card.holoFx;
   return {
@@ -51,12 +43,6 @@ export function createCardLook(): CardLook {
     uFogNear: { value: l.fogNear },
     uFogFar: { value: l.fogFar },
     uShade: { value: 0 },
-    uBend: { value: 0 },
-    uWaveFreq: { value: new Vector2(...b.waveFreq) },
-    uWaveAmp: { value: new Vector2(...b.waveAmp) },
-    uWaveSpeed: { value: new Vector2(...b.waveSpeed) },
-    uCurl: { value: b.curl },
-    uCurlSpeed: { value: b.curlSpeed },
     uHoloTint: { value: new Color(l.accent) },
     uDetailRange: { value: new Vector2(...lod.detail) },
     uColorRange: { value: new Vector2(...lod.color) },
@@ -74,22 +60,12 @@ export function createCardLook(): CardLook {
 }
 
 /**
- * 종이 휨: 카드 좌표(-0.5~0.5)의 가로·세로 물결과 가로 말림을 더한 높이 f(x, y)를 앞뒤로 민다.
- * 법선은 f 의 편미분으로 구해 휜 면을 따라 빛이 바뀌게 한다. 펼치는 동안(uFocus)에는 평평해진다.
- * 카드 높이가 화면 높이에서 차지하는 비율로 단순한 모양 ↔ 제대로 된 모양(vDetail), 흑백 ↔ 제 색(vColor)을 정한다.
+ * 카드는 평평한 유리판이다. 카드 높이가 화면 높이에서 차지하는 비율로 단순한 모양 ↔ 제대로 된 모양(vDetail), 흑백 ↔ 제 색(vColor)을 정한다.
  * 카드 중심 하나로 재서 한 장 안에서는 같다.
  */
 const vertexShader = /* glsl */ `
-uniform float uTime;
-uniform float uBend;
-uniform float uBendPhase;
 uniform float uFocus;
 uniform vec2 uCardSize;
-uniform vec2 uWaveFreq;
-uniform vec2 uWaveAmp;
-uniform vec2 uWaveSpeed;
-uniform float uCurl;
-uniform float uCurlSpeed;
 uniform vec2 uDetailRange;
 uniform vec2 uColorRange;
 varying vec2 vUv;
@@ -105,22 +81,10 @@ void main() {
   float screen = uCardSize.y * scaleY * projectionMatrix[1][1] * 0.5 / max(-center.z, 1e-3);
   vDetail = max(smoothstep(uDetailRange.x, uDetailRange.y, screen), uFocus);
   vColor = max(smoothstep(uColorRange.x, uColorRange.y, screen), uFocus);
-  vec3 p = position;
-  float x = p.x / uCardSize.x;
-  float y = p.y / uCardSize.y;
-  float amt = uBend * (1.0 - uFocus);
-  float ax = uWaveFreq.x * x + uWaveSpeed.x * uTime + uBendPhase;
-  float ay = uWaveFreq.y * y + uWaveSpeed.y * uTime + uBendPhase * 1.7;
-  float cs = sin(uCurlSpeed * uTime + uBendPhase * 0.6);
-  float f = uWaveAmp.x * sin(ax) + uWaveAmp.y * sin(ay) + uCurl * x * x * cs;
-  float fx = uWaveAmp.x * uWaveFreq.x * cos(ax) + 2.0 * uCurl * x * cs;
-  float fy = uWaveAmp.y * uWaveFreq.y * cos(ay);
-  p.z += f * uCardSize.x * amt;
-  vec3 nLocal = normalize(vec3(-fx * amt, -fy * amt * uCardSize.x / uCardSize.y, 1.0));
-  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vDepth = -mv.z;
   vViewPos = mv.xyz;
-  vNormalV = normalize(normalMatrix * nLocal);
+  vNormalV = normalize(normalMatrix * vec3(0.0, 0.0, 1.0));
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -149,7 +113,7 @@ uniform vec3 uRunner;
 uniform vec3 uRunnerVar;
 /** 카드 겉모양(둥근 사각형)의 모서리 반지름(카드 높이 단위) */
 uniform float uCorner;
-uniform float uBendPhase;
+uniform float uPhase;
 uniform float uAspect;
 uniform float uDim;
 uniform float uFocus;
@@ -200,7 +164,7 @@ void main() {
   color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
 
   // 보는 각도(면의 기울기와 시선)에 따라 미끄러지는 위상. 카드가 돌거나 시점이 움직이면 빛이 흐른다
-  float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uIrisShift + dot(viewDir.xy, vec2(-0.6, 0.8)) * uIrisShift * 0.5 + uBendPhase;
+  float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uIrisShift + dot(viewDir.xy, vec2(-0.6, 0.8)) * uIrisShift * 0.5 + uPhase;
   vec3 rainbow = iris(phase + (vUv.x + vUv.y) * 0.35);
 
   // 비스듬히 볼수록 가장자리가 밝아지고 무지개빛 막이 돈다
@@ -223,7 +187,7 @@ void main() {
   vec2 fromCenter = vec2((vUv.x - 0.5) * uAspect, vUv.y - 0.5);
   float around = atan(fromCenter.y, fromCenter.x) / 6.28318530718 + 0.5;
   float dir = sign(uRunnerVar.x);
-  float behind = fract(uTime * uRunner.y * abs(uRunnerVar.x) + uBendPhase - around * dir);
+  float behind = fract(uTime * uRunner.y * abs(uRunnerVar.x) + uPhase - around * dir);
   float runner = exp(-behind / (uRunner.z * uRunnerVar.y)) * smoothstep(1.0, 0.97, behind);
   float lit = rim * (uBorder.y + uRunner.x * uRunnerVar.z * runner) * body;
   color.rgb += uHoloTint * lit;
@@ -263,8 +227,8 @@ export interface CardMaterialOptions {
   look: CardLook;
   width: number;
   height: number;
-  /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다. 훑는 빛 띠의 때와 무지개빛 위상도 어긋낸다 */
-  bendPhase: number;
+  /** 카드마다 어긋낸 위상. 테두리를 도는 빛의 출발점과 무지개빛 위상을 어긋낸다 */
+  phase: number;
   /** 카드 겉모양의 모서리 반지름(카드 높이 단위, cornerUv). 테두리 빛이 이 선을 따른다 */
   corner: number;
   /** 테두리를 따라 도는 빛의 카드별 배율(runnerVariation) */
@@ -282,7 +246,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       uHoloTint: { value: new Color(o.tint) },
       uAspect: { value: o.width / o.height },
       uCardSize: { value: new Vector2(o.width, o.height) },
-      uBendPhase: { value: o.bendPhase },
+      uPhase: { value: o.phase },
       uCorner: { value: o.corner },
       uRunnerVar: { value: new Vector3(o.runner.speed, o.runner.tail, o.runner.strength) },
       uDim: { value: 0 },

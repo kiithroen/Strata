@@ -53,7 +53,7 @@ export class PerfOverlay {
       `호출 ${info.render.calls}  삼각형 ${kilo(info.render.triangles)}  점 ${kilo(info.render.points)}  선 ${kilo(info.render.lines)}`,
       `텍스처 ${info.memory.textures}  형상 ${info.memory.geometries}  사진 디코딩 ${photoQueue.active} (대기 ${photoQueue.pending})`,
       `화면 ${window.innerWidth}×${window.innerHeight} CSS  캔버스 ${canvas.width}×${canvas.height} @${f(pr, 2)} (dpr ${f(window.devicePixelRatio, 2)})  aa ${tuning.render.antialias ? 'on' : 'off'}  블룸 ${tuning.render.bloom ? 'on' : 'off'}`,
-      `먼지 ${tuning.cosmos.dust.count}  별 ${tuning.cosmos.stars.count}  성운 ${nebula}  격자 ${tuning.card.segments}  텍스처 ${tuning.card.textureWidth}`,
+      `먼지 ${tuning.cosmos.dust.count}  별 ${tuning.cosmos.stars.count}  성운 ${nebula}  텍스처 ${tuning.card.textureWidth}`,
       this.gpu,
     ].join('\n');
   }

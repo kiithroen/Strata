@@ -130,13 +130,6 @@ export const tuning = {
     memo: { widthScales: [0.6, 0.92], fullText: 40, aspect: [0.5, 1.3], titleRatio: 0.07, bodyRatio: 0.058, lineHeight: 1.45 },
     /** 긴 문서는 1:√2 세로 비율이다. 기준 폭 대비 배율 */
     doc: { widthScale: 1.05 },
-    /** 휨 격자 칸 수(가로·세로) */
-    segments: 10,
-    /**
-     * 종이 휨: 카드 좌표(-0.5~0.5)에서 가로·세로 물결의 빈도·높이·빠르기, 가로 말림 크기와 빠르기.
-     * 높이는 카드 폭 대비다
-     */
-    bend: { waveFreq: [5, 4], waveAmp: [0.05, 0.035], waveSpeed: [1.9, 1.5], curl: 0.32, curlSpeed: 0.6 },
     /** 카드 중심에서 연결 선이 닿는 뒷면 오프셋(폭 대비) */
     pin: { lift: 0.012 },
   },
@@ -521,8 +514,8 @@ export const tuning = {
    */
   quality: {
     presets: {
-      low: { pr: 1, aa: false, bloom: false, dust: 3000, stars: 1200, nebula: 128, seg: 6, tex: 224 },
-      mid: { pr: 1.5, aa: true, dust: 5500, stars: 1800, nebula: 256, seg: 8, tex: 288 },
+      low: { pr: 1, aa: false, bloom: false, dust: 3000, stars: 1200, nebula: 128, tex: 224 },
+      mid: { pr: 1.5, aa: true, dust: 5500, stars: 1800, nebula: 256, tex: 288 },
       high: {},
     },
     options: {
@@ -530,7 +523,6 @@ export const tuning = {
       dust: [0, 3000, 5500, 9000],
       stars: [600, 1200, 1800, 2600],
       nebula: ['off', 0, 128, 256, 512],
-      seg: [4, 6, 8, 10],
       tex: [224, 288, 320],
     },
   },

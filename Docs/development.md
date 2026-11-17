@@ -37,7 +37,6 @@ npm run dev
 | 블룸 | 블룸 후처리(`render.bloom`). 낮음 프리셋은 끈다 |
 | 먼지, 별 | 개수(`cosmos.dust.count`, `cosmos.stars.count`) |
 | 성운 | 끄기, 매 프레임 계산, 그 크기 큐브맵에 굽기(`cosmos.nebula`) |
-| 종이 격자 | 종이 휨 격자 칸 수(`card.segments`) |
 | 카드 텍스처 | 떠 있는 카드 텍스처 폭(`card.textureWidth`) |
 
 `quality.options`에는 기본값과 모든 프리셋 값이 들어 있어야 한다(테스트가 확인한다). 맞는 값을 찾으면 `src/config.ts`의 기본값과 프리셋을 고친다.

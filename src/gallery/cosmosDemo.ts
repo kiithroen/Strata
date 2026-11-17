@@ -50,7 +50,6 @@ import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import { CardField } from '../widgets/noteCard/cardField';
 import { createPose } from '../widgets/noteCard/cardMotion';
 import { NoteCard } from '../widgets/noteCard/NoteCard';
-import { bendHeight } from '../widgets/noteCard/paperBend';
 import { pinPoint } from '../widgets/noteCard/paperPin';
 import {
   AxisController,
@@ -143,7 +142,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   look.uFogNear.value = c.fogNear;
   look.uFogFar.value = c.fogFar;
   look.uShade.value = c.paperShade;
-  look.uBend.value = 1;
   const labels = new LabelCache();
   const universe = new Universe(stage.renderer);
   stage.scene.add(universe.group);
@@ -608,8 +606,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       // 카드 공간 보기 동안에는 층 판·층 낱말·은하 그래프를 걷고 별 배경만 남긴다
       strata.veil = 1 - fieldMix;
       graph.alphaScale = (1 - mix * (1 - tuning.strata.galaxyDim)) * (1 - fieldMix);
-      // 지층에 눕힌 창은 종이 휨과 떠 있는 흔들림 없이 판 위에 가만히 놓인다
-      look.uBend.value = 1 - mix;
       if (strata.active) {
         pinnedTime = strata.focusTime;
         if (pinnedTime !== null) controller.target.focusTime = pinnedTime;
@@ -724,13 +720,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = paperFade[m] * (1 - card.motion.focus);
-          const bent = bendHeight(0, 0, time, card.bendPhase) * look.uBend.value * (1 - card.motion.focus);
           pinPoint(
             card.mesh.position,
             card.mesh.quaternion,
             card.mesh.scale.x,
             card.layout.worldWidth,
-            bent - tuning.card.pin.lift,
+            -tuning.card.pin.lift,
             pinWorld,
           );
           spokeEnd.copy(dotP).lerp(pinWorld, tied);
