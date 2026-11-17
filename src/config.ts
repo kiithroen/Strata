@@ -392,11 +392,11 @@ export const tuning = {
     spin: { speed: 0.08, rate: 2.5 },
     /**
      * 아래에서 올라오는 빛기둥. emitterGap 은 가장 아래층에서 발광부까지 거리(layerGap 배), topGap 은 가장 위층 위로 더 뻗는 거리(layerGap 배),
-     * spread 는 위쪽 반지름(가장 큰 층 반지름 배), base 는 발광부 반지름(월드), alpha 는 빛기둥 밝기, glow 는 발광부 빛 무리 크기(월드)다
+     * spread 는 위쪽 반지름(가장 큰 층 반지름 배), base 는 발광부 반지름(월드), alpha 는 빛기둥 밝기, glow·glowAlpha 는 발광부 빛 무리 크기(월드)·밝기다
      */
-    beam: { emitterGap: 0.9, topGap: 0.35, spread: 0.85, base: 0.12, alpha: 0.5, glow: 2.2 },
+    beam: { emitterGap: 0.9, topGap: 0.35, spread: 0.85, base: 0.12, alpha: 0.42, glow: 1.45, glowAlpha: 0.55 },
     /** 바라보는 층이 아닌 층의 밝기 배율 */
-    otherLayerAlpha: 0.45,
+    otherLayerAlpha: 0.36,
     /** 들어가고 나오는 전환 속도(1/초) */
     transitionRate: 3.2,
     /** 카메라가 층을 내려다보는 각(라디안)과 거리, 판 반폭이 차지해도 되는 화면 반폭 비율(넘으면 물러난다) */

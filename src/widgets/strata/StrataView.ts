@@ -46,6 +46,7 @@ void main() {
 const ringFragment = /* glsl */ `
 uniform vec3 uColor;
 uniform float uOpacity;
+uniform float uFocus;
 uniform float uTime;
 uniform float uLine;
 uniform float uFill;
@@ -79,23 +80,27 @@ void main() {
   float aaTurn = fwidth(turn) > 0.5 ? 0.0 : fwidth(turn);
 
   float a = 0.0;
-  // 바깥 실선 링과 10도마다 눈금
-  a += ring(rho, 1.0, uLine, aa);
-  float tick = dashes(turn, 36.0, 0.08, aaTurn) * step(1.0, rho) * (1.0 - smoothstep(1.04, 1.04 + aa, rho));
-  a += tick * 0.8;
+  // 바깥 실선 링(바라보는 층은 더 도드라진다)과 10도·30도 눈금
+  float outer = ring(rho, 1.0, uLine * mix(0.85, 1.15, uFocus), aa);
+  a += outer;
+  float tick10 = dashes(turn, 36.0, 0.08, aaTurn) * step(1.0, rho) * (1.0 - smoothstep(1.035, 1.035 + aa, rho));
+  float tick30 = dashes(turn, 12.0, 0.04, aaTurn) * step(1.0, rho) * (1.0 - smoothstep(1.06, 1.06 + aa, rho));
+  a += (tick10 * 0.65 + tick30 * 0.55) * mix(0.55, 1.0, uFocus);
   // 안쪽 점선 링
-  a += ring(rho, 0.93, uLine * 0.7, aa) * dashes(fract(turn + uTime * uSpeed.x), uDashes, 0.5, aaTurn) * 0.8;
+  a += ring(rho, 0.93, uLine * 0.7, aa) * dashes(fract(turn + uTime * uSpeed.x), uDashes, 0.5, aaTurn) * 0.75;
   // 바깥 호 조각 두 개
   float t2 = fract(turn + uTime * uSpeed.y);
   float arcs = max(arc(t2, 0.02, 0.2), arc(t2, 0.52, 0.6));
-  a += ring(rho, 1.09, uLine * 1.6, aa) * arcs;
-  // 더 안쪽 점 링
+  float arcRing = ring(rho, 1.09, uLine * 1.5, aa) * arcs * mix(0.5, 1.0, uFocus);
+  a += arcRing;
+  // 안쪽 점 링과 옅은 내측 링
   a += ring(rho, 0.62, uLine * 0.6, aa) * dashes(fract(turn + uTime * uSpeed.z), 48.0, 0.2, aaTurn) * 0.5;
+  a += ring(rho, 0.38, uLine * 0.45, aa) * 0.28;
   // 가운데가 밝은 옅은 바탕
   a += uFill * (1.0 - smoothstep(0.0, 1.0, rho)) * (1.0 - smoothstep(1.0 - aa, 1.0, rho));
 
-  // 호 조각은 조금 더 하얗게 빛난다
-  vec3 color = mix(uColor, vec3(1.0), 0.2 * arcs * ring(rho, 1.09, uLine * 1.6, aa));
+  // 바라보는 층의 실선과 호 조각은 조금 더 하얗게 빛난다
+  vec3 color = mix(uColor, vec3(1.0), 0.22 * (arcRing + outer * 0.5 * uFocus));
   gl_FragColor = vec4(color, min(a, 1.0) * uOpacity);
   #include <colorspace_fragment>
 }
@@ -131,9 +136,9 @@ varying vec3 vNormalV;
 varying vec3 vViewPos;
 void main() {
   float facing = abs(dot(normalize(vNormalV), normalize(-vViewPos)));
-  float rays = 0.7 + 0.3 * sin(vAngle * 14.0 + uTime * 0.6) * sin(vAngle * 5.0 - uTime * 0.35);
-  float a = pow(1.0 - vH, 1.6) * pow(facing, 1.5) * rays;
-  gl_FragColor = vec4(mix(uColor, vec3(1.0), 0.25 * (1.0 - vH)), a * uOpacity);
+  float rays = 0.72 + 0.28 * sin(vAngle * 18.0 + uTime * 0.5) * sin(vAngle * 7.0 - uTime * 0.3);
+  float a = pow(1.0 - vH, 1.45) * pow(facing, 1.5) * rays;
+  gl_FragColor = vec4(mix(uColor, vec3(1.0), 0.2 * (1.0 - vH)), a * uOpacity);
   #include <colorspace_fragment>
 }
 `;
@@ -236,7 +241,9 @@ export class StrataView {
       l.table.rotation.y = spin;
       l.emphasis = damp(l.emphasis, i === focus ? 1 : s.otherLayerAlpha, s.transitionRate * 2, dt);
       const a = mix * l.emphasis;
+      const focusAmt = s.otherLayerAlpha < 1 ? Math.min(1, Math.max(0, (l.emphasis - s.otherLayerAlpha) / (1 - s.otherLayerAlpha))) : 1;
       l.ring.material.uniforms.uOpacity.value = s.ring.alpha * a;
+      l.ring.material.uniforms.uFocus.value = focusAmt;
       l.label.material.opacity = a;
       if (this.group.visible) {
         const tex = this.labels.get(l.labelText, 'major');
@@ -247,8 +254,11 @@ export class StrataView {
       }
     });
     if (this.beam) this.beam.material.uniforms.uOpacity.value = s.beam.alpha * mix;
-    if (this.base) this.base.material.uniforms.uOpacity.value = s.ring.alpha * mix;
-    this.glow.material.opacity = mix;
+    if (this.base) {
+      this.base.material.uniforms.uOpacity.value = s.ring.alpha * mix;
+      this.base.material.uniforms.uFocus.value = 1;
+    }
+    this.glow.material.opacity = s.beam.glowAlpha * mix;
   }
 
   clear(): void {
@@ -285,6 +295,7 @@ export class StrataView {
       uniforms: {
         uColor: { value: this.color },
         uOpacity: { value: 0 },
+        uFocus: { value: 1 },
         uTime: this.time,
         uLine: { value: r.line },
         uFill: { value: r.fillAlpha },
