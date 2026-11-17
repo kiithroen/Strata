@@ -18,8 +18,7 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { tuning } from '../../config';
-import type { LabelCache } from '../common/labelCache';
-import { ScreenLabels } from '../common/screenLabels';
+import type { LabelOptions, ScreenLabels } from '../common/screenLabels';
 
 /**
  * 우주 보기의 선 그래프: 가지(연속 발광 곡선 리본), 살(행성 → 카드/점 직선), 점, 노드 구슬, 빛 무리, 글자.
@@ -32,12 +31,15 @@ export class GraphView {
   private readonly dots: PointBatch;
   private readonly orbs: PointBatch;
   private readonly glows: PointBatch;
-  private readonly labels: ScreenLabels;
   /** 모든 선·점·빛·글자의 불투명도에 곱하는 배율. 지층 보기 동안 은하를 옅게 한다 */
   alphaScale = 1;
 
-  constructor(labelCache: LabelCache, maxSegments: number, maxPoints: number) {
-    this.labels = new ScreenLabels(labelCache);
+  /** labels 는 화면 글자 묶음이다. 다른 글자와 함께 겹침을 정리하도록 바깥에서 받고, begin·end·화면 크기는 바깥이 맞춘다 */
+  constructor(
+    private readonly labels: ScreenLabels,
+    maxSegments: number,
+    maxPoints: number,
+  ) {
     const g = tuning.cosmos.graph;
     this.branches = new RibbonBatch(maxSegments, g.branchSegments, g.branchWidth);
     this.spokes = new LineBatch(maxSegments, g.spokeWidth);
@@ -46,7 +48,7 @@ export class GraphView {
     this.dots = new PointBatch(maxPoints, 'dot');
     this.orbs = new PointBatch(maxPoints, 'orb');
     this.glows = new PointBatch(maxPoints, 'glow');
-    this.group.add(this.glows.points, this.branches.mesh, this.spokes.line, this.dots.points, this.orbs.points, this.labels.group);
+    this.group.add(this.glows.points, this.branches.mesh, this.spokes.line, this.dots.points, this.orbs.points);
   }
 
   /** 화면 크기(CSS px)와 시야각이 바뀌면 다시 맞춘다 */
@@ -59,7 +61,6 @@ export class GraphView {
     const [minPx, maxPx] = tuning.cosmos.graph.orbPx;
     this.orbs.setSizeLimits(minPx * pixelRatio, maxPx * pixelRatio);
     this.glows.setScale(scale);
-    this.labels.setViewport(height, fovDeg);
   }
 
   begin(): void {
@@ -68,7 +69,6 @@ export class GraphView {
     this.dots.begin();
     this.orbs.begin();
     this.glows.begin();
-    this.labels.begin();
   }
 
   /** 정점을 공유하는 연속 곡선 가지를 그린다. 앞의 count 개 점을 쓰고, 각 점마다 alpha 를 주면 깊이에 따라 부드럽게 옅어진다 */
@@ -93,9 +93,9 @@ export class GraphView {
     this.glows.add(p, color, size, alpha * this.alphaScale);
   }
 
-  /** 카메라를 향한 글자. 거리와 상관없이 화면에서 heightPx(CSS px) 높이로 보이고, 화면 위쪽으로 offsetPx 만큼 옮겨 놓는다(음수면 아래) */
-  label(p: Vector3, text: string, heightPx: number, alpha: number, cameraPosition: Vector3, offsetPx = 0, color?: Color): void {
-    this.labels.add(p, text, heightPx, alpha * this.alphaScale, cameraPosition, 0, offsetPx, color);
+  /** 카메라를 향한 글자. 거리와 상관없이 화면에서 heightPx(CSS px) 높이로 보인다. 자리 옮김·색·겹칠 때 차례는 opts 로 준다 */
+  label(p: Vector3, text: string, heightPx: number, alpha: number, cameraPosition: Vector3, opts: LabelOptions = {}): void {
+    this.labels.add(p, text, heightPx, alpha * this.alphaScale, cameraPosition, opts);
   }
 
   end(): void {
@@ -104,7 +104,6 @@ export class GraphView {
     this.dots.end();
     this.orbs.end();
     this.glows.end();
-    this.labels.end();
   }
 
   dispose(): void {
@@ -113,7 +112,6 @@ export class GraphView {
     this.dots.dispose();
     this.orbs.dispose();
     this.glows.dispose();
-    this.labels.dispose();
   }
 }
 

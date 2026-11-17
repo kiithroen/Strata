@@ -259,7 +259,7 @@ export class StrataMode {
       strataPoint(this.frame, 0, layer.y, 0, this.center);
       const far = cloudVisibility(screenFraction(height, this.center.distanceTo(cameraPosition), p11));
       this.hidden.set(layer, far.cards);
-      drawCloud(labels, this.center, layer.words, far.words * this.mix * this.veil, cameraPosition);
+      drawCloud(labels, this.center, layer.words, far.words * this.mix * this.veil, cameraPosition, layer.key);
     }
   }
 

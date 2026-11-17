@@ -35,6 +35,11 @@ export const tuning = {
     fogFar: 22,
     focusEdgeWidth: 0.012,
     dimFloor: 0.28,
+    /**
+     * 화면 글자: outline·outlineAlpha 는 텍스처에 두르는 바탕색 테두리 굵기(글자 크기 대비)와 불투명도.
+     * declutter 는 겹치는 글자 정리: padPx 는 글자 사이 여백(CSS px), blockAlpha 는 자리를 막는 최소 불투명도, rate 는 숨고 나타나는 빠르기(1/초)
+     */
+    label: { outline: 0.22, outlineAlpha: 0.8, declutter: { padPx: 2, blockAlpha: 0.25, rate: 8 } },
   },
 
   card: {
@@ -284,7 +289,9 @@ export const tuning = {
     planetGrowth: 0.05,
     planetMaxRadius: 0.34,
     /** 행성 글자 높이(CSS px). 화면에 늘 같은 크기로 보인다 */
-    planetLabelPx: 12,
+    planetLabelPx: 13,
+    /** 행성 위에 노드 색으로 뜨는 대표 태그 글자 높이(CSS px). 멀어져 워드 클라우드가 뜨면 그쪽으로 넘어간다 */
+    planetTitlePx: 16,
     /**
      * 선 그래프. 선 굵기는 CSS px, 점·빛 크기는 월드 단위 지름이다.
      * branchBend: 허브에서 자식 행성으로 가는 곡선 가지의 제어점. 허브 쪽은 척추 접선 방향으로, 행성 쪽은 허브 쪽으로 허브-행성 거리의 이 비율만큼 당긴다.
@@ -432,7 +439,7 @@ export const tuning = {
    */
   cloud: {
     maxWords: 5,
-    px: [10, 16],
+    px: [12, 17],
     gapPx: 4,
     show: [0.075, 0.045],
     hide: [0.04, 0.022],

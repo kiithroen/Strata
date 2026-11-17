@@ -123,6 +123,9 @@ export interface CosmosDemo extends WidgetDemo {
  * 은하에서 노드나 종이를 처음 탭하면 그 노드로 다가가고(종이는 그 행성), 다가간 노드를 한 번 더 탭하면
  * 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 종이는 지층 보기에서 탭해야 펼친다.
  */
+/** 은하 글자가 겹칠 때 남는 차례: 허브 날짜 > 행성 대표 태그 > 행성 날짜 */
+const LABEL_PRIORITY = { hub: 3, title: 2, date: 1 } as const;
+
 /** 가짜 노트의 가장 최근 시각 */
 const FAKE_NEWEST = new Date(2026, 10, 15, 21, 30).getTime();
 
@@ -168,15 +171,18 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     return card;
   });
 
-  const graph = new GraphView(labels, notes.length * 3, notes.length * 3);
+  /**
+   * 화면 글자(은하 날짜·대표 태그·워드 클라우드, 지층 낱말). 한 묶음이라 서로 겹치면 차례대로 정리된다.
+   * 은하 글자만 graph.label 로 넣어 지층 보기에서 옅어지고, 낱말은 바로 넣어 지층에서도 또렷하다
+   */
+  const screenLabels = new ScreenLabels(labels);
+  stage.scene.add(screenLabels.group);
+  const graph = new GraphView(screenLabels, notes.length * 3, notes.length * 3);
   stage.scene.add(graph.group);
-  /** 태그 워드 클라우드 글자. 지층 보기에서도 은하처럼 옅어지지 않게 그래프와 따로 둔다 */
-  const cloudLabels = new ScreenLabels(labels);
-  stage.scene.add(cloudLabels.group);
   const syncViewport = () => {
     const el = stage.renderer.domElement;
     graph.setViewport(el.clientWidth, el.clientHeight, stage.renderer.getPixelRatio(), stage.camera.fov);
-    cloudLabels.setViewport(el.clientHeight, stage.camera.fov);
+    screenLabels.setViewport(el.clientWidth, el.clientHeight, stage.camera.fov);
   };
   syncViewport();
   const stopResize = stage.onResize(syncViewport);
@@ -204,8 +210,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     const n = cluster.members.length;
     const affinities = clusterAffinities(notes, cluster.members, unit);
     const color = nodeColor(cluster.key);
+    const tags = topTags(cluster.members.map((m) => notes[m].tags), tuning.cloud.maxWords);
     return {
       cluster,
+      /** 대표 태그 글자색: 노드 색에서 흰색 쪽으로 cloud.tintLift 만큼 밝힌다(클라우드의 가장 많이 쓰인 낱말과 같은 색) */
+      titleColor: color.clone().lerp(new Color(1, 1, 1), tuning.cloud.tintLift),
       offsetS: timeOffsetDepth(spiralState, cluster.anchorTime),
       jitter: planetJitter(cluster.key),
       fade: 0,
@@ -216,8 +225,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       label: planetLabel(unit, floorTo(unit, cluster.anchorTime), n),
       /** 2D 카드 목록의 묶음 머리 글자(장수는 목록이 따로 붙인다) */
       date: bucketLabel(unit, floorTo(unit, cluster.anchorTime)),
-      /** 멀리서 보이는 태그 워드 클라우드 */
-      words: layoutCloud(topTags(cluster.members.map((m) => notes[m].tags), tuning.cloud.maxWords)),
+      /** 노드 위에 뜨는 대표 태그(가장 많이 쓰인 태그)와 멀리서 보이는 태그 워드 클라우드 */
+      title: tags[0]?.text ?? null,
+      words: layoutCloud(tags),
       affinities,
       /** 관련도 높은 순서의 묶음 안 번호 */
       order: Array.from({ length: n }, (_, i) => i).sort((a, b) => affinities[b] - affinities[a]),
@@ -619,8 +629,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       // 카드가 멀어 작아지면 묶음 위에 태그 낱말이 떠오르고, 더 작아지면 카드가 사라진다
       const p11 = 1 / Math.tan((stage.camera.fov * Math.PI) / 360);
       const satelliteHeight = tuning.card.width * c.satelliteScale;
-      cloudLabels.begin();
-      strata.measure(cameraPosition, p11, cloudLabels);
+      graph.begin();
+      screenLabels.begin();
+      strata.measure(cameraPosition, p11, screenLabels);
       // 시점이 옮겨 간 시간 거리만큼 먼지가 나선팔을 따라 흐른다(과거로 가면 음수)
       const focusNow = controller.current.focusTime;
       const scrollS = ((focusNow - lastFocusTime) / DAY_MS) * depthPerDay(spiralState);
@@ -634,7 +645,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       approachGlow = damp(approachGlow, approach.approached ? 1 : 0, c.approach.glowRate, dt);
       /** 다가간 노드의 빛 크기 배율 */
       const glowOf = (key: string) => (key === approach.approached ? 1 + (c.approach.glowScale - 1) * approachGlow : 1);
-      graph.begin();
       /** 가장 많이 펼친 카드의 펼친 정도. 그만큼 블룸을 줄인다 */
       let opened = 0;
 
@@ -650,9 +660,24 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         planetAlphas[pi] = alpha;
         graph.orb(pos, planet.color, planet.size, alpha);
         graph.glow(pos, planet.color, planet.glowSize * glowOf(planet.node.key), g.glowAlpha * alpha);
-        graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, -(orbRadiusPx + c.planetLabelPx * 0.8));
+        // 글자 위계: 위에 대표 태그(노드 색, 굵은 산세리프), 아래에 날짜 · 노트 수. 멀어지면 대표 태그가 워드 클라우드로 넘어간다
         const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
-        drawCloud(cloudLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition, planet.color);
+        // 겹치면 허브 날짜 > 대표 태그 > 행성 날짜 차례로 남는다(LABEL_PRIORITY)
+        graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, {
+          offsetYPx: -(orbRadiusPx + c.planetLabelPx * 0.8),
+          priority: LABEL_PRIORITY.date,
+          key: `${cluster.key}:date`,
+        });
+        if (planet.title) {
+          graph.label(pos, planet.title, c.planetTitlePx, alpha * (1 - far.words), cameraPosition, {
+            offsetYPx: orbRadiusPx + c.planetTitlePx * 0.75,
+            color: planet.titleColor,
+            style: 'title',
+            priority: LABEL_PRIORITY.title,
+            key: `${cluster.key}:title`,
+          });
+        }
+        drawCloud(screenLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition, cluster.key, planet.color);
 
         facingQuaternion(pos, cameraPosition, burstQuat);
         const r = planet.radius;
@@ -724,7 +749,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         hubAlphas[hi] = hubAlpha;
         graph.orb(hp, view.color, g.hubSize, hubAlpha);
         graph.glow(hp, view.color, g.hubGlowSize * glowOf(view.node.key), g.glowAlpha * hubAlpha);
-        graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, orbRadiusPx + g.hubLabelPx * 0.7);
+        graph.label(hp, view.label, g.hubLabelPx, hubAlpha, cameraPosition, {
+          offsetYPx: -(orbRadiusPx + g.hubLabelPx * 0.8),
+          priority: LABEL_PRIORITY.hub,
+          key: view.hub.key,
+        });
       }
       const drawSpine = (spineNodes: readonly { node: CosmosNode }[], alphas: readonly number[]) => {
         const n = spineNodes.length;
@@ -790,7 +819,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
 
       stage.bloomScale = 1 - opened;
       graph.end();
-      cloudLabels.end();
+      screenLabels.end(stage.camera, dt);
       readout.update();
       scrubber.update();
     },
@@ -808,8 +837,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       stage.camera.quaternion.identity();
       stage.camera.updateMatrixWorld();
       stage.scene.remove(graph.group);
-      stage.scene.remove(cloudLabels.group);
-      cloudLabels.dispose();
+      stage.scene.remove(screenLabels.group);
+      screenLabels.dispose();
       graph.dispose();
       stage.scene.remove(universe.group);
       universe.dispose();

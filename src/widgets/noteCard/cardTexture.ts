@@ -1,5 +1,6 @@
 import { CanvasTexture, Color, SRGBColorSpace } from 'three';
 import { tuning } from '../../config';
+import { MONO, SANS } from '../common/fonts';
 import { formatStamp } from '../../core/format';
 import { createRng } from '../../core/random';
 import { cornerRadius, memoMetrics, MEMO_TITLE_LINES, type CardLayout, type NoteKind, type Rect } from './cardLayout';
@@ -31,8 +32,6 @@ export interface CardFace {
   tint?: number;
 }
 
-const MONO = 'ui-monospace, "Cascadia Mono", "Malgun Gothic", Consolas, "D2Coding", monospace';
-const SANS = 'system-ui, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
 
 /** 카드의 홀로그램 선 색. 사진·문서는 종류 색, 메모는 포스트잇 색 가운데 하나다 */
 export function holoTint(face: Pick<CardFace, 'id' | 'kind' | 'tint'>): string {
