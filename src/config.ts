@@ -369,14 +369,19 @@ export const tuning = {
     /** 칸 사이 여백(가장 큰 창 대각선 대비)과 칸 안에서 비트는 요의 최대각(라디안) */
     cellGap: 0.16,
     yawJitter: 0.2,
-    /** 층 판이 창 무리보다 넓게 두르는 여백(월드)과 판 안 격자 간격(월드) */
+    /** 층 원판이 가장 바깥 창보다 넓게 두르는 여백(월드)과 날짜 글자 높이(월드) */
     margin: 0.3,
-    gridStep: 0.45,
-    /** 판 바탕·테두리·격자의 불투명도, 날짜 글자 높이(월드) */
-    fillAlpha: 0.035,
-    frameAlpha: 0.55,
-    gridAlpha: 0.1,
     labelHeight: 0.14,
+    /**
+     * 층 원판의 HUD 링(반지름 1 기준). line 은 선 굵기, alpha 는 가장 밝을 때 불투명도, fillAlpha 는 가운데가 밝은 원판 바탕,
+     * dashes 는 안쪽 점선 링의 점 수, dashSpeed·arcSpeed·dotSpeed 는 점선 링·바깥 호 조각·안쪽 점 링이 도는 빠르기(초당 바퀴, 음수는 반대 방향)다
+     */
+    ring: { line: 0.009, alpha: 0.6, fillAlpha: 0.07, dashes: 96, dashSpeed: 0.02, arcSpeed: -0.045, dotSpeed: 0.03 },
+    /**
+     * 아래에서 올라오는 빛기둥. emitterGap 은 가장 아래층에서 발광부까지 거리(layerGap 배), topGap 은 가장 위층 위로 더 뻗는 거리(layerGap 배),
+     * spread 는 위쪽 반지름(가장 큰 층 반지름 배), base 는 발광부 반지름(월드), alpha 는 빛기둥 밝기, glow 는 발광부 빛 무리 크기(월드)다
+     */
+    beam: { emitterGap: 0.9, topGap: 0.35, spread: 0.85, base: 0.12, alpha: 0.5, glow: 2.2 },
     /** 바라보는 층이 아닌 층의 밝기 배율 */
     otherLayerAlpha: 0.45,
     /** 들어가고 나오는 전환 속도(1/초) */

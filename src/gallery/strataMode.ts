@@ -207,7 +207,7 @@ export class StrataMode {
       const t = (this.frame.origin.y + layer.y - ray.origin.y) / ray.direction.y;
       if (t <= 0 || t >= bestT) return;
       ray.at(t, this.hit).sub(this.frame.origin).applyAxisAngle(AXIS_Y, -this.frame.yaw);
-      if (Math.abs(this.hit.x) <= layer.halfWidth && Math.abs(this.hit.z) <= layer.halfDepth) {
+      if (Math.hypot(this.hit.x, this.hit.z) <= layer.radius) {
         best = i;
         bestT = t;
       }

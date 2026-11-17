@@ -39,12 +39,13 @@ describe('layoutStrata', () => {
     }
   });
 
-  it('층 안의 창은 서로 겹치지 않고 판 안에 들어간다', () => {
+  it('층 안의 창은 서로 겹치지 않고 원판 안에 들어가며, 원판은 가장 바깥 창에 여유만큼 붙는다', () => {
     for (const layer of layoutStrata(layers, 0)) {
       const t = layer.tiles;
+      const outer = Math.max(...t.map((x) => Math.hypot(x.x, x.z) + x.radius));
+      expect(layer.radius).toBeCloseTo(outer + s.margin, 9);
       for (let i = 0; i < t.length; i++) {
-        expect(Math.abs(t[i].x) + t[i].radius).toBeLessThanOrEqual(layer.halfWidth - s.margin + 1e-9);
-        expect(Math.abs(t[i].z) + t[i].radius).toBeLessThanOrEqual(layer.halfDepth - s.margin + 1e-9);
+        expect(Math.hypot(t[i].x, t[i].z) + t[i].radius).toBeLessThanOrEqual(layer.radius - s.margin + 1e-9);
         expect(Math.abs(t[i].yaw)).toBeLessThanOrEqual(s.yawJitter);
         for (let j = i + 1; j < t.length; j++) {
           expect(Math.hypot(t[i].x - t[j].x, t[i].z - t[j].z)).toBeGreaterThanOrEqual(t[i].radius + t[j].radius - 1e-9);
@@ -107,21 +108,18 @@ describe('strataDistance', () => {
   const halfTan = Math.tan((fovDeg * Math.PI) / 360);
 
   it('판이 화면 폭에 들어오면 기본 거리다', () => {
-    const tiny = [{ halfWidth: 0.01, halfDepth: 0.01 }];
+    const tiny = [{ radius: 0.01 }];
     expect(strataDistance(tiny, fovDeg, 1)).toBe(s.distance);
   });
 
-  it('좁은 화면에서는 판 앞 모서리의 반폭이 화면 반폭 × fitWidth 안에 들 만큼 물러난다', () => {
-    const layers = [
-      { halfWidth: 1, halfDepth: 1 },
-      { halfWidth: 3, halfDepth: 2 },
-    ];
+  it('좁은 화면에서는 원판 앞 가장자리의 반지름이 화면 반폭 × fitWidth 안에 들 만큼 물러난다', () => {
+    const layers = [{ radius: 1 }, { radius: 3 }];
     for (const aspect of [0.45, 0.86, 2]) {
       const d = strataDistance(layers, fovDeg, aspect);
       expect(d).toBeGreaterThanOrEqual(s.distance);
       for (const l of layers) {
-        const front = d - l.halfDepth * Math.cos(s.pitch);
-        expect(l.halfWidth / (front * halfTan * aspect)).toBeLessThanOrEqual(s.fitWidth + 1e-9);
+        const front = d - l.radius * Math.cos(s.pitch);
+        expect(l.radius / (front * halfTan * aspect)).toBeLessThanOrEqual(s.fitWidth + 1e-9);
       }
     }
     expect(strataDistance(layers, fovDeg, 0.45)).toBeGreaterThan(strataDistance(layers, fovDeg, 0.86));
