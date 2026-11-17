@@ -1,14 +1,9 @@
-import { Color, DoubleSide, ShaderMaterial, type Texture, Vector2 } from 'three';
+import { Color, DoubleSide, ShaderMaterial, type Texture, Vector2, Vector3 } from 'three';
 import { tuning } from '../../config';
 
 /** 모든 카드가 함께 쓰는 유니폼. 같은 객체를 각 재질에 넘겨 한 번만 갱신한다. */
 export interface CardLook {
   uTime: { value: number };
-  uScanDensity: { value: number };
-  uScanSpeed: { value: number };
-  uScanStrength: { value: number };
-  uNoiseStrength: { value: number };
-  uNoiseFps: { value: number };
   uEdgeWidth: { value: number };
   uDimFloor: { value: number };
   uFogColor: { value: Color };
@@ -30,23 +25,21 @@ export interface CardLook {
   uFarAlpha: { value: number };
   uFocusAlpha: { value: number };
   uGlint: { value: number };
-  uFlicker: { value: Vector2 };
-  uFlickerDepth: { value: number };
-  uSweep: { value: Vector2 };
+  /** 훑는 빛 띠: 속도, 밝기, 두께 */
+  uSweep: { value: Vector3 };
+  /** 간섭 무늬: 빈도, 밝기, 각도에 따라 미끄러지는 정도 */
+  uFringe: { value: Vector3 };
+  uIris: { value: number };
+  uChroma: { value: number };
 }
 
 export function createCardLook(): CardLook {
   const l = tuning.look;
   const b = tuning.card.bend;
   const lod = tuning.card.lod;
-  const f = tuning.card.flicker;
+  const h = tuning.card.holoFx;
   return {
     uTime: { value: 0 },
-    uScanDensity: { value: l.scanlineDensity },
-    uScanSpeed: { value: l.scanlineSpeed },
-    uScanStrength: { value: l.scanlineStrength },
-    uNoiseStrength: { value: l.noiseStrength },
-    uNoiseFps: { value: l.noiseFps },
     uEdgeWidth: { value: l.focusEdgeWidth },
     uDimFloor: { value: l.dimFloor },
     uFogColor: { value: new Color(l.background) },
@@ -65,9 +58,10 @@ export function createCardLook(): CardLook {
     uFarAlpha: { value: lod.farAlpha },
     uFocusAlpha: { value: lod.focusAlpha },
     uGlint: { value: lod.glint },
-    uFlicker: { value: new Vector2(f.rate, f.chance) },
-    uFlickerDepth: { value: f.depth },
-    uSweep: { value: new Vector2(f.sweepSpeed, f.sweepStrength) },
+    uSweep: { value: new Vector3(h.sweepSpeed, h.sweepStrength, h.sweepWidth) },
+    uFringe: { value: new Vector3(h.fringeFreq, h.fringeStrength, h.fringeShift) },
+    uIris: { value: h.iridescence },
+    uChroma: { value: h.chroma },
   };
 }
 
@@ -127,11 +121,6 @@ const fragmentShader = /* glsl */ `
 uniform sampler2D map;
 uniform sampler2D mapSimple;
 uniform float uTime;
-uniform float uScanDensity;
-uniform float uScanSpeed;
-uniform float uScanStrength;
-uniform float uNoiseStrength;
-uniform float uNoiseFps;
 uniform float uEdgeWidth;
 uniform float uDimFloor;
 uniform vec3 uFogColor;
@@ -141,9 +130,10 @@ uniform vec3 uHoloTint;
 uniform float uFarAlpha;
 uniform float uFocusAlpha;
 uniform float uGlint;
-uniform vec2 uFlicker;
-uniform float uFlickerDepth;
-uniform vec2 uSweep;
+uniform vec3 uSweep;
+uniform vec3 uFringe;
+uniform float uIris;
+uniform float uChroma;
 uniform float uBendPhase;
 uniform float uAspect;
 uniform float uDim;
@@ -157,16 +147,26 @@ varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
 
-float hash12(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
+// 얇은 막의 무지개빛: 위상 t 에 따라 색상이 돈다
+vec3 iris(float t) {
+  return 0.5 + 0.5 * cos(6.28318530718 * (t + vec3(0.0, 0.33, 0.67)));
 }
 
 void main() {
+  float live = 1.0 - uFocus;
+  vec3 nrm = normalize(vNormalV);
+  vec3 viewDir = normalize(-vViewPos);
+  float facing = abs(dot(nrm, viewDir));
+  float graze = 1.0 - facing;
+
   // 양면 홀로그램: 뒤에서 봐도 글자가 바로 읽히게 가로를 뒤집는다
   vec2 uv = vec2(gl_FrontFacing ? vUv.x : 1.0 - vUv.x, vUv.y);
-  vec4 color = mix(texture2D(mapSimple, uv), texture2D(map, uv), vDetail);
+  // 선의 빨강·파랑이 옆으로 살짝 갈라진다(비스듬할수록 더). 펼친 카드는 글이 또렷하게 갈라지지 않는다
+  vec4 detail = texture2D(map, uv);
+  vec2 split = vec2(uChroma * (0.4 + graze) * live, 0.0);
+  detail.r = texture2D(map, uv + split).r;
+  detail.b = texture2D(map, uv - split).b;
+  vec4 color = mix(texture2D(mapSimple, uv), detail, vDetail);
   // 겉모양 밖(메모의 깎은 모서리, 문서 탭 옆)은 비어 있다. 아래 효과들도 그 자리는 건드리지 않는다
   float body = smoothstep(0.0, 0.25, color.a);
 
@@ -177,26 +177,24 @@ void main() {
   // 펼친 카드는 바탕을 거의 불투명하게 해 뒤 카드가 글을 가리지 않게 한다
   color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
 
-  float live = 1.0 - uFocus;
-  // 비스듬히 볼수록 가장자리가 밝아진다
-  vec3 nrm = normalize(vNormalV);
-  float facing = abs(dot(nrm, normalize(-vViewPos)));
-  float glint = pow(1.0 - facing, 3.0) * uGlint * uShade * live;
-  color.rgb += uHoloTint * glint;
+  // 보는 각도(면의 기울기와 시선)에 따라 미끄러지는 위상. 카드가 돌거나 시점이 움직이면 빛이 흐른다
+  float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uFringe.z + dot(viewDir.xy, vec2(-0.6, 0.8)) * uFringe.z * 0.5 + uBendPhase;
+  vec3 rainbow = iris(phase + (vUv.x + vUv.y) * 0.35);
+
+  // 비스듬히 볼수록 가장자리가 밝아지고 무지개빛 막이 돈다
+  float glint = pow(graze, 3.0) * uGlint * uShade * live;
+  color.rgb += mix(uHoloTint, rainbow, 0.5) * glint;
   color.a = min(1.0, color.a + glint * 0.5 * body);
+  color.rgb += rainbow * uIris * (0.15 + graze) * body * live;
 
-  // 위에서 아래로 훑는 밝은 띠
-  float sweep = fract(vUv.y + uTime * uSweep.x + uBendPhase);
-  color.rgb += uHoloTint * smoothstep(0.03, 0.0, abs(sweep - 0.5)) * uSweep.y * live;
+  // 위에서 아래로 천천히 훑는 부드러운 빛 띠
+  float sweep = fract(vUv.y + uTime * uSweep.x + uBendPhase) - 0.5;
+  float band = exp(-(sweep * sweep) / (uSweep.z * uSweep.z));
+  color.rgb += mix(uHoloTint, rainbow, 0.35) * band * uSweep.y * body * live;
 
-  // 주사선: 펼칠수록 옅어진다
-  float scan = 0.5 + 0.5 * sin((vUv.y * uScanDensity - uTime * uScanSpeed) * 6.28318530718);
-  color.rgb *= 1.0 - uScanStrength * scan * (1.0 - 0.7 * uFocus);
-
-  // 가끔 전원이 흔들리듯 깜빡인다. 카드마다 때가 다르다
-  float tick = floor(uTime * uFlicker.x);
-  float flick = step(1.0 - uFlicker.y, hash12(vec2(tick, uBendPhase * 97.0)));
-  color.a *= 1.0 - flick * (1.0 - uFlickerDepth) * live;
+  // 비스듬한 가는 간섭 무늬. 각도에 따라 옆으로 흐르고, 비스듬하거나 빛 띠가 지날 때 드러난다
+  float lines = 0.5 + 0.5 * sin(((vUv.x * uAspect + vUv.y) * uFringe.x + phase * 2.0) * 3.14159265359);
+  color.rgb += rainbow * pow(lines, 16.0) * uFringe.y * (0.15 + graze + band * 2.0) * body * live;
 
   // 펼친 카드의 테두리 빛. 가로 거리를 높이 단위로 맞춰 네 변의 두께를 같게 한다
   vec2 edgeDist = min(vUv, 1.0 - vUv);
@@ -213,10 +211,6 @@ void main() {
 
   gl_FragColor = color;
   #include <colorspace_fragment>
-
-  // 화면 고정 잡음. 출력 색공간으로 바꾼 뒤에 더해야 어두운 곳에서 튀지 않는다
-  float noise = hash12(gl_FragCoord.xy + floor(uTime * uNoiseFps) * 17.0);
-  gl_FragColor.rgb += (noise - 0.5) * uNoiseStrength * (1.0 - 0.6 * uFocus);
 }
 `;
 
@@ -227,9 +221,9 @@ export interface CardMaterialOptions {
   look: CardLook;
   width: number;
   height: number;
-  /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다. 깜빡임·훑는 띠의 때도 어긋낸다 */
+  /** 종이마다 다르게 출렁이도록 휨 위상을 어긋낸다. 훑는 빛 띠의 때와 무지개빛 위상도 어긋낸다 */
   bendPhase: number;
-  /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때, 테두리 빛·반짝임·훑는 띠도 이 색이다 */
+  /** 홀로그램 선 색(노트 종류 색). 멀리서 흑백으로 바꿀 때 이 색으로 물들고, 테두리 빛·반짝임·훑는 띠도 이 색을 바탕으로 한다 */
   tint: string;
 }
 
