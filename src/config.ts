@@ -123,6 +123,12 @@ export const tuning = {
       runnerJitter: { speed: [0.55, 1.6], tail: [0.6, 1.6], strength: [0.55, 1.15], reverse: 0.4 },
     },
     /**
+     * 그림 밝기 누르기: 펼치지 않은 카드는 그림(사진·글) 밝기를 블룸 문턱 아래로 눌러 흰 바탕 사진이 번져 날아가지 않게 한다.
+     * knee 아래 밝기는 그대로 두고, 그 위는 ceiling 에 다가갈 뿐 넘지 않게 부드럽게 누른다. 둘 다 bloom.threshold 대비 화면 밝기다.
+     * 테두리 빛·도는 빛은 그 뒤에 더해 블룸이 그대로 걸린다. 펼친 카드는 제 밝기다
+     */
+    highlight: { knee: 0.55, ceiling: 0.9 },
+    /**
      * 짧은 노트(메모): 글 양에 맞춰 크기가 바뀐다. 폭은 기준 폭 대비 widthScales 범위에서 글 폭(어림, 글자 크기 단위)이 fullText 에 가까울수록 넓고,
      * 높이는 제목·본문 줄 수에 맞추되 폭 대비 aspect 범위로 자른다. 글자 크기는 텍스처 기준 폭 대비 titleRatio·bodyRatio, 줄 간격 배율 lineHeight
      */

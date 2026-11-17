@@ -1,4 +1,4 @@
-import { Color, DoubleSide, ShaderMaterial, type Texture, Vector2, Vector3 } from 'three';
+import { Color, DoubleSide, SRGBColorSpace, ShaderMaterial, type Texture, Vector2, Vector3 } from 'three';
 import { tuning } from '../../config';
 import type { RunnerVariation } from './borderRunner';
 
@@ -26,6 +26,13 @@ export interface CardLook {
   /** 테두리 빛: 폭, 밝기 / 도는 빛: 밝기, 빠르기, 꼬리 길이 */
   uBorder: { value: Vector2 };
   uRunner: { value: Vector3 };
+  /** 그림 밝기 누르기의 무릎·천장(선형 밝기) */
+  uHighlight: { value: Vector2 };
+}
+
+/** 화면(sRGB) 밝기를 셰이더가 다루는 선형 밝기로 바꾼다 */
+function linearOf(srgb: number): number {
+  return new Color().setRGB(srgb, srgb, srgb, SRGBColorSpace).r;
 }
 
 export function createCardLook(): CardLook {
@@ -51,6 +58,9 @@ export function createCardLook(): CardLook {
     uGlass: { value: new Vector2(h.glassSheen, h.bevel) },
     uBorder: { value: new Vector2(tuning.card.border.width, tuning.card.border.strength) },
     uRunner: { value: new Vector3(tuning.card.border.runnerStrength, tuning.card.border.runnerSpeed, tuning.card.border.runnerTail) },
+    uHighlight: {
+      value: new Vector2(linearOf(tuning.bloom.threshold * tuning.card.highlight.knee), linearOf(tuning.bloom.threshold * tuning.card.highlight.ceiling)),
+    },
   };
 }
 
@@ -103,6 +113,7 @@ uniform float uChroma;
 uniform vec2 uGlass;
 uniform vec2 uBorder;
 uniform vec3 uRunner;
+uniform vec2 uHighlight;
 /** 이 카드의 도는 빛 배율: 빠르기(부호가 방향), 꼬리, 밝기 */
 uniform vec3 uRunnerVar;
 /** 카드 겉모양(둥근 사각형)의 모서리 반지름(카드 높이 단위) */
@@ -155,6 +166,12 @@ void main() {
   color.a *= mix(uFarAlpha, 1.0, vDetail);
   // 펼친 카드는 바탕을 거의 불투명하게 해 뒤 카드가 글을 가리지 않게 한다
   color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
+
+  // 그림 밝기 누르기: 무릎 위 밝기는 천장에 다가갈 뿐 넘지 않아 흰 바탕 사진이 블룸에 번지지 않는다. 펼친 카드는 제 밝기다
+  float lum = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  float room = max(uHighlight.y - uHighlight.x, 1e-4);
+  float pressed = lum <= uHighlight.x ? lum : uHighlight.x + room * (1.0 - exp(-(lum - uHighlight.x) / room));
+  color.rgb *= mix(1.0, pressed / max(lum, 1e-4), live);
 
   // 보는 각도(면의 기울기와 시선)에 따라 미끄러지는 위상. 카드가 돌거나 시점이 움직이면 빛이 흐른다
   float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uIrisShift + dot(viewDir.xy, vec2(-0.6, 0.8)) * uIrisShift * 0.5 + uPhase;

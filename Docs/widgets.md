@@ -59,6 +59,7 @@
   - 무지개빛 막(`iridescence`, `irisShift`): 보는 각도(면의 기울기와 시선)로 정한 위상에 따라 색이 돌고, 비스듬히 볼수록 짙다.
   - 색수차(`chroma`): 선의 빨강·파랑이 옆으로 살짝 갈라지고 비스듬할수록 더 갈라진다.
   - 유리 광택(`glassSheen`, `bevel`): 시선 각도에 따라 카드 유리면에 대각선 반사와 테두리 안쪽 반사광이 은은하게 돈다. 펼친 카드는 꺼진다.
+- 그림 밝기 누르기(`card.highlight`): 펼치지 않은 카드는 그림(사진·글, 멀리서의 흑백 포함)의 밝기를 블룸 문턱 아래로 누른다. `bloom.threshold` × `knee` 아래는 그대로, 그 위는 `bloom.threshold` × `ceiling`에 다가갈 뿐 넘지 않는다(셰이더는 선형 밝기로 바꿔 쓴다). 흰 바탕 사진이 겹쳐도 하얗게 번지지 않고, 아래 테두리 빛·도는 빛은 그 뒤에 더해 블룸이 그대로 걸린다. 펼친 카드는 제 밝기다.
 - 테두리 빛(`card.border`): 셰이더가 카드 겉모양(둥근 사각형, `cardLayout.ts`의 `cornerUv`로 텍스처와 같은 둥글기)까지의 거리로 선을 따라 종류 색을 더한다(`width`, `strength`). 밝아진 선에 블룸이 걸린다. 그 위로 꼬리 달린 빛이 테두리를 따라 돈다(`runnerStrength`, `runnerSpeed`, `runnerTail`). 도는 위치는 카드 가운데에서 본 각도로 재고 카드마다 출발점이 다르다. 빠르기·꼬리·밝기는 노트 번호로 정한 배율(`runnerJitter`, `borderRunner.ts`의 `runnerVariation`)을 곱하고, `runnerJitter.reverse` 비율의 카드는 반대 방향으로 돈다. 펼친 카드는 꺼진다.
 - 카드는 휘지 않는 평평한 유리판(사각형 하나)이다. 무지개빛 위상과 테두리를 도는 빛의 출발점은 노트 번호로 정한 카드별 위상(`uPhase`)만큼 어긋난다.
 - `setBadge(text)`로 카드 오른쪽 위에 배지를 붙인다(높이 `axis.badgeHeight`). 글자 텍스처는 `widgets/common/labelCache.ts`가 구워 재사용한다.
@@ -230,6 +231,7 @@
 파일: `src/gallery/bloom.ts`, 켜기 `src/gallery/stage.ts`
 
 - 모든 갤러리 화면에 걸리는 후처리다. 장면은 캔버스에 바로 그리고(반투명 합성이 출력 색공간에서 일어나 옅은 바탕·빛 무리 밝기가 블룸 없을 때와 같다), 그 화면을 텍스처로 복사한다. 밝기가 `bloom.threshold` 이상인 곳을 여러 단계로 흐려 `bloom.strength`·`bloom.radius`로 캔버스에 더한다. 흐리는 셰이더는 three의 `UnrealBloomPass` 것을 쓴다.
+- 카드 그림은 셰이더가 문턱 아래로 눌러 블룸을 내지 않는다(노트 카드의 "그림 밝기 누르기"). 블룸은 노드·빛 무리·카드 테두리 빛에 걸린다.
 - `Stage.bloomScale`(0~1)을 세기에 곱한다. 우주 보기와 노트 카드 데모는 가장 많이 펼친 카드의 펼친 정도만큼 줄여, 펼친 사진·글이 번져 날아가지 않게 한다.
 - 설정 화면의 품질 `블룸`(`render.bloom`)으로 끈다.
 
