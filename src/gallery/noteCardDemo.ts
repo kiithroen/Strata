@@ -78,8 +78,11 @@ export function mountNoteCardDemo(stage: Stage): NoteCardDemo {
       look.uTime.value = time;
       const pose = focus.pose();
       cards.forEach((c, i) => c.update(dt, time, homes[i], c === focus.focused ? pose : null));
+      // 펼친 카드의 사진·글이 번져 날아가지 않게 펼친 정도만큼 블룸을 줄인다
+      stage.bloomScale = 1 - Math.max(...cards.map((c) => c.motion.focus));
     },
     dispose() {
+      stage.bloomScale = 1;
       stopTap();
       for (const c of cards) {
         stage.scene.remove(c.mesh);

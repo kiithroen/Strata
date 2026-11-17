@@ -8,6 +8,15 @@ export const tuning = {
     maxPixelRatio: 2,
     /** 다중 표본 계단 제거(MSAA) */
     antialias: true,
+    /** 블룸 후처리(아래 bloom) */
+    bloom: true,
+  },
+
+  /** 블룸: 밝기(선형)가 threshold 이상인 곳을 흐려 strength 배로 되더한다. radius 는 번짐 반경(0~1) */
+  bloom: {
+    strength: 0.6,
+    radius: 0.6,
+    threshold: 0.68,
   },
 
   camera: {
@@ -86,9 +95,9 @@ export const tuning = {
       sweepStrength: 0.14,
       sweepWidth: 0.07,
       fringeFreq: 34,
-      fringeStrength: 0.06,
+      fringeStrength: 0.03,
       fringeShift: 1.4,
-      iridescence: 0.07,
+      iridescence: 0.035,
       chroma: 0.0022,
     },
     /**
@@ -471,7 +480,7 @@ export const tuning = {
    */
   quality: {
     presets: {
-      low: { pr: 1, aa: false, dust: 3000, stars: 1200, nebula: 128, seg: 6, tex: 224 },
+      low: { pr: 1, aa: false, bloom: false, dust: 3000, stars: 1200, nebula: 128, seg: 6, tex: 224 },
       mid: { pr: 1.5, aa: true, dust: 5500, stars: 1800, nebula: 256, seg: 8, tex: 288 },
       high: {},
     },

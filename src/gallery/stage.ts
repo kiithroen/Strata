@@ -1,5 +1,6 @@
 import { Color, Fog, GridHelper, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
 import { tuning } from '../config';
+import { BloomPipeline } from './bloom';
 
 /** 위젯 갤러리가 함께 쓰는 렌더러·장면·카메라. 컨테이너 크기가 바뀌면(접기·펼치기 포함) 맞춰 다시 잡는다. */
 export class Stage {
@@ -10,6 +11,10 @@ export class Stage {
   readonly grid: GridHelper;
   private readonly observer: ResizeObserver;
   private readonly resizeListeners = new Set<() => void>();
+  /** 블룸 후처리(render.bloom 이 꺼져 있으면 없다) */
+  private readonly bloom: BloomPipeline | null;
+  /** 블룸 세기 배율(0~1). 펼친 카드의 사진·글이 번져 날아가지 않게 데모가 펼친 정도만큼 줄인다 */
+  bloomScale = 1;
 
   constructor(readonly container: HTMLElement) {
     const c = tuning.camera;
@@ -20,6 +25,7 @@ export class Stage {
     container.appendChild(this.renderer.domElement);
 
     this.camera = new PerspectiveCamera(c.fovDeg, 1, c.near, c.far);
+    this.bloom = r.bloom ? new BloomPipeline(this.renderer) : null;
     this.scene.background = new Color(l.background);
     this.scene.fog = new Fog(l.background, l.fogNear, l.fogFar);
 
@@ -49,10 +55,12 @@ export class Stage {
 
   render(): void {
     this.renderer.render(this.scene, this.camera);
+    this.bloom?.apply(this.bloomScale);
   }
 
   dispose(): void {
     this.observer.disconnect();
+    this.bloom?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -61,6 +69,7 @@ export class Stage {
     const w = Math.max(1, this.container.clientWidth);
     const h = Math.max(1, this.container.clientHeight);
     this.renderer.setSize(w, h, false);
+    this.bloom?.resize();
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     for (const listener of this.resizeListeners) listener();

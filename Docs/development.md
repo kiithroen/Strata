@@ -34,6 +34,7 @@ npm run dev
 |---|---|
 | 해상도 배율 | 픽셀 비율 상한(`render.maxPixelRatio`). 기기 배율을 넘지 않는다 |
 | 계단 제거 | MSAA(`render.antialias`) |
+| 블룸 | 블룸 후처리(`render.bloom`). 낮음 프리셋은 끈다 |
 | 먼지, 별 | 개수(`cosmos.dust.count`, `cosmos.stars.count`) |
 | 성운 | 끄기, 매 프레임 계산, 그 크기 큐브맵에 굽기(`cosmos.nebula`) |
 | 종이 격자 | 종이 휨 격자 칸 수(`card.segments`) |
@@ -57,7 +58,7 @@ npm run dev
 | `src/widgets/<위젯>/` | 위젯 하나. 움직임·배치는 순수 로직, 텍스처·재질·메시는 뷰 |
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
-| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
+| `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 블룸 후처리(`bloom.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
 | `src/dev/` | 개발용 가짜 데이터(`noteData.ts`)와 실데이터 임시 불러오기(`localNotes.ts`, `imageHeader.ts`, `keepNote.ts`) |
 | `test/` | vitest 단위 테스트(노드 환경) |
 

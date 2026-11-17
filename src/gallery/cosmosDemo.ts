@@ -609,6 +609,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       /** 다가간 노드의 빛 크기 배율 */
       const glowOf = (key: string) => (key === approach.approached ? 1 + (c.approach.glowScale - 1) * approachGlow : 1);
       graph.begin();
+      /** 가장 많이 펼친 카드의 펼친 정도. 그만큼 블룸을 줄인다 */
+      let opened = 0;
 
       for (const planet of planets) {
         const { cluster, affinities, order } = planet;
@@ -659,6 +661,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           // 지층에 눕힌 창은 흔들리지 않고, 카드 공간에서는 노트 카드처럼 다시 떠 흔들린다
           card.motion.floatScale = 1 - mix * (1 - fieldMix);
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
+          opened = Math.max(opened, card.motion.focus);
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
@@ -736,12 +739,14 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       }
       controller.step(dt);
 
+      stage.bloomScale = 1 - opened;
       graph.end();
       cloudLabels.end();
       readout.update();
       scrubber.update();
     },
     dispose() {
+      stage.bloomScale = 1;
       stopFieldResize();
       cardList.dispose();
       strata.dispose();

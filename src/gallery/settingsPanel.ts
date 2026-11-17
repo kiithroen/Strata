@@ -15,6 +15,7 @@ import { type AppSettings, saveSettings } from './settings';
 const KEY_LABEL: Record<QualityKey, string> = {
   pr: '해상도 배율',
   aa: '계단 제거',
+  bloom: '블룸',
   dust: '먼지',
   stars: '별',
   nebula: '성운',

@@ -4,6 +4,7 @@ import { tuning } from '../config';
  * 설정 화면에서 고르는 품질 값. 실기기에서 무거운 부분을 하나씩 끄고 줄여 보려고 둔다.
  * - pr: 렌더러 픽셀 비율 상한(render.maxPixelRatio)
  * - aa: MSAA(render.antialias)
+ * - bloom: 블룸 후처리(render.bloom)
  * - dust, stars: 먼지·별 개수(cosmos.dust.count, cosmos.stars.count)
  * - nebula: 'off' 면 성운을 끄고, 0 이면 매 프레임 계산, 양수면 그 크기 큐브맵에 굽는다(cosmos.nebula)
  * - seg: 종이 휨 격자 칸 수(card.segments)
@@ -12,6 +13,7 @@ import { tuning } from '../config';
 export interface QualityValues {
   pr: number;
   aa: boolean;
+  bloom: boolean;
   dust: number;
   stars: number;
   nebula: number | 'off';
@@ -22,7 +24,7 @@ export interface QualityValues {
 export type QualityKey = keyof QualityValues;
 export type QualityPreset = keyof typeof tuning.quality.presets;
 
-export const qualityKeys: readonly QualityKey[] = ['pr', 'aa', 'dust', 'stars', 'nebula', 'seg', 'tex'];
+export const qualityKeys: readonly QualityKey[] = ['pr', 'aa', 'bloom', 'dust', 'stars', 'nebula', 'seg', 'tex'];
 export const qualityPresets = Object.keys(tuning.quality.presets) as QualityPreset[];
 
 /** target 의 지금 품질 값을 읽는다 */
@@ -31,6 +33,7 @@ export function readQuality(target: typeof tuning = tuning): QualityValues {
   return {
     pr: target.render.maxPixelRatio,
     aa: target.render.antialias,
+    bloom: target.render.bloom,
     dust: target.cosmos.dust.count,
     stars: target.cosmos.stars.count,
     nebula: n.visible ? n.bakeSize : 'off',
@@ -50,6 +53,7 @@ export function sanitizeQuality(raw: unknown): Partial<QualityValues> {
   const pr = num(r.pr);
   if (pr !== undefined && pr > 0) out.pr = pr;
   if (typeof r.aa === 'boolean') out.aa = r.aa;
+  if (typeof r.bloom === 'boolean') out.bloom = r.bloom;
   const dust = int(r.dust);
   if (dust !== undefined && dust >= 0) out.dust = dust;
   const stars = int(r.stars);
@@ -87,9 +91,9 @@ export function qualityDiff(values: QualityValues, base: QualityValues = quality
   return out;
 }
 
-/** 설정 화면이 보여 줄 값 목록. aa 는 켜고 끄기뿐이다 */
+/** 설정 화면이 보여 줄 값 목록. aa·bloom 은 켜고 끄기뿐이다 */
 export function qualityOptions(key: QualityKey): readonly (number | boolean | 'off')[] {
-  if (key === 'aa') return [false, true];
+  if (key === 'aa' || key === 'bloom') return [false, true];
   return tuning.quality.options[key];
 }
 
@@ -100,6 +104,7 @@ export function qualityOptions(key: QualityKey): readonly (number | boolean | 'o
 export function applyQuality(o: Partial<QualityValues>, target: typeof tuning = tuning): void {
   if (o.pr !== undefined) set(target.render, 'maxPixelRatio', o.pr);
   if (o.aa !== undefined) set(target.render, 'antialias', o.aa);
+  if (o.bloom !== undefined) set(target.render, 'bloom', o.bloom);
   if (o.dust !== undefined) set(target.cosmos.dust, 'count', o.dust);
   if (o.stars !== undefined) set(target.cosmos.stars, 'count', o.stars);
   if (o.nebula === 'off') set(target.cosmos.nebula, 'visible', false);

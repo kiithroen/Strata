@@ -183,14 +183,14 @@ void main() {
 
   // 비스듬히 볼수록 가장자리가 밝아지고 무지개빛 막이 돈다
   float glint = pow(graze, 3.0) * uGlint * uShade * live;
-  color.rgb += mix(uHoloTint, rainbow, 0.5) * glint;
+  color.rgb += mix(uHoloTint, rainbow, 0.2) * glint;
   color.a = min(1.0, color.a + glint * 0.5 * body);
   color.rgb += rainbow * uIris * (0.15 + graze) * body * live;
 
   // 위에서 아래로 천천히 훑는 부드러운 빛 띠
   float sweep = fract(vUv.y + uTime * uSweep.x + uBendPhase) - 0.5;
   float band = exp(-(sweep * sweep) / (uSweep.z * uSweep.z));
-  color.rgb += mix(uHoloTint, rainbow, 0.35) * band * uSweep.y * body * live;
+  color.rgb += mix(uHoloTint, rainbow, 0.15) * band * uSweep.y * body * live;
 
   // 비스듬한 가는 간섭 무늬. 각도에 따라 옆으로 흐르고, 비스듬하거나 빛 띠가 지날 때 드러난다
   float lines = 0.5 + 0.5 * sin(((vUv.x * uAspect + vUv.y) * uFringe.x + phase * 2.0) * 3.14159265359);

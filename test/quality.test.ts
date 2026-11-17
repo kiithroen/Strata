@@ -15,8 +15,8 @@ import {
 
 describe('sanitizeQuality', () => {
   it('읽을 수 있는 키만 남긴다', () => {
-    expect(sanitizeQuality({ pr: 1.5, aa: false, dust: 12, stars: 3, nebula: 'off', seg: 2, tex: 64 })).toEqual({
-      pr: 1.5, aa: false, dust: 12, stars: 3, nebula: 'off', seg: 2, tex: 64,
+    expect(sanitizeQuality({ pr: 1.5, aa: false, bloom: false, dust: 12, stars: 3, nebula: 'off', seg: 2, tex: 64 })).toEqual({
+      pr: 1.5, aa: false, bloom: false, dust: 12, stars: 3, nebula: 'off', seg: 2, tex: 64,
     });
     expect(sanitizeQuality({ nebula: 0 }).nebula).toBe(0);
   });
@@ -24,7 +24,7 @@ describe('sanitizeQuality', () => {
   it('깨진 값은 버린다', () => {
     expect(sanitizeQuality(null)).toEqual({});
     expect(sanitizeQuality('x')).toEqual({});
-    expect(sanitizeQuality({ pr: 0, aa: 1, dust: 'abc', stars: -1, nebula: 1.5, seg: 0, tex: Infinity, extra: 3 })).toEqual({});
+    expect(sanitizeQuality({ pr: 0, aa: 1, bloom: 'on', dust: 'abc', stars: -1, nebula: 1.5, seg: 0, tex: Infinity, extra: 3 })).toEqual({});
   });
 });
 
@@ -78,9 +78,10 @@ describe('qualityDiff', () => {
 describe('applyQuality', () => {
   it('값을 튜닝 값의 제자리에 쓴다', () => {
     const t = structuredClone(tuning);
-    applyQuality({ pr: 1.25, aa: false, dust: 11, stars: 22, nebula: 64, seg: 3, tex: 99 }, t);
+    applyQuality({ pr: 1.25, aa: false, bloom: !tuning.render.bloom, dust: 11, stars: 22, nebula: 64, seg: 3, tex: 99 }, t);
     expect(t.render.maxPixelRatio).toBe(1.25);
     expect(t.render.antialias).toBe(false);
+    expect(t.render.bloom).toBe(!tuning.render.bloom);
     expect(t.cosmos.dust.count).toBe(11);
     expect(t.cosmos.stars.count).toBe(22);
     expect(t.cosmos.nebula.visible).toBe(true);
