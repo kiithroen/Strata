@@ -2,7 +2,7 @@ import { createRng, range } from '../core/random';
 import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 
 /**
- * 개발용 가짜 사진. 풍경, 메모 스캔(검은 바탕에 글씨만), 화이트보드 세 종류를 시드로 만든다.
+ * 개발용 가짜 사진. 풍경, 메모 스캔, 화이트보드 스캔(둘 다 검은 바탕에 글씨·마커 자국만) 세 종류를 시드로 만든다.
  * 사진마다 시드를 들고 있다가 요청한 해상도로 같은 그림을 다시 그린다. 그린 캔버스는 들고 있지 않는다.
  */
 const SIZES: [number, number][] = [
@@ -88,10 +88,11 @@ function drawScan(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () =
   }
 }
 
+/** 화이트보드 스캔: 판의 흰 바탕을 지우고 마커 자국만 남긴 검은 바탕. 마커 색은 어두운 바탕에서 보이게 밝힌다 */
 function drawWhiteboard(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number): void {
-  ctx.fillStyle = `hsl(200, 8%, ${range(rng, 80, 90)}%)`;
+  ctx.fillStyle = `hsl(220, 12%, ${range(rng, 3, 6)}%)`;
   ctx.fillRect(0, 0, w, h);
-  const colors = ['#1f4fbf', '#c3262f', '#1d7a3d', '#202020'];
+  const colors = ['#7fa8f0', '#e0767c', '#72c48f', '#c9ced8'];
   const strokes = 4 + Math.floor(rng() * 6);
   for (let i = 0; i < strokes; i++) {
     ctx.strokeStyle = colors[Math.floor(rng() * colors.length)];
