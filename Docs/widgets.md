@@ -192,7 +192,7 @@
 - 층마다 강조색(`look.accent`) HUD 링을 셰이더 하나로 그린다(`strata.ring`): 바깥 실선 링과 10도·30도 눈금, 안쪽 점선 링, 바깥 호 조각 두 개, 안쪽 점 링과 내측 가이드 링, 가운데가 밝은 옅은 바탕. 점선 링·호 조각·점 링은 원판에 대해 더 돌 수 있다(`dashSpeed`, `arcSpeed`, `dotSpeed`). 바라보는 층은 외곽 선과 눈금·호 조각이 더 또렷하다. 날짜(`strata.labelHeight`)는 원판 뒤쪽 바깥 가운데에 눕힌다(앞쪽이면 아래층 카드 위에 겹친다).
 - 가장 아래층 밑(`strata.beam.emitterGap`)에 발광부(작은 링과 빛 무리 `beam.glow`, `beam.glowAlpha`)를 두고, 거기서 가장 위층 위(`beam.topGap`)까지 위로 넓어지는 빛기둥(층 높이마다 조각으로 나눈다)(아래 반지름 `beam.base`, 위 반지름은 가장 큰 층 반지름 × `beam.spread`)을 세운다. 아래가 밝고 위로 갈수록 옅어지며, 둘레를 따라 천천히 도는 빛줄기 무늬가 있다(`beam.alpha`).
 - 링·빛기둥·발광부는 모두 가산 합성이라 블룸이 걸린다.
-- 층 판(링·날짜), 빛기둥 조각, 발광부는 카메라와 높이 차가 큰 것부터 그린다(`paintOrder`, 매 프레임 `StrataView.sortForCamera`). 층에 깔린 창은 그 층 판 바로 다음 차례(`StrataMode.cardOrder` → `NoteCard.layerOrder`)라, 위에서 보면 아래층과 그 카드가 먼저 깔리고 위층 판과 카드가 그 위를 덮는다. 펼치는 카드는 늘 맨 마지막이다.
+- 층 판(링·날짜)은 카메라와 높이 차가 큰 것부터 그린다(`paintOrder`, 매 프레임 `StrataView.sortForCamera`). 빛기둥·발광부는 모든 층보다 먼저 그려 카드 뒤에 깔린다. 카드 위에 더해지면 낮은 각도에서 빛기둥 속 카드가 하얗게 타고 블룸으로 번진다. 층에 깔린 창은 그 층 판 바로 다음 차례(`StrataMode.cardOrder` → `NoteCard.layerOrder`)라, 위에서 보면 아래층과 그 카드가 먼저 깔리고 위층 판과 카드가 그 위를 덮는다. 펼치는 카드는 늘 맨 마지막이다.
 - 원판은 테이블처럼 창을 얹은 채 층 중심 둘레로 돈다(`strata.spin.speed`, `strataPose`의 `spin`). 날짜는 돌지 않는다. 손가락이 닿아 있거나 카드를 펼쳤거나 카드 보기를 열면 멈추고, 멈추고 다시 돌 때 빠르기는 `strata.spin.rate`로 따라간다.
 - 바라보는 층은 밝고 나머지 층은 `strata.otherLayerAlpha` 배로 옅다.
 

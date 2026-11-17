@@ -24,6 +24,8 @@ const RING_EXTENT = 1.18;
 const LABEL_RING = 1.12;
 /** 지층의 첫 그리는 차례. 은하 그래프·먼지(1 이하)보다 뒤다. 한 차례에 2 씩 써서 층 판 다음에 그 층 카드를 그린다 */
 const ORDER_BASE = 2;
+/** 빛기둥·발광부의 그리는 차례: 모든 층 판과 카드보다 먼저 */
+const LIGHT_ORDER = ORDER_BASE - 1;
 
 interface LayerMeshes {
   root: Group;
@@ -163,9 +165,8 @@ export class StrataView {
   private readonly color = new Color(tuning.look.accent);
   private readonly time = { value: 0 };
   /** 빛기둥 조각(발광부 → 층 → 층 → 꼭대기)과 각 조각 가운데 높이(판 좌표) */
-  private beams: { mesh: Mesh<CylinderGeometry, ShaderMaterial>; y: number }[] = [];
+  private beams: { mesh: Mesh<CylinderGeometry, ShaderMaterial> }[] = [];
   private readonly beamOpacity = { value: 0 };
-  private bottomY = 0;
   private base: Mesh<PlaneGeometry, ShaderMaterial> | null = null;
   private readonly glow: Sprite;
 
@@ -233,10 +234,9 @@ export class StrataView {
       });
       const mesh = new Mesh(new CylinderGeometry(radiusAt(y1), radiusAt(y0), y1 - y0, 64, 1, true), material);
       strataPoint(frame, 0, mid, 0, mesh.position);
-      this.beams.push({ mesh, y: mid });
+      this.beams.push({ mesh });
       this.group.add(mesh);
     }
-    this.bottomY = bottom;
 
     // 발광부: 작은 링 판과 빛 무리
     this.base = new Mesh(this.ringGeometry, this.ringMaterial());
@@ -253,22 +253,24 @@ export class StrataView {
   }
 
   /**
-   * 카메라 높이(eyeY, 고른 층을 0으로 한 판 좌표)에 맞춰 층 판·빛기둥 조각·발광부의 그리는 차례를 정한다.
-   * 카메라에서 먼 높이의 것부터 그려, 위에서 내려다보면 아래층과 그 카드가 먼저 깔리고 위층 판과 카드가 그 위를 덮는다
+   * 카메라 높이(eyeY, 고른 층을 0으로 한 판 좌표)에 맞춰 층 판의 그리는 차례를 정한다.
+   * 카메라에서 먼 높이의 층부터 그려, 위에서 내려다보면 아래층과 그 카드가 먼저 깔리고 위층 판과 카드가 그 위를 덮는다.
+   * 빛기둥·발광부는 가산 합성이라 서로의 차례는 상관없고, 모든 층보다 먼저 그려 카드 뒤에 깔린다.
+   * 카드 위에 더해지면 어느 각도에서는 빛기둥 속 카드가 하얗게 타고 블룸으로 번진다
    */
   sortForCamera(eyeY: number): void {
-    const n = this.layers.length;
-    const heights = [...this.layers.map((l) => l.y), ...this.beams.map((b) => b.y), this.bottomY];
-    const rank = paintOrder(heights, eyeY);
+    const rank = paintOrder(
+      this.layers.map((l) => l.y),
+      eyeY,
+    );
     this.layers.forEach((l, i) => {
       l.order = ORDER_BASE + rank[i] * 2;
       l.ring.renderOrder = l.order;
       l.label.renderOrder = l.order;
     });
-    this.beams.forEach((b, i) => (b.mesh.renderOrder = ORDER_BASE + rank[n + i] * 2));
-    const baseOrder = ORDER_BASE + rank[heights.length - 1] * 2;
-    if (this.base) this.base.renderOrder = baseOrder;
-    this.glow.renderOrder = baseOrder;
+    for (const b of this.beams) b.mesh.renderOrder = LIGHT_ORDER;
+    if (this.base) this.base.renderOrder = LIGHT_ORDER;
+    this.glow.renderOrder = LIGHT_ORDER;
   }
 
   /** 층(번호)에 놓인 카드가 쓸 그리는 차례. 그 층 판 바로 다음이다 */
