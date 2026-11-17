@@ -155,6 +155,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         photo: photos[i],
         title: note.title,
         body: note.body,
+        tint: note.tint,
       },
       float: { phase: range(rng, 0, Math.PI * 2), period: range(rng, tuning.float.periodMin, tuning.float.periodMax) },
       look,

@@ -13,5 +13,6 @@ npm run dev
 
 - [concept.md](Docs/concept.md): 무엇을 만드는지, 조작과 화면 방향
 - [widgets.md](Docs/widgets.md): 위젯 목록과 각 위젯의 동작 규칙(로컬 탐색기 포함)
+- [sync.md](Docs/sync.md): 메모 앨범과 구글 드라이브의 노트 기록 형식과 합치기 규칙
 - [development.md](Docs/development.md): 실행, 폰에서 열기, 테스트, 디버그 훅
 - [roadmap.md](Docs/roadmap.md): 지금 상태와 다음 작업

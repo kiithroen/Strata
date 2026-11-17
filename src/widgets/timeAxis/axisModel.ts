@@ -192,6 +192,8 @@ export interface NoteRef {
   kind?: NoteKind;
   title?: string;
   body?: string;
+  /** 메모 포스트잇 색 번호(card.holo.memoColors). 없으면 노트 번호로 고른다 */
+  tint?: number;
 }
 
 export interface Cluster {
