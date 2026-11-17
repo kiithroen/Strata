@@ -2,6 +2,7 @@ import './style.css';
 import { tuning } from './config';
 import { applyQuality, readQuality } from './core/quality';
 import { importLocalNotes, photoQueue } from './dev/localNotes';
+import { appHooks } from './gallery/appHooks';
 import { mountCosmosDemo } from './gallery/cosmosDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
 import { PerfOverlay } from './gallery/perfOverlay';
@@ -46,6 +47,8 @@ const settings = loadSettings();
 applyQuality(settings.quality);
 
 const stage = new Stage(container);
+// 위젯 데모가 부르는 앱 동작은 데모를 만들기 전에 채운다(아래 importFiles 는 함수 선언이라 여기서 쓸 수 있다)
+appHooks.showInCosmos = (files) => importFiles(files);
 const picked = pickDemo(location.search);
 let id = picked.id;
 let demo: WidgetDemo = picked.factory(stage);

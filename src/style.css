@@ -554,3 +554,423 @@ body.card-view-open .strata-actions {
 .card-item-tag {
   color: var(--card-tint);
 }
+
+/* 로컬 탐색기: HUD 아래를 채우는 2D 화면과 전체 화면 뷰어 */
+.explorer {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 70px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.explorer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  min-width: 0;
+}
+
+
+.explorer-path {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.explorer-crumb {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.explorer-crumb:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.explorer-crumb.current {
+  color: var(--text);
+  cursor: default;
+  background: transparent;
+}
+
+.explorer-sep {
+  color: color-mix(in srgb, var(--text-dim) 60%, transparent);
+}
+
+.explorer-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 좁은 화면에서는 경로 막대를 단추 아래 한 줄로 내린다 */
+@media (max-width: 720px) {
+  .explorer-path {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .explorer-actions {
+    margin-left: auto;
+  }
+}
+
+.explorer-button,
+.explorer-sort {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 32%, transparent);
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.explorer-sort option {
+  background: var(--bg);
+}
+
+.explorer-button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.explorer-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.explorer-button[hidden] {
+  display: none;
+}
+
+.explorer-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 4px 16px 16px;
+}
+
+.explorer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--explorer-col), 100%), 1fr));
+  gap: 10px;
+}
+
+.explorer-tile {
+  --tint: var(--kind-other);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  min-width: 0;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--tint) 30%, transparent);
+  background: color-mix(in srgb, var(--tint) 7%, var(--bg));
+  color: var(--text);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.explorer-tile:hover {
+  border-color: color-mix(in srgb, var(--tint) 75%, transparent);
+  background: color-mix(in srgb, var(--tint) 14%, var(--bg));
+}
+
+.explorer-tile.disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.explorer-tile[data-kind="folder"] { --tint: var(--kind-folder); }
+.explorer-tile[data-kind="image"] { --tint: var(--kind-image); }
+.explorer-tile[data-kind="video"] { --tint: var(--kind-video); }
+.explorer-tile[data-kind="audio"] { --tint: var(--kind-audio); }
+.explorer-tile[data-kind="text"] { --tint: var(--kind-text); }
+
+.explorer-thumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--tint) 12%, var(--bg));
+}
+
+.explorer-thumb-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: explorer-fade 200ms ease;
+}
+
+@keyframes explorer-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.explorer-thumb.loaded .explorer-ext {
+  display: none;
+}
+
+.explorer-ext {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--tint);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--tint) 55%, transparent);
+}
+
+.explorer-folder-icon {
+  position: relative;
+  width: 46%;
+  aspect-ratio: 4 / 3;
+  border-radius: 4px 8px 8px 8px;
+  border: 2px solid var(--tint);
+  background: color-mix(in srgb, var(--tint) 18%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--tint) 35%, transparent);
+}
+
+.explorer-folder-icon::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: -9px;
+  width: 42%;
+  height: 7px;
+  border: 2px solid var(--tint);
+  border-bottom: 0;
+  border-radius: 4px 6px 0 0;
+}
+
+.explorer-name {
+  font-size: 13px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.explorer-status {
+  padding: 8px 16px calc(env(safe-area-inset-bottom) + 10px);
+  font-size: 12px;
+  color: var(--text-dim);
+  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.explorer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18vh;
+  color: var(--text-dim);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 14px;
+  text-align: center;
+}
+
+.explorer-empty-note {
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 12vh;
+}
+
+body.viewer-open .hud,
+body.viewer-open .settings-button {
+  visibility: hidden;
+}
+
+/* 탐색기는 상태 줄이 안내 글을 대신한다 */
+body.explorer-open .hud-bottom {
+  visibility: hidden;
+}
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--bg) 97%, black);
+}
+
+.viewer[hidden] {
+  display: none;
+}
+
+.viewer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 10px;
+}
+
+.viewer-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 14px;
+}
+
+.viewer-count {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.viewer-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 16px);
+  touch-action: pan-y;
+}
+
+.viewer[data-kind="text"] .viewer-stage {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.viewer-image,
+.viewer-video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.viewer-video {
+  width: 100%;
+  background: black;
+}
+
+.viewer-audio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(520px, 100%);
+  padding: 28px 24px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--viewer-audio) 45%, transparent);
+  background: color-mix(in srgb, var(--viewer-audio) 10%, var(--bg));
+}
+
+.viewer-audio-name {
+  margin: 0;
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.viewer-audio-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.viewer-audio audio {
+  width: 100%;
+}
+
+.viewer-text-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.viewer-text {
+  flex: 1;
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: color-mix(in srgb, var(--bg) 70%, black);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.viewer-message {
+  color: var(--text-dim);
+}
+
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 64px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  color: var(--text);
+  font-size: 32px;
+  cursor: pointer;
+}
+
+.viewer-nav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.viewer-prev {
+  left: 8px;
+}
+
+.viewer-next {
+  right: 8px;
+}
+
+.viewer[data-kind="text"] .viewer-nav,
+.viewer[data-kind="audio"] .viewer-nav {
+  top: auto;
+  bottom: calc(env(safe-area-inset-bottom) + 24px);
+  transform: none;
+}

@@ -80,6 +80,7 @@ npm run build
 - 단위 테스트는 `tuning`을 읽어 기대를 계산한다. 주사율 무관성은 같은 게임 시간을 여러 주사율로 진행해 비교한다.
 - 화면은 개발 서버를 띄워 캡처로 확인한다. 자동화 테스트는 렌더링 결과를 보지 않는다.
 - 화면 기준은 **폴드 펼친 화면**이다. 배치·간격·글자 크기는 이 크기에서 먼저 맞추고, 접은 화면(세로로 긴 폰)과 데스크톱은 깨지지 않는지만 본다. 기준 CSS 크기는 **936×858**이다(갤럭시 폴드 펼친 화면, 크롬 주소창이 있을 때 성능 표시의 `화면` 값. 가로가 조금 긴 정사각형에 가깝다). 접은 화면은 **514×1076**이다. 앱으로 감싸 주소창이 없어지면 세로가 늘어나니 그때 다시 읽는다. 폰 크롬이 '데스크톱 사이트' 모드면 넓은 가상 폭으로 그려 값이 틀어진다.
+- 로컬 탐색기(`?w=explorer`)는 데스크톱이 기준이다. 기준 CSS 크기는 **1440×900**이고, 폴드 펼친 화면과 접은 화면은 깨지지 않는지만 본다(좁은 화면에서는 경로 막대가 단추 아래 줄로 내려간다).
 
 ## 디버그 훅
 
@@ -90,6 +91,7 @@ npm run build
   - 노트 카드: `cards`, `focus(card | null)`, `focusedId()`
   - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
   - 우주 보기: 시간축에 더해 `hubs()`, `nodes()`(지난 프레임의 행성·허브 노드), `screenOf(월드 위치)`(탭할 화면 좌표, CSS px), `tapNode(노드)`(은하 탭 두 단계를 거친다)·`approachedKey()`(다가간 노드 키), `enterStrata(노드)`(바로 들어간다)·`exitStrata()`, `strataState()`, `pickStrataLayer(x, y)`, `openCardList()`(지층 보기의 카드 보기)·`setCardMode('space' | 'list')`·`cardListState()`
+  - 로컬 탐색기: `openFiles(File[])`(파일 목록으로 원본을 연다. 폴더 고르기 창은 스크립트로 열 수 없어 확인 스크립트는 `webkitRelativePath`를 붙인 `File`로 폴더 구조를 넘긴다), `view.state()`(원본·폴더·항목 수·기다리는 썸네일·뷰어 파일), `view.navigate(경로)`, `view.openFile(경로)`, `view.viewer`(`step(±1)`, `close()`)
 - `importFiles(File[])`: 설정 화면의 실데이터 불러오기와 같다. 결과 글을 돌려준다. 확인 스크립트는 `OffscreenCanvas.convertToBlob`으로 만든 JPEG 바이트를 `File`로 감싸 넘긴다
 - `time()`: 지금 게임 시간(초)
 - `advance(seconds, hz = 60)`: 게임 시간을 고정 간격으로 진행하고 한 번 그린다

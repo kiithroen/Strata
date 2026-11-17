@@ -1,5 +1,6 @@
 import { mountCardListDemo } from './cardListDemo';
 import { mountCosmosDemo } from './cosmosDemo';
+import { mountExplorerDemo } from './explorerDemo';
 import { mountNoteCardDemo } from './noteCardDemo';
 import type { WidgetDemoFactory } from './stage';
 import { mountTimeAxisDemo } from './timeAxisDemo';
@@ -10,6 +11,7 @@ export const widgetDemos: Record<string, WidgetDemoFactory> = {
   'time-axis': mountTimeAxisDemo,
   'note-card': mountNoteCardDemo,
   'card-list': mountCardListDemo,
+  explorer: mountExplorerDemo,
 };
 
 export function pickDemo(search: string): { id: string; factory: WidgetDemoFactory } {

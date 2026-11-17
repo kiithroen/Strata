@@ -12,6 +12,6 @@ npm run dev
 ## 문서
 
 - [concept.md](Docs/concept.md): 무엇을 만드는지, 조작과 화면 방향
-- [widgets.md](Docs/widgets.md): 위젯 목록과 각 위젯의 동작 규칙
+- [widgets.md](Docs/widgets.md): 위젯 목록과 각 위젯의 동작 규칙(로컬 탐색기 포함)
 - [development.md](Docs/development.md): 실행, 폰에서 열기, 테스트, 디버그 훅
 - [roadmap.md](Docs/roadmap.md): 지금 상태와 다음 작업

@@ -238,6 +238,33 @@
 - 보이는 정도는 카드 높이가 화면 높이에서 차지하는 비율로 정한다(`screenFraction`, `cloudVisibility`). `cloud.show` 범위에서 작아질수록 낱말이 나타나고, `cloud.hide` 범위에서 카드가 사라진다. 은하는 행성까지 거리와 위성 카드 크기(`cosmos.satelliteScale`), 지층은 층 판 중심까지 거리와 가장 큰 창 크기(`strata.cardScale`)로 잰다.
 - 은하의 낱말은 지층 보기로 들어가면 옅어진다. 지층 보기의 낱말은 은하처럼 옅어지지 않게 그래프와 따로 그린다.
 
+## 로컬 탐색기
+
+파일: `src/widgets/explorer/` (원본 인터페이스 `fileSource.ts`, 브라우저 원본 `browserSources.ts`, 모델 `explorerModel.ts`, 화면 `ExplorerView.ts`, 뷰어 `MediaViewer.ts`), 데모 `src/gallery/explorerDemo.ts`(`?w=explorer`)
+
+기기의 폴더를 2D로 훑고 사진·동영상·음악·텍스트를 여는 탐색기 모드다. 파일은 `FileSource`(이름, `list(경로)`, `file(경로)`)로만 읽는다. 경로는 원본 폴더 기준 `/`로 이은 문자열이고 원본 폴더는 `''`이다.
+
+**원본**
+- `HandleSource`: File System Access API 폴더 핸들로 읽는다(데스크톱 크롬·엣지). 하위 폴더 핸들은 처음 열 때 찾아 기억한다. 파일 크기·수정 시각은 폴더를 읽을 때 한꺼번에 연다.
+- `ListSource`: 폴더 입력이 넘긴 파일 목록의 `webkitRelativePath`로 폴더 구조를 다시 세운다. 첫 경로 조각이 원본 폴더 이름이다. 폴더 고르기가 없는 브라우저(폰 크롬)와 확인 스크립트가 쓴다.
+- 마지막으로 연 폴더 핸들은 IndexedDB에 기억해 두고, 빈 화면에 `최근 폴더 다시 열기` 단추를 띄운다. 다시 열 때 읽기 권한을 다시 묻는다. 편의 기능이라 저장이 막혀도 그냥 넘어간다.
+
+**종류와 정렬** (`explorerModel.ts`)
+- 종류(`kindOf`)는 확장자로 고르고, 모르는 확장자는 MIME 앞부분을 본다. 사진·동영상·음악·텍스트를 뷰어로 열고(`isViewable`), 나머지는 흐리게 둔다.
+- 폴더가 먼저이고, 파일은 이름순(숫자는 값으로: `IMG_2` < `IMG_10`)·최근 수정순·큰 파일순 가운데 고른다(`sortEntries`).
+
+**화면** (`ExplorerView`)
+- HUD 아래를 채운다. 머리 줄에 `↑ 위로`, 경로 막대(누르면 그 폴더로), 정렬, `은하로 보기`, `폴더 열기`가 있고, 아래 상태 줄이 폴더·파일 수와 크기를 보인다. 좁은 화면에서는 경로 막대가 단추 아래 줄로 내려가고, 넘치면 지금 폴더(끝)가 보이게 스크롤한다.
+- 칸은 썸네일 격자(`explorer.tileMinPx`)다. 칸 색은 종류 색(`explorer.kindColors`)이고, 폴더는 폴더 그림, 파일은 확장자 글자다. 사진은 화면 근처(`explorer.preloadPx`)에 들어온 칸만 디코딩 큐(`explorer.decodeConcurrency`)로 `explorer.thumbPx` 폭(기기 픽셀 비율, 최대 2배)의 썸네일을 만든다. 폴더를 옮기면 기다리던 썸네일은 버린다.
+- 폴더를 옮길 때마다 방문 기록을 쌓아 브라우저·안드로이드 뒤로가 지난 폴더로 간다. `Backspace`·`Alt+↑`는 위 폴더로 간다.
+- `은하로 보기`는 지금 폴더의 사진을 설정 화면의 실데이터 불러오기와 같은 길(`appHooks.showInCosmos`)로 우주 보기에 띄운다.
+
+**뷰어** (`MediaViewer`)
+- 전체 화면 2D다. 지금 폴더의 뷰어로 여는 파일을 지금 정렬 순서로 넘긴다(`‹ ›` 단추, 방향키, 사진은 가로로 `explorer.swipePx` 이상 끌기). `Esc`·닫기·뒤로로 닫는다. 열 때 방문 기록을 하나 쌓고, 닫기·`Esc`로 닫으면 되돌린다.
+- 사진은 화면에 맞춰 보이고, 동영상·음악은 브라우저 기본 재생기로 바로 튼다. 음악이 끝나면 같은 폴더의 다음 음악을 튼다. 브라우저가 못 여는 형식은 안내 글을 띄운다.
+- 텍스트는 앞에서부터 `explorer.textMaxBytes`까지 읽는다. BOM이 있으면 그 인코딩, 없으면 UTF-8로 읽고 깨지면 EUC-KR로 다시 읽는다(`decodeText`). 잘라 읽었으면 끝에서 잘린 글자는 버리고 그 사실을 적는다.
+- 파일은 열 때마다 원본에서 읽고, 넘기거나 닫으면 객체 URL을 돌려준다.
+
 ## 카메라·제스처
 
 파일: `src/input/gesture.ts`, `src/widgets/camera/axisNavigation.ts`, `src/widgets/camera/cameraRig.ts`, `src/gallery/timeScrubber.ts`

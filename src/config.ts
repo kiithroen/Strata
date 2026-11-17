@@ -426,6 +426,22 @@ export const tuning = {
     tintLift: 0.3,
   },
 
+  /**
+   * 로컬 탐색기. tileMinPx 는 썸네일 격자 칸의 최소 폭(CSS px), thumbPx 는 썸네일을 디코딩하는 폭(CSS px, 기기 픽셀 비율을 곱해 쓴다),
+   * decodeConcurrency 는 동시에 디코딩하는 썸네일 수, preloadPx 는 화면 밖 얼마나 미리 썸네일을 만들지(CSS px),
+   * textMaxBytes 는 텍스트 뷰어가 앞에서부터 읽는 최대 바이트, swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
+   * kindColors 는 칸 종류 색이다
+   */
+  explorer: {
+    tileMinPx: 150,
+    thumbPx: 220,
+    decodeConcurrency: 3,
+    preloadPx: 480,
+    textMaxBytes: 2_000_000,
+    swipePx: 60,
+    kindColors: { folder: '#38d4ff', image: '#48d6ff', video: '#ff7fbf', audio: '#ffcf5a', text: '#7fa4ff', other: '#5e8aa6' },
+  },
+
   dev: {
     /** 시간축 데모의 가짜 노트 */
     noteCount: 110,
