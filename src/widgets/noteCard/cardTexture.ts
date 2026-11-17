@@ -202,12 +202,14 @@ function mosaic(image: CanvasImageSource, blocks: number): HTMLCanvasElement {
   const iw = (image as { width: number }).width;
   const ih = (image as { height: number }).height;
   const canvas = document.createElement('canvas');
-  canvas.width = blocks;
-  canvas.height = Math.max(1, Math.round((blocks * ih) / iw));
+  canvas.width = Math.max(1, blocks);
+  canvas.height = iw > 0 && ih > 0 ? Math.max(1, Math.round((blocks * ih) / iw)) : 1;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D 캔버스를 만들 수 없다');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  if (iw > 0 && ih > 0) {
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  }
   return canvas;
 }
 
@@ -421,6 +423,7 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
 function drawCover(ctx: CanvasRenderingContext2D, image: CanvasImageSource, r: Rect): void {
   const iw = (image as { width: number }).width;
   const ih = (image as { height: number }).height;
+  if (iw <= 0 || ih <= 0) return;
   const scale = Math.max(r.width / iw, r.height / ih);
   const sw = r.width / scale;
   const sh = r.height / scale;

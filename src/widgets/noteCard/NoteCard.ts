@@ -131,7 +131,7 @@ export class NoteCard {
     this.mesh.visible = opacity > HIDDEN;
     // 펼치는 카드는 다른 카드보다 나중에, 깊이 검사 없이 그려 카메라에 더 가까운 카드에도 가려지지 않고 맨 위에 보인다
     const opening = m.focused || m.focus > HIDDEN;
-    this.mesh.renderOrder = opening ? 10 : 0;
+    this.mesh.renderOrder = opening ? (m.focused ? 11 : 10) : 0;
     this.mesh.material.depthTest = !opening;
     this.updateDetail();
     if (this.badge) this.badge.material.opacity = opacity * (1 - m.focus);
@@ -139,13 +139,14 @@ export class NoteCard {
 
   /** 묶음 장수 같은 배지를 카드 오른쪽 위에 붙인다. null 이면 뗀다 */
   setBadge(text: string | null): void {
-    if (text === this.badgeText) return;
-    this.badgeText = text;
     if (text === null) {
+      this.badgeText = null;
       if (this.badge) this.badge.visible = false;
       return;
     }
     const label = this.labels.get(text, 'badge');
+    if (text === this.badgeText && this.badge && this.badge.material.map === label.texture) return;
+    this.badgeText = text;
     if (!this.badge) {
       this.badge = new Mesh(
         new PlaneGeometry(1, 1),

@@ -62,4 +62,26 @@ describe('TaskQueue', () => {
     await expect(bad).rejects.toThrow('x');
     expect(await good).toBe(7);
   });
+
+  it('clear 는 돌고 있는 작업은 두고 기다리던 작업만 취소한다', async () => {
+    const q = new TaskQueue(1);
+    const running = gate();
+    let ranSecond = false;
+    const first = q.run(async () => {
+      await running.done;
+      return 'ok';
+    });
+    const second = q.run(async () => {
+      ranSecond = true;
+      return 'later';
+    });
+    expect(q.active).toBe(1);
+    expect(q.pending).toBe(1);
+    q.clear();
+    expect(q.pending).toBe(0);
+    await expect(second).rejects.toThrow('cancelled');
+    running.open();
+    expect(await first).toBe('ok');
+    expect(ranSecond).toBe(false);
+  });
 });

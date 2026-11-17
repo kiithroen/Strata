@@ -273,7 +273,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   });
 
   // 카드 보기: 지층에 깔린 노트만 3D 카드 공간(field 배치) 또는 2D 카드 목록으로 본다
-  const cardList = new CardListMode('← 지층으로', () => focus.set(null));
+  const cardList = new CardListMode(
+    '← 지층으로',
+    () => focus.set(null),
+    () => focus.set(null),
+  );
   let field: CardField | null = null;
   /** 노트 번호 → 카드 공간 자리 번호(-1 이면 공간에 없음). 최근 노트가 앞자리다 */
   const fieldSlotOf = new Int32Array(notes.length).fill(-1);

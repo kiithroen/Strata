@@ -4,7 +4,7 @@
  */
 export class TaskQueue {
   private running = 0;
-  private readonly waiting: Array<() => void> = [];
+  private readonly waiting: Array<{ start: () => void; cancel: (reason: unknown) => void }> = [];
 
   constructor(private readonly concurrency: number) {
     if (!(concurrency >= 1)) throw new Error('동시 작업 수는 1 이상이어야 한다');
@@ -20,24 +20,33 @@ export class TaskQueue {
     return this.waiting.length;
   }
 
+  /** 아직 시작하지 않은 대기 작업을 모두 취소한다 */
+  clear(reason: unknown = new Error('cancelled')): void {
+    const dropped = this.waiting.splice(0, this.waiting.length);
+    for (const entry of dropped) entry.cancel(reason);
+  }
+
   run<T>(task: () => Promise<T>, urgent = false): Promise<T> {
     return new Promise<T>((resolve, reject) => {
-      const start = () => {
-        this.running++;
-        let result: Promise<T>;
-        try {
-          result = task();
-        } catch (e) {
-          result = Promise.reject(e);
-        }
-        result.then(resolve, reject).finally(() => {
-          this.running--;
-          this.waiting.shift()?.();
-        });
+      const entry = {
+        start: () => {
+          this.running++;
+          let result: Promise<T>;
+          try {
+            result = task();
+          } catch (e) {
+            result = Promise.reject(e);
+          }
+          result.then(resolve, reject).finally(() => {
+            this.running--;
+            this.waiting.shift()?.start();
+          });
+        },
+        cancel: reject,
       };
-      if (this.running < this.concurrency) start();
-      else if (urgent) this.waiting.unshift(start);
-      else this.waiting.push(start);
+      if (this.running < this.concurrency) entry.start();
+      else if (urgent) this.waiting.unshift(entry);
+      else this.waiting.push(entry);
     });
   }
 }

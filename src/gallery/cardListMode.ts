@@ -17,9 +17,14 @@ export class CardListMode {
     if (!this.view.open || isCardListHistoryState(e.state)) return;
     this.pushed = false;
     this.view.hide();
+    this.onClose?.();
   };
 
-  constructor(closeLabel: string, onModeChange?: (mode: CardViewMode) => void) {
+  constructor(
+    closeLabel: string,
+    onModeChange?: (mode: CardViewMode) => void,
+    private readonly onClose?: () => void,
+  ) {
     this.view = new CardListView({ closeLabel, onClose: () => this.close(), onModeChange });
     window.addEventListener('popstate', this.onPop);
   }
@@ -53,6 +58,7 @@ export class CardListMode {
   close(): void {
     if (!this.view.open) return;
     this.view.hide();
+    this.onClose?.();
     if (this.pushed) {
       this.pushed = false;
       history.back();

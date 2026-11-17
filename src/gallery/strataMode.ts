@@ -131,6 +131,8 @@ export class StrataMode {
     const s = tuning.strata;
     if (!this.active) {
       this.saved = { target: this.rig.goalTarget.clone(), yaw: this.rig.yaw, pitch: this.rig.pitch, distance: this.rig.goalDistance };
+      this.spin = 0;
+      this.spinPace = 1;
     }
     this.active = true;
     this.frame = { origin: origin.clone(), yaw: this.rig.yaw };

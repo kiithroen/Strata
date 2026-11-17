@@ -343,6 +343,7 @@ body.card-view-open .hud,
 body.card-view-open .axis-readout,
 body.card-view-open .time-scrubber,
 body.card-view-open .settings-button,
+body.card-view-open .settings-panel,
 body.card-view-open .strata-actions {
   visibility: hidden;
 }

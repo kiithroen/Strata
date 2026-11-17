@@ -1,7 +1,7 @@
 import './style.css';
 import { tuning } from './config';
 import { applyQuality, readQuality } from './core/quality';
-import { importLocalNotes } from './dev/localNotes';
+import { importLocalNotes, photoQueue } from './dev/localNotes';
 import { mountCosmosDemo } from './gallery/cosmosDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
 import { PerfOverlay } from './gallery/perfOverlay';
@@ -67,11 +67,12 @@ async function importFiles(files: File[], progress?: (text: string) => void): Pr
   const summary = `사진 ${photos}장 · 메모 ${memos}장${skipped > 0 ? ` · 건너뜀 ${skipped}` : ''}`;
   if (result.data.notes.length === 0) return `띄울 노트가 없다 (${summary})`;
   demo.dispose();
+  photoQueue.clear();
   demo = mountCosmosDemo(stage, result.data);
   id = 'cosmos';
   hintEl.textContent = demo.hint;
   for (const a of tabsEl.querySelectorAll('a')) a.className = a.textContent === id.toUpperCase() ? 'active' : '';
-  history.replaceState(history.state, '', '?w=cosmos');
+  history.replaceState(null, '', '?w=cosmos');
   return summary;
 }
 

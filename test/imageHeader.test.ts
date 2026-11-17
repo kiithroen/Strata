@@ -76,6 +76,17 @@ describe('readImageInfo', () => {
     const cut = jpeg({ width: 10, height: 10 });
     expect(readImageInfo(cut.slice(0, cut.length - 21))).toBeNull();
   });
+
+  it('세그먼트 길이가 2보다 작은 손상된 JPEG 나 잘못된 EXIF 헤더에도 멈추지 않는다', () => {
+    const zeroLen = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0xff, 0xc0]);
+    expect(readImageInfo(zeroLen)).toBeNull();
+    const badExif = new Uint8Array([
+      0xff, 0xd8,
+      0xff, 0xe1, 0, 16, 0x45, 0x78, 0x69, 0x66, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0xff, 0xc0, 0, 17, 8, 0, 100, 0, 200, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1,
+    ]);
+    expect(readImageInfo(badExif)).toEqual({ width: 200, height: 100, orientation: 1, takenAt: undefined });
+  });
 });
 
 describe('parseExifDate', () => {

@@ -29,6 +29,7 @@ export class CardListView {
   private generation = 0;
   private count = 0;
   private current: CardViewMode = 'list';
+  private focusSection: HTMLElement | null = null;
   private readonly toggles = new Map<CardViewMode, HTMLButtonElement>();
 
   constructor(private readonly options: CardListOptions) {
@@ -81,16 +82,25 @@ export class CardListView {
     return this.current;
   }
 
-  /** 보기 방식을 바꾼다(onModeChange 는 부르지 않는다). 목록으로 바뀌면 보이는 칸의 사진을 받는다 */
+  /** 보기 방식을 바꾼다(onModeChange 는 부르지 않는다). 목록으로 바뀌면 보이는 칸의 사진을 받고 첫 전환이면 바라보는 층으로 스크롤한다 */
   setMode(mode: CardViewMode): void {
     this.current = mode;
     this.applyMode();
+    this.scrollToFocus();
   }
 
   private applyMode(): void {
     this.root.classList.toggle('space', this.current === 'space');
     this.title.textContent = this.current === 'space' ? `노트 ${this.count}장 · 끌기: 앞뒤 이동` : `노트 ${this.count}장`;
     for (const [mode, b] of this.toggles) b.classList.toggle('active', mode === this.current);
+  }
+
+  private scrollToFocus(): void {
+    if (this.current !== 'list' || !this.open) return;
+    if (this.focusSection) {
+      this.body.scrollTop = this.focusSection.offsetTop;
+      this.focusSection = null;
+    }
   }
 
   /** 지금 목록에 있는 카드 수와 사진을 아직 받지 않은 칸 수 */
@@ -118,9 +128,11 @@ export class CardListView {
       this.body.append(sec);
       if (section.key === focusKey) focusEl = sec;
     }
+    this.focusSection = focusEl;
     this.root.hidden = false;
     document.body.classList.add('card-view-open');
-    this.body.scrollTop = focusEl ? focusEl.offsetTop : 0;
+    this.body.scrollTop = 0;
+    this.scrollToFocus();
   }
 
   hide(): void {
@@ -139,6 +151,7 @@ export class CardListView {
 
   private reset(): void {
     this.generation++;
+    this.focusSection = null;
     this.observer.disconnect();
     this.pending.clear();
     this.body.replaceChildren();
@@ -217,6 +230,7 @@ export class CardListView {
 function drawCover(ctx: CanvasRenderingContext2D, image: CanvasImageSource, photo: PhotoSource, w: number, h: number): void {
   const iw = 'width' in image && typeof image.width === 'number' ? image.width : photo.width;
   const ih = 'height' in image && typeof image.height === 'number' ? image.height : photo.height;
+  if (iw <= 0 || ih <= 0) return;
   const scale = Math.max(w / iw, h / ih);
   const dw = iw * scale;
   const dh = ih * scale;

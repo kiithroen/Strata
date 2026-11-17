@@ -40,6 +40,7 @@ function readJpeg(bytes: Uint8Array): ImageInfo | null {
     }
     if (marker === 0xd9 || marker === 0xda) return null;
     const len = v.getUint16(p + 2);
+    if (len < 2) return null;
     const body = p + 4;
     if (marker === 0xe1 && body + 6 <= bytes.length && ascii(bytes, body, 4) === 'Exif') {
       const exif = readExif(v, body + 6, Math.min(bytes.length, p + 2 + len));
@@ -68,7 +69,9 @@ const TAG_DATETIME_ORIGINAL = 0x9003;
 function readExif(v: DataView, start: number, end: number): { orientation: number; takenAt?: number } {
   const out: { orientation: number; takenAt?: number } = { orientation: 1 };
   if (start + 8 > end) return out;
-  const little = v.getUint16(start) === 0x4949;
+  const byteOrder = v.getUint16(start);
+  if (byteOrder !== 0x4949 && byteOrder !== 0x4d4d) return out;
+  const little = byteOrder === 0x4949;
   const u16 = (o: number) => v.getUint16(o, little);
   const u32 = (o: number) => v.getUint32(o, little);
   let dateTime: number | undefined;
