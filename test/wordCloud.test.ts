@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
-import { cloudVisibility, layoutCloud, screenFraction, topTags, wordBox } from '../src/widgets/cloud/wordCloud';
+import { farCardHide, layoutCloud, screenFraction, topTags, wordBox } from '../src/widgets/cloud/wordCloud';
 
 const c = tuning.cloud;
 
@@ -55,20 +55,17 @@ describe('layoutCloud', () => {
   });
 });
 
-describe('cloudVisibility', () => {
-  it('카드가 작아질수록 낱말이 먼저 나타나고 더 작아지면 카드가 사라진다', () => {
-    const big = cloudVisibility(c.show[0] * 1.5);
-    expect(big).toEqual({ words: 0, cards: 0 });
-    const mid = cloudVisibility(c.show[1]);
-    expect(mid.words).toBe(1);
-    expect(mid.cards).toBe(0);
-    const tiny = cloudVisibility(c.hide[1] * 0.5);
-    expect(tiny).toEqual({ words: 1, cards: 1 });
-    let prev = cloudVisibility(1);
+describe('farCardHide', () => {
+  it('카드가 cloud.hide 범위로 작아질수록 사라진다', () => {
+    expect(farCardHide(c.hide[0] * 1.5)).toBe(0);
+    expect(farCardHide(c.hide[1] * 0.5)).toBe(1);
+    const mid = farCardHide((c.hide[0] + c.hide[1]) / 2);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+    let prev = farCardHide(1);
     for (let s = 0.2; s > 0.001; s *= 0.9) {
-      const v = cloudVisibility(s);
-      expect(v.words).toBeGreaterThanOrEqual(prev.words);
-      expect(v.cards).toBeGreaterThanOrEqual(prev.cards);
+      const v = farCardHide(s);
+      expect(v).toBeGreaterThanOrEqual(prev);
       prev = v;
     }
   });

@@ -7,7 +7,7 @@ import { createFakeNoteData, type NoteData } from '../dev/noteData';
 import { listenGestures } from '../input/gesture';
 import { CameraRig } from '../widgets/camera/cameraRig';
 import { drawCloud } from '../widgets/cloud/CloudView';
-import { cloudVisibility, layoutCloud, screenFraction, topTags } from '../widgets/cloud/wordCloud';
+import { farCardHide, layoutCloud, screenFraction, topTags, type PlacedWord } from '../widgets/cloud/wordCloud';
 import { LabelCache } from '../widgets/common/labelCache';
 import { ScreenLabels } from '../widgets/common/screenLabels';
 import {
@@ -213,7 +213,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     const tags = topTags(cluster.members.map((m) => notes[m].tags), tuning.cloud.maxWords);
     return {
       cluster,
-      /** 대표 태그 글자색: 노드 색에서 흰색 쪽으로 cloud.tintLift 만큼 밝힌다(클라우드의 가장 많이 쓰인 낱말과 같은 색) */
+      /** 노드 위 글자색: 노드 색에서 흰색 쪽으로 cloud.tintLift 만큼 밝힌다(클라우드의 가장 많이 쓰인 낱말과 같은 색) */
       titleColor: color.clone().lerp(new Color(1, 1, 1), tuning.cloud.tintLift),
       offsetS: timeOffsetDepth(spiralState, cluster.anchorTime),
       jitter: planetJitter(cluster.key),
@@ -225,8 +225,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       label: group.label,
       /** 지층 층 이름과 2D 카드 목록의 묶음 머리 글자(장수는 목록이 따로 붙인다) */
       date: group.heading,
-      /** 노드 위에 뜨는 글자(폴더 축은 폴더 이름, 날짜 축은 가장 많이 쓰인 태그)와 멀리서 보이는 태그 워드 클라우드 */
-      title: group.title ?? tags[0]?.text ?? null,
+      /** 노드 위에 뜨는 글자(폴더 축의 폴더 이름. 날짜 축은 없고 워드 클라우드가 대표 태그를 맡는다)와 늘 떠 있는 태그 워드 클라우드 */
+      title: group.title,
       words: layoutCloud(tags),
       affinities,
       /** 관련도 높은 순서의 묶음 안 번호 */
@@ -309,6 +309,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     () => focus.set(null),
   );
   let field: CardField | null = null;
+  /** 카드 공간의 층별 카드 무리: 그 무리 가운데에 층의 워드 클라우드를 띄운다 */
+  let fieldGroups: { key: string; words: readonly PlacedWord[]; slots: number[] }[] = [];
+  const fieldCloudAt = new Vector3();
   /** 노트 번호 → 카드 공간 자리 번호(-1 이면 공간에 없음). 최근 노트가 앞자리다 */
   const fieldSlotOf = new Int32Array(notes.length).fill(-1);
   /** 카드 공간 보기로 들어간 정도(0~1) */
@@ -333,6 +336,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     field = buildField(members.length);
     fieldSlotOf.fill(-1);
     members.forEach((m, i) => (fieldSlotOf[m] = i));
+    fieldGroups = groups.map((grp) => ({ key: grp.key, words: grp.words, slots: grp.members.map((m) => fieldSlotOf[m]) }));
     cardList.show(buildCardSections(groups, notes, photos), strata.focusKey ?? undefined);
   };
   const strata = new StrataMode(stage, cameraRig, labels, {
@@ -650,6 +654,13 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       graph.begin();
       screenLabels.begin();
       strata.measure(cameraPosition, p11, screenLabels);
+      if (fieldMix > 0 && field) {
+        for (const grp of fieldGroups) {
+          const seen = field.centroid(grp.slots, fieldCloudAt);
+          fieldCloudAt.applyQuaternion(stage.camera.quaternion).add(stage.camera.position);
+          drawCloud(screenLabels, fieldCloudAt, grp.words, fieldMix * seen, cameraPosition, `field:${grp.key}`, { onTop: true });
+        }
+      }
       // 시점이 옮겨 간 시간 거리만큼 먼지가 나선팔을 따라 흐른다(과거로 가면 음수)
       const focusNow = controller.current.focusTime;
       const scrollS = ((focusNow - lastFocusTime) / DAY_MS) * depthPerDay(spiralState);
@@ -676,18 +687,16 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
         planetAlphas[pi] = alpha;
         graph.orb(pos, planet.color, planet.size, alpha);
         graph.glow(pos, planet.color, planet.glowSize * glowOf(planet.node.key), g.glowAlpha * alpha);
-        // 글자 위계: 위에 대표 태그(노드 색, 굵은 산세리프), 아래에 날짜 · 노트 수. 멀어지면 대표 태그가 워드 클라우드로 넘어간다
-        const far = cloudVisibility(screenFraction(satelliteHeight, dist, p11));
-        // 겹치면 허브 날짜 > 대표 태그 > 행성 날짜 차례로 남는다(LABEL_PRIORITY)
+        // 글자 위계: 위에 태그 워드 클라우드(가장 많이 쓰인 태그가 대표, 노드 색)와 폴더 이름, 아래에 날짜 · 노트 수
+        const cardHide = farCardHide(screenFraction(satelliteHeight, dist, p11));
+        // 겹치면 허브 날짜 > 대표 태그·폴더 이름 > 행성 날짜 > 나머지 낱말 차례로 남는다(LABEL_PRIORITY)
         graph.label(pos, planet.label, c.planetLabelPx, alpha * 0.85, cameraPosition, {
           offsetYPx: -(orbRadiusPx + c.planetLabelPx * 0.8),
           priority: LABEL_PRIORITY.date,
           key: `${cluster.key}:date`,
         });
         if (planet.title) {
-          // 태그가 없어 워드 클라우드가 비면(폴더 축의 파일 등) 멀어져도 노드 위 글자를 남긴다
-          const titleFade = planet.words.length > 0 ? far.words : 0;
-          graph.label(pos, planet.title, c.planetTitlePx, alpha * (1 - titleFade), cameraPosition, {
+          graph.label(pos, planet.title, c.planetTitlePx, alpha, cameraPosition, {
             offsetYPx: orbRadiusPx + c.planetTitlePx * 0.75,
             color: planet.titleColor,
             style: 'title',
@@ -695,7 +704,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
             key: `${cluster.key}:title`,
           });
         }
-        drawCloud(screenLabels, pos, planet.words, far.words * alpha * (1 - mix), cameraPosition, cluster.key, planet.color);
+        drawCloud(screenLabels, pos, planet.words, alpha * (1 - mix), cameraPosition, cluster.key, { tint: planet.color, leadPriority: LABEL_PRIORITY.title });
 
         facingQuaternion(pos, cameraPosition, burstQuat);
         const r = planet.radius;
@@ -712,7 +721,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
           facingQuaternion(p, cameraPosition, home.quaternion);
           home.scale = c.satelliteScale;
           const card = cards[m];
-          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * orbitFade[m] * (1 - far.cards);
+          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * orbitFade[m] * (1 - cardHide);
           let fade = strata.blendCard(m, home, baseFade);
           if (fieldMix > 0 && field) {
             // 카드 공간: 카메라 앞 자리로 날아가고, 공간에 없는 카드는 사라진다

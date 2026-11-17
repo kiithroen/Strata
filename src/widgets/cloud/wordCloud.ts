@@ -69,12 +69,12 @@ export function layoutCloud(words: readonly CloudWord[]): PlacedWord[] {
 }
 
 /**
- * 멀리서 보일 때의 정도. screen 은 카드 높이가 화면 높이에서 차지하는 비율이다.
- * words 는 낱말이 나타난 정도, cards 는 카드가 사라진 정도(0~1)다. 둘 다 카드가 작아질수록 커진다.
+ * 멀리서 카드가 사라진 정도(0~1). screen 은 카드 높이가 화면 높이에서 차지하는 비율이고, cloud.hide 범위에서 작아질수록 커진다.
+ * 낱말은 거리와 상관없이 늘 보인다.
  */
-export function cloudVisibility(screen: number): { words: number; cards: number } {
+export function farCardHide(screen: number): number {
   const c = tuning.cloud;
-  return { words: fall(c.show[0], c.show[1], screen), cards: fall(c.hide[0], c.hide[1], screen) };
+  return fall(c.hide[0], c.hide[1], screen);
 }
 
 /** from 이상이면 0, to 이하면 1 인 부드러운 내림 계단(from > to) */

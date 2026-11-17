@@ -3,7 +3,7 @@ import { tuning } from '../config';
 import { damp } from '../core/motion';
 import type { CameraRig } from '../widgets/camera/cameraRig';
 import { drawCloud } from '../widgets/cloud/CloudView';
-import { cloudVisibility, screenFraction } from '../widgets/cloud/wordCloud';
+import { farCardHide, screenFraction, type PlacedWord } from '../widgets/cloud/wordCloud';
 import type { ScreenLabels } from '../widgets/common/screenLabels';
 import type { LabelCache } from '../widgets/common/labelCache';
 import { createPose, type Pose } from '../widgets/noteCard/cardMotion';
@@ -169,8 +169,8 @@ export class StrataMode {
   }
 
   /** 층마다 열쇠, 날짜 글자, 깔린 노트 번호(최근 층부터) */
-  groups(): { key: string; label: string; members: number[] }[] {
-    return this.layers.map((layer) => ({ key: layer.key, label: layer.label, members: layer.tiles.map((t) => t.index) }));
+  groups(): { key: string; label: string; members: number[]; words: readonly PlacedWord[] }[] {
+    return this.layers.map((layer) => ({ key: layer.key, label: layer.label, members: layer.tiles.map((t) => t.index), words: layer.words }));
   }
 
   /** 바라보는 층의 열쇠 */
@@ -249,7 +249,7 @@ export class StrataMode {
   }
 
   /**
-   * 카메라 높이에 맞춰 층별 그리는 차례를 정하고, 층마다 카드가 화면에서 차지하는 크기를 재서, 멀면 층 위에 태그 워드 클라우드를 그리고 더 멀면 카드를 감춘다(blendCard).
+   * 카메라 높이에 맞춰 층별 그리는 차례를 정하고, 층 위에 태그 워드 클라우드를 그린다. 층마다 카드가 화면에서 차지하는 크기를 재서 멀면 카드를 감춘다(blendCard).
    * p11 은 투영 행렬의 [1][1] 이다
    */
   measure(cameraPosition: Vector3, p11: number, labels: ScreenLabels): void {
@@ -258,9 +258,8 @@ export class StrataMode {
     const height = tuning.card.width * tuning.strata.cardScale[1];
     for (const layer of this.layers) {
       strataPoint(this.frame, 0, layer.y, 0, this.center);
-      const far = cloudVisibility(screenFraction(height, this.center.distanceTo(cameraPosition), p11));
-      this.hidden.set(layer, far.cards);
-      drawCloud(labels, this.center, layer.words, far.words * this.mix * this.veil, cameraPosition, layer.key);
+      this.hidden.set(layer, farCardHide(screenFraction(height, this.center.distanceTo(cameraPosition), p11)));
+      drawCloud(labels, this.center, layer.words, this.mix * this.veil, cameraPosition, layer.key);
     }
   }
 

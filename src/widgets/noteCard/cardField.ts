@@ -67,8 +67,32 @@ export class CardField {
 
   /** i 번째 자리의 보이는 정도. 카메라에 너무 가까워지거나 지나치면 사라진다 */
   fade(i: number): number {
+    return this.fadeAt(this.slots[i].depth);
+  }
+
+  /**
+   * 자리 여럿(slots 번호)의 가운데: out 에 카메라 공간 평균 자리를 넣고, 그 깊이의 보이는 정도를 낸다.
+   * 카드 공간에서 층별 카드 무리 위에 워드 클라우드를 띄울 자리다. 자리가 없으면 0 이다.
+   */
+  centroid(indices: readonly number[], out: Vector3): number {
+    out.set(0, 0, 0);
+    if (indices.length === 0) return 0;
+    let depth = 0;
+    for (const i of indices) {
+      const s = this.slots[i];
+      out.x += s.x;
+      out.y += s.y;
+      depth += s.depth;
+    }
+    const n = indices.length;
+    depth /= n;
+    out.set(out.x / n, out.y / n, -(depth - this.offset));
+    return this.fadeAt(depth);
+  }
+
+  private fadeAt(depth: number): number {
     const [d0, d1] = tuning.cardField.nearFade;
-    const t = (this.slots[i].depth - this.offset - d0) / (d1 - d0);
+    const t = (depth - this.offset - d0) / (d1 - d0);
     const c = Math.min(1, Math.max(0, t));
     return c * c * (3 - 2 * c);
   }

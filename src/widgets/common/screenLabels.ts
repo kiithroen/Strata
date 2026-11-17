@@ -6,6 +6,8 @@ import type { LabelCache, LabelStyle } from './labelCache';
 import { pickVisible, type LabelRect } from './labelLayout';
 
 const WHITE = new Color(1, 1, 1);
+/** 위에 그리는 글자의 그리는 차례. 펼친 카드(NoteCard 의 OPEN_ORDER)보다는 아래다 */
+const ON_TOP_ORDER = 900;
 
 export interface LabelOptions {
   /** 화면 오른쪽·위쪽으로 옮기는 거리(CSS px, 음수면 왼쪽·아래) */
@@ -17,6 +19,8 @@ export interface LabelOptions {
   priority?: number;
   /** 프레임 사이에 같은 글자를 알아보는 열쇠. 겹쳐 숨고 나타나는 것을 부드럽게 잇는다. 없으면 글자 자체다 */
   key?: string;
+  /** 앞에 있는 카드에 가리지 않고 그 위에 그린다(펼친 카드보다는 아래) */
+  onTop?: boolean;
 }
 
 interface Entry extends LabelRect {
@@ -88,6 +92,8 @@ export class ScreenLabels {
     mesh.position.copy(p).addScaledVector(this.right, offX * k).addScaledVector(this.up, offY * k);
     mesh.material.opacity = alpha;
     mesh.material.color.copy(opts.color ?? WHITE);
+    mesh.material.depthTest = !opts.onTop;
+    mesh.renderOrder = opts.onTop ? ON_TOP_ORDER : 0;
     mesh.visible = true;
 
     let e = this.entries[this.count];
