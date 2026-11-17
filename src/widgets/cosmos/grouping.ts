@@ -82,7 +82,9 @@ function parentFolder(path: string): string {
 const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
 
 /**
- * 폴더 축: 파일이 바로 들어 있는 폴더 하나가 행성이고, 그 부모 폴더가 허브다(원본 폴더의 파일은 원본 폴더 허브에 든다).
+ * 폴더 축: 파일이 바로 들어 있는 폴더 하나가 행성이다. 하위에 파일 폴더가 더 없는 행성(잎)은 부모 폴더 허브에 든다.
+ * 잎을 품은 폴더는 자기 이름의 허브가 되고, 그 폴더에 파일이 있으면 그 행성도 자기 허브에 든다(같은 폴더가 허브와 다른 묶음의 행성으로 갈라지지 않게).
+ * 그래서 허브의 수는 그 허브의 지층 층에 깔리는 파일 수다.
  * folderOf 는 노트마다 들어 있는 폴더 경로(원본 기준, 원본은 '')이고 rootName 은 원본 폴더 이름이다.
  * 노드 위에는 폴더 이름, 아래에는 가장 최근 파일의 날짜와 파일 수를 적는다. 폴더 안의 관련도는 최근 파일일수록 높고
  * 가장 오래된 파일이 cosmos.folderAxis.minAffinity 다. notes 는 최근 것부터여야 한다.
@@ -115,14 +117,20 @@ export function folderGrouping(notes: readonly NoteRef[], folderOf: readonly str
     };
   });
 
+  // 하위에 행성이 있는 폴더와, 잎 행성을 품은(그래서 허브가 되는) 폴더
+  const paths = new Set(folders.map((x) => x.path));
+  const hasChild = new Set<string>();
+  for (const p of paths) if (p !== '') hasChild.add(parentFolder(p));
+  const hubFolders = new Set<string>();
+  for (const p of paths) if (!hasChild.has(p)) hubFolders.add(parentFolder(p));
   const hubByPath = new Map<string, GroupHub>();
   const hubs: GroupHub[] = [];
   folders.forEach(({ path }, i) => {
-    const parent = parentFolder(path);
-    let hub = hubByPath.get(parent);
+    const owner = hubFolders.has(path) ? path : parentFolder(path);
+    let hub = hubByPath.get(owner);
     if (!hub) {
-      hub = { key: `dir:${parent}`, anchorTime: planets[i].cluster.anchorTime, children: [], notes: 0, label: '' };
-      hubByPath.set(parent, hub);
+      hub = { key: `dir:${owner}`, anchorTime: planets[i].cluster.anchorTime, children: [], notes: 0, label: '' };
+      hubByPath.set(owner, hub);
       hubs.push(hub);
     }
     hub.children.push(i);

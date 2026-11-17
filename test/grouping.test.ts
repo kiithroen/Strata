@@ -52,13 +52,16 @@ describe('folderGrouping', () => {
     expect(out.planets.map((p) => p.heading)).toEqual(['가', '폴더9', '폴더10']);
   });
 
-  it('부모 폴더가 허브이고, 원본 폴더의 파일과 원본 바로 아래 폴더는 원본 허브에 든다', () => {
+  it('잎 폴더는 부모 허브에 들고, 잎을 품은 폴더는 자기 파일 행성과 함께 자기 허브가 된다', () => {
     const byKey = new Map(g.hubs.map((h) => [h.key, h]));
-    expect(byKey.get('dir:사진')?.children).toEqual([0]);
+    // 사진/여름: 자기 파일(0)과 잎 바다(3). 사진은 잎을 품지 않아 원본 허브에 든다. 원본: 사진(1), 원본 파일(2), 잎 문서(4)
+    expect([...byKey.keys()].sort()).toEqual(['dir:', 'dir:사진/여름']);
+    expect(byKey.get('dir:사진/여름')?.children).toEqual([0, 3]);
     expect(byKey.get('dir:')?.children).toEqual([1, 2, 4]);
-    expect(byKey.get('dir:사진/여름')?.children).toEqual([3]);
+    expect(byKey.get('dir:사진/여름')?.label).toBe('여름 · 4');
     expect(byKey.get('dir:')?.label).toBe('내 폴더 · 3');
-    expect(byKey.get('dir:사진')?.label).toBe('사진 · 3');
+    // 허브 수는 자식 행성의 파일 수를 모은 것이다
+    for (const h of g.hubs) expect(h.notes).toBe(h.children.reduce((n, c) => n + g.planets[c].cluster.members.length, 0));
     // 허브도 가장 최근 자식 순서다
     expect(g.hubs.map((h) => h.anchorTime)).toEqual([...g.hubs.map((h) => h.anchorTime)].sort((x, y) => y - x));
   });
