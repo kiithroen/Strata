@@ -64,9 +64,9 @@ appHooks.showNotes = (data, resume) => {
   showNotes(data, undefined, resume ? { push: { cosmos: true } } : 'reset');
   return `노트 ${data.notes.length}개를 은하로 열었다`;
 };
-appHooks.showAlbum = (focusId) => {
+appHooks.showAlbum = (target) => {
   appHooks.explorerResume = null;
-  switchDemo('cosmos', () => mountAlbumDemo(stage, focusId), 'keep');
+  switchDemo('cosmos', () => mountAlbumDemo(stage, target), 'keep');
 };
 const picked = pickDemo(location.search);
 let id = picked.id;

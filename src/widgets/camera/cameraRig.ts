@@ -97,6 +97,17 @@ export class CameraRig {
     this.goalYaw = yaw === undefined ? null : wrapAngle(yaw);
   }
 
+  /** 움직임 없이 목표 중심·거리·시선 각도로 바로 옮긴다(보던 화면을 되살릴 때) */
+  snap(): void {
+    this.cancelInertia();
+    this.target.copy(this.goalTarget);
+    this.distance = this.goalDistance;
+    if (this.goalPitch !== null) this.pitch = this.goalPitch;
+    if (this.goalYaw !== null) this.yaw = this.goalYaw;
+    this.goalPitch = null;
+    this.goalYaw = null;
+  }
+
   /** 목표 거리를 그대로 정한다(focusPoint 는 줄이기만 한다) */
   setGoalDistance(distance: number): void {
     this.goalDistance = clampDistance(distance);

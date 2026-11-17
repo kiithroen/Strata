@@ -3,7 +3,15 @@ import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 import { NoteEditor, type EditorResult } from '../widgets/noteView/NoteEditor';
 import { NoteViewer } from '../widgets/noteView/NoteViewer';
 import type { NoteRef } from '../widgets/timeAxis/axisModel';
+import type { CosmosView } from './cosmosDemo';
 import { OverlayStack } from './overlayStack';
+
+/** 앨범을 다시 띄울 때 보여 줄 것: 새로 쓴 노트의 묶음(focusNote) 또는 보던 화면(view), 그리고 노트 보기로 열 노트(openNote) */
+export interface AlbumReload {
+  focusNote?: string;
+  view?: CosmosView;
+  openNote?: string;
+}
 
 /** 메모 앨범 동작. 우주 보기가 앨범 노트를 띄울 때 넘긴다 */
 export interface AlbumActions {
@@ -14,14 +22,15 @@ export interface AlbumActions {
   /** 입력 내용을 저장하고 노트 번호를 돌려준다(id 가 없으면 새 노트). 화면은 바꾸지 않는다 */
   save(result: EditorResult, id?: string): Promise<string>;
   remove(id: string): Promise<void>;
-  /** 앨범을 다시 띄운다. focusId 가 있으면 그 노트의 묶음으로 다가간다 */
-  reload(focusId?: string): void;
+  /** 앨범을 다시 띄운다 */
+  reload(target: AlbumReload): void;
   readTakenAt?: (file: File) => Promise<number | undefined>;
 }
 
 /**
  * 우주 보기 위에 겹쳐 여는 노트 보기·입력 화면과 그 방문 기록. 저장·삭제 뒤에는 열린 화면과 아래 화면(카드 보기·지층 보기)이
- * 쌓은 기록을 한꺼번에 되돌린 다음 앨범을 다시 띄운다.
+ * 쌓은 기록을 한꺼번에 되돌린 다음 앨범을 다시 띄운다. 새 노트는 그 노트의 묶음으로 다가가고, 고치거나 지웠으면
+ * 보던 화면을 되살린다(고쳤으면 그 노트의 보기 화면도 다시 연다).
  */
 export class NoteScreens {
   readonly viewer: NoteViewer;
@@ -34,6 +43,8 @@ export class NoteScreens {
     private readonly notes: readonly NoteRef[],
     private readonly photos: readonly (PhotoSource | undefined)[],
     private readonly album: AlbumActions | undefined,
+    /** 지금 보는 우주 보기 화면 */
+    private readonly snapshot: () => CosmosView,
     /** 아래 화면을 기록은 그대로 두고 닫고, 그 화면들이 쌓았던 기록 수를 돌려준다 */
     private readonly dismissBelow: () => number,
   ) {
@@ -112,17 +123,20 @@ export class NoteScreens {
     const album = this.album;
     if (!album) return;
     // 저장이 실패하면 입력 화면을 그대로 두어 글을 잃지 않는다
-    const id = await album.save(result, this.editing);
+    const editing = this.editing;
+    const id = await album.save(result, editing);
+    const view = editing === undefined ? undefined : this.snapshot();
     await this.leave();
-    album.reload(id);
+    album.reload(editing === undefined ? { focusNote: id } : { view, openNote: id });
   }
 
   private async remove(id: string): Promise<void> {
     const album = this.album;
     if (!album) return;
     await album.remove(id);
+    const view = this.snapshot();
     await this.leave();
-    album.reload();
+    album.reload({ view });
   }
 
   /** 열린 화면과 아래 화면을 닫고 그동안 쌓인 기록을 되돌린다 */

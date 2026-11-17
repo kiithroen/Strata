@@ -15,6 +15,19 @@ function makeRig(opts?: { yaw?: number; pitch?: number; distance?: number }) {
 }
 
 describe('CameraRig', () => {
+  it('snap 은 목표 중심·거리·시선 각도로 바로 옮기고, 그 뒤에는 움직이지 않는다', () => {
+    const rig = makeRig({ yaw: 0.1, pitch: 0.2, distance: 10 });
+    rig.focusPoint(new Vector3(1, 2, 3));
+    rig.setGoalDistance(6);
+    rig.orbitTo(0.5, -1.2);
+    rig.snap();
+    const at = () => ({ x: rig.target.x, y: rig.target.y, z: rig.target.z, d: rig.distance, yaw: rig.yaw, pitch: rig.pitch });
+    const snapped = at();
+    expect(snapped).toEqual({ x: 1, y: 2, z: 3, d: rig.goalDistance, yaw: -1.2, pitch: 0.5 });
+    for (let i = 0; i < 30; i++) rig.step(1 / 60);
+    expect(at()).toEqual(snapped);
+  });
+
   it('orbitTo 는 같은 게임 시간이면 주사율과 상관없이 같은 각도에 닿고, 짧은 쪽으로 돈다', () => {
     const goal = { pitch: 0.8, yaw: -2.9 };
     const run = (hz: number) => {

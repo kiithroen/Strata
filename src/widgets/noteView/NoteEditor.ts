@@ -296,7 +296,7 @@ export class NoteEditor {
 
   private async save(): Promise<void> {
     const draft = this.draft();
-    if (this.saving || !draftHasContent(draft)) return;
+    if (!this.open || this.saving || !draftHasContent(draft)) return;
     this.saving = true;
     this.refresh();
     this.status.textContent = '저장하는 중';

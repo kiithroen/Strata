@@ -4,7 +4,7 @@ import { MemoryNoteStore, openNoteStore } from '../album/noteStore';
 import { bakePhotoCopy, readTakenAt } from '../album/photoCopy';
 import { appHooks } from './appHooks';
 import { mountCosmosDemo, type CosmosDemo } from './cosmosDemo';
-import type { AlbumActions } from './noteScreens';
+import type { AlbumActions, AlbumReload } from './noteScreens';
 import type { Stage } from './stage';
 
 /** 메모 앨범. openAlbum 전에는 빈 메모리 저장소다 */
@@ -47,14 +47,14 @@ const actions: AlbumActions = {
     return (await album.save(next, blob, id)).id;
   },
   remove: (id) => album.remove(id),
-  reload: (focusId) => appHooks.showAlbum?.(focusId),
+  reload: (target) => appHooks.showAlbum?.(target),
   readTakenAt,
 };
 
 /**
  * 메모 앨범의 우주 보기: 저장된 노트가 있으면 그 노트를, 없으면 가짜 노트를 미리보기로 띄운다.
- * `+ 노트`로 노트를 쓰고, 저장된 노트는 보기 화면에서 고치고 지운다. focusNote 를 주면 그 노트의 묶음으로 다가간다
+ * `+ 노트`로 노트를 쓰고, 저장된 노트는 보기 화면에서 고치고 지운다. reload 는 저장·삭제 뒤 보여 줄 것이다
  */
-export function mountAlbumDemo(stage: Stage, focusNote?: string): CosmosDemo {
-  return mountCosmosDemo(stage, album.data() ?? undefined, { album: actions, focusNote });
+export function mountAlbumDemo(stage: Stage, reload: AlbumReload = {}): CosmosDemo {
+  return mountCosmosDemo(stage, album.data() ?? undefined, { album: actions, focusNote: reload.focusNote, restore: reload.view, openNote: reload.openNote });
 }

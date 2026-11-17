@@ -67,6 +67,22 @@ export interface CosmosNode {
   position: Vector3;
 }
 
+/**
+ * 우주 보기에서 보던 화면. 노트를 저장·삭제해 앨범을 다시 띄울 때 되살린다. 노드·층은 키로 적어 노트가 바뀌어도 찾는다.
+ * galaxy 는 은하 카메라(지층 보기 중이면 들어가기 전 자리)로, 피벗을 가장 가까운 노드에서 잰 차이로 적는다
+ */
+export interface CosmosView {
+  orbitClock: number;
+  galaxy: { anchor: string | null; offset: [number, number, number]; yaw: number; pitch: number; distance: number };
+  approached: string | null;
+  /** 지층 보기: 깔린 층 키들(최근 것부터), 바라보는 층 키, 지층 카메라 시선과 거리, 원판이 돈 각도 */
+  strata: { layers: string[]; focus: string | null; yaw: number; pitch: number; distance: number; spin: number } | null;
+  /** 카드 보기: 지층에서 열었는지 다가간 노드에서 열었는지, 모드, 공간 모드로 들어간 비율(0~1) */
+  cards: { source: 'strata' | 'node'; mode: CardViewMode; progress: number } | null;
+  /** 검색 화면의 검색어 */
+  search: string | null;
+}
+
 export interface CosmosDemo extends WidgetDemo {
   readonly controller: AxisController;
   readonly cameraRig: CameraRig;
@@ -98,6 +114,8 @@ export interface CosmosDemo extends WidgetDemo {
   setCardMode(mode: CardViewMode): void;
   /** 노트 보기·입력 화면 */
   readonly noteScreens: NoteScreens;
+  /** 지금 보는 화면(되살릴 때 restore 로 넘긴다) */
+  snapshot(): CosmosView;
   /** 검색 화면을 열고 query 로 찾는다(`검색` 단추와 같다). 찾은 노트 수를 돌려준다 */
   openSearch(query?: string): number;
   /** 은하에서 다가간 노드의 묶음을 카드 보기로 연다(`카드 보기` 단추와 같다) */
@@ -139,8 +157,12 @@ export interface CosmosOptions {
   onBack?: () => void;
   /** 메모 앨범: 있으면 `+ 노트` 단추를 띄우고, 저장된 노트는 보기 화면에서 고치고 지울 수 있다 */
   album?: AlbumActions;
-  /** 띄운 뒤 이 번호의 노트가 속한 묶음으로 다가간다(저장한 노트를 보여 줄 때) */
+  /** 띄운 뒤 이 번호의 노트가 속한 묶음으로 다가간다(새로 쓴 노트를 보여 줄 때) */
   focusNote?: string;
+  /** 띄운 뒤 이 화면을 움직임 없이 되살린다(고치거나 지운 뒤 보던 자리로) */
+  restore?: CosmosView;
+  /** 띄운 뒤 이 번호의 노트를 노트 보기로 연다 */
+  openNote?: string;
 }
 
 /** data 를 넘기면 그 노트로 띄운다(실데이터 임시 주입). 비었거나 없으면 가짜 노트다 */
@@ -350,11 +372,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       onQuery: (q) => void runSearch(q),
     },
   });
-  const openSearch = (query?: string): number => {
+  /** focusInput 이 거짓이면 검색 칸에 입력 초점을 두지 않는다(폰에서 가상 키보드가 뜨지 않게, 되살릴 때) */
+  const openSearch = (query?: string, focusInput = true): number => {
     focus.set(null);
     const n = runSearch(query ?? searchList.query);
     if (query !== undefined) searchList.setQuery(query);
-    searchList.focusSearch();
+    if (focusInput) searchList.focusSearch();
     return n;
   };
   let field: CardField | null = null;
@@ -378,6 +401,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     field.offset = field.goalOffset;
   });
   const fieldOn = (): boolean => field !== null && cardList.open && cardList.mode === 'space';
+  /** 카드 보기를 어디서 열었는지 */
+  let cardSource: 'strata' | 'node' = 'strata';
   /** 카드 보기를 연다. 목록은 묶음(층)별로 펼치고 focusKey 묶음을 맨 위에 둔다 */
   const showCards = (
     groups: readonly { key: string; label: string; members: readonly number[]; words: CardLayerInfo['words'] }[],
@@ -407,6 +432,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   const openCardList = () => {
     if (!strata.active) return;
     const groups = strata.groups().map((g) => ({ ...g, label: planetByKey.get(g.key)?.date ?? g.label }));
+    cardSource = 'strata';
     showCards(groups, strata.focusKey ?? undefined, '← 지층으로');
   };
   /** 행성들의 카드 보기 묶음 */
@@ -416,6 +442,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   const openNodeCards = () => {
     const key = approach.approached;
     if (strata.active || !key) return;
+    cardSource = 'node';
     const hubView = hubViews.find((h) => h.hub.key === key);
     if (hubView) {
       showCards(planetGroups(hubView.hub.children), undefined, '← 은하로');
@@ -430,7 +457,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
    * 노트 보기·입력 화면. 저장·삭제 뒤 앨범을 다시 띄우기 전에 카드 보기·검색·지층 보기를 기록은 둔 채 닫고,
    * 그 화면들이 쌓았던 기록 수를 알려 한꺼번에 되돌리게 한다
    */
-  const screens = new NoteScreens(notes, photos, options.album, () => {
+  const screens = new NoteScreens(notes, photos, options.album, () => snapshot(), () => {
     let pushed = 0;
     for (const list of [cardList, searchList]) {
       if (list.historyPushed) pushed++;
@@ -713,13 +740,117 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     },
   });
 
-  // 저장한 노트를 보여 줄 때는 그 노트의 묶음으로 다가간다(노드 자리는 첫 프레임 전이라 여기서 구한다)
-  const focusNoteIndex = options.focusNote === undefined ? undefined : noteIndex.get(options.focusNote);
-  if (focusNoteIndex !== undefined && planetOfNote[focusNoteIndex] >= 0) {
-    const planet = planets[planetOfNote[focusNoteIndex]];
-    spiralPoint(planet.offsetS, orbitClock, planet.jitter, planet.node.position);
-    tapNode(planet.node);
+  /** 노드 자리를 지금 공전 시계로 구한다(첫 프레임 전에 다가가거나 되살릴 때) */
+  const placeNodes = () => {
+    for (const p of planets) spiralPoint(p.offsetS, orbitClock, p.jitter, p.node.position);
+    for (const h of hubViews) hubPoint(h.childOffsets, orbitClock, h.node.position);
+  };
+  const nodeByKey = (key: string | null) => (key === null ? undefined : nodes.find((n) => n.key === key));
+
+  function snapshot(): CosmosView {
+    const saved = strata.galaxyCamera;
+    const target = saved ? saved.target : cameraRig.goalTarget;
+    let anchor: CosmosNode | null = null;
+    let best = Infinity;
+    for (const node of nodes) {
+      const d = node.position.distanceToSquared(target);
+      if (d < best) {
+        best = d;
+        anchor = node;
+      }
+    }
+    const offsetV = anchor ? target.clone().sub(anchor.position) : target.clone();
+    return {
+      orbitClock,
+      galaxy: {
+        anchor: anchor?.key ?? null,
+        offset: [offsetV.x, offsetV.y, offsetV.z],
+        yaw: saved ? saved.yaw : cameraRig.yaw,
+        pitch: saved ? saved.pitch : cameraRig.pitch,
+        distance: saved ? saved.distance : cameraRig.goalDistance,
+      },
+      approached: approach.approached,
+      strata: strata.active
+        ? {
+            layers: strata.groups().map((g) => g.key),
+            focus: strata.focusKey,
+            yaw: cameraRig.yaw,
+            pitch: cameraRig.pitch,
+            distance: cameraRig.goalDistance,
+            spin: strata.spinAngle,
+          }
+        : null,
+      cards: cardList.open
+        ? { source: cardSource, mode: cardList.mode, progress: field && field.maxOffset > 0 ? field.goalOffset / field.maxOffset : 0 }
+        : null,
+      search: searchList.open ? searchList.query : null,
+    };
   }
+
+  /** 보던 화면을 움직임 없이 되살린다. 없어진 노드·층은 건너뛴다 */
+  const restoreView = (view: CosmosView) => {
+    orbitClock = view.orbitClock;
+    placeNodes();
+    const g = view.galaxy;
+    // 기준 노드가 없어졌으면(그 묶음의 마지막 노트를 지움) 처음 카메라로 둔다
+    const anchor = nodeByKey(g.anchor);
+    if (anchor) {
+      cameraRig.focusPoint(new Vector3(...g.offset).add(anchor.position));
+      cameraRig.setGoalDistance(g.distance);
+      cameraRig.orbitTo(g.pitch, g.yaw);
+      cameraRig.snap();
+    }
+    const approached = nodeByKey(view.approached);
+    if (approached) {
+      approach.tap(approached.key);
+      approachGlow = 1;
+      pinnedTime = approached.anchorTime;
+      controller.target.focusTime = approached.anchorTime;
+      controller.current.focusTime = approached.anchorTime;
+    }
+    const s = view.strata;
+    if (s) {
+      // 바라보던 층의 행성으로 들어가면 같은 허브의 층들이 다시 깔린다. 그 층이 없어졌으면 남은 층으로 들어간다
+      const keys = [s.focus, ...s.layers].filter((k): k is string => k !== null);
+      const planet = keys.map((k) => planetByKey.get(k)).find((p) => p !== undefined);
+      if (planet) {
+        enterStrata(planet.node);
+        strata.spinAngle = s.spin;
+        cameraRig.orbitTo(s.pitch, s.yaw);
+        cameraRig.setGoalDistance(s.distance);
+        cameraRig.snap();
+        strata.snapIn();
+        orbitPace = 0;
+      }
+    }
+    const cv = view.cards;
+    if (cv) {
+      if (cv.source === 'strata') openCardList();
+      else openNodeCards();
+      if (cardList.open) {
+        if (cardList.mode !== cv.mode) cardList.setMode(cv.mode);
+        if (field) {
+          field.dolly(cv.progress * field.maxOffset - field.goalOffset);
+          field.offset = field.goalOffset;
+        }
+        if (cv.mode === 'space') fieldMix = 1;
+        orbitPace = 0;
+      }
+    }
+    if (view.search !== null) openSearch(view.search, false);
+  };
+
+  if (options.restore) restoreView(options.restore);
+  else {
+    // 새로 쓴 노트를 보여 줄 때는 그 노트의 묶음으로 다가간다
+    const focusNoteIndex = options.focusNote === undefined ? undefined : noteIndex.get(options.focusNote);
+    if (focusNoteIndex !== undefined && planetOfNote[focusNoteIndex] >= 0) {
+      placeNodes();
+      tapNode(planets[planetOfNote[focusNoteIndex]].node);
+    }
+  }
+  const openNoteIndex = options.openNote === undefined ? undefined : noteIndex.get(options.openNote);
+  if (openNoteIndex !== undefined) screens.openNote(openNoteIndex);
 
   return {
     title: 'COSMOS',
@@ -741,7 +872,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     pickStrataLayer: (x, y) => strata.pickLayer(x, y),
     openCardList,
     noteScreens: screens,
-    openSearch,
+    snapshot,
+    openSearch: (query) => openSearch(query),
     openNodeCards,
     setCardMode: (mode) => {
       if (!cardList.open || cardList.mode === mode) return;

@@ -164,6 +164,25 @@ export class StrataMode {
     }
   }
 
+  /** 들어가기 전의 은하 카메라(나올 때 돌아갈 자리). 지층 보기가 아니면 null */
+  get galaxyCamera(): Readonly<{ target: Vector3; yaw: number; pitch: number; distance: number }> | null {
+    return this.active ? this.saved : null;
+  }
+
+  /** 원판이 돈 각도. 보던 화면을 되살릴 때 이어 간다 */
+  get spinAngle(): number {
+    return this.spin;
+  }
+
+  set spinAngle(angle: number) {
+    this.spin = angle;
+  }
+
+  /** 들어가는 움직임 없이 다 들어간 상태로 둔다(보던 화면을 되살릴 때) */
+  snapIn(): void {
+    if (this.active) this.mix = 1;
+  }
+
   /** 들어갈 때 쌓은 방문 기록이 남아 있는지 */
   get historyPushed(): boolean {
     return this.pushed;
