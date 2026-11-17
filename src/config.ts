@@ -90,10 +90,9 @@ export const tuning = {
     /**
      * 멀고 가까움에 따른 모습. 값은 카드 높이가 화면 높이에서 차지하는 비율이다.
      * detail 범위에서 단순한 모양이 제대로 된 모양으로, color 범위에서 흑백이 제 색으로 바뀐다.
-     * farAlpha 는 단순한 모양일 때의 불투명도 배율, focusAlpha 는 펼친 카드 바탕의 최소 불투명도(뒤가 비쳐 글이 흐려지지 않게),
-     * glint 는 비스듬히 볼 때 가장자리가 밝아지는 정도다
+     * farAlpha 는 단순한 모양일 때의 불투명도 배율, focusAlpha 는 펼친 카드 바탕의 최소 불투명도(뒤가 비쳐 글이 흐려지지 않게)다
      */
-    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], farAlpha: 0.78, focusAlpha: 0.94, glint: 0.55 },
+    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], farAlpha: 0.78, focusAlpha: 0.94 },
     /**
      * 홀로그램 빛. stripe* 는 카드를 가로지르는 가는 줄무늬의 빈도(카드 높이당 줄 수)·세기(줄 사이가 투명해지는 정도)·
      * 위로 흐르는 속도(카드 높이/초), iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기,
@@ -138,7 +137,6 @@ export const tuning = {
     amplitude: 0.06,
     periodMin: 4.5,
     periodMax: 7.5,
-    tiltAmplitude: 0.05,
   },
 
   focus: {
@@ -280,7 +278,7 @@ export const tuning = {
     maxElevation: 1.45,
     /** 은하 전체가 도는 속도(라디안/초) */
     spin: 0.015,
-    /** 행성(시간 묶음 노드)의 반지름: 종이가 나는 띠의 안쪽 기준. 위성 수의 제곱근 × planetGrowth 를 더하고 planetMaxRadius 를 넘지 않는다 */
+    /** 행성(시간 묶음 노드)의 반지름: 카드가 도는 띠의 안쪽 기준. 위성 수의 제곱근 × planetGrowth 를 더하고 planetMaxRadius 를 넘지 않는다 */
     planetRadius: 0.16,
     planetGrowth: 0.05,
     planetMaxRadius: 0.34,
@@ -317,20 +315,16 @@ export const tuning = {
       /** 허브는 자식 행성 반지름의 이 비율인 안쪽 구면 껍질 위에 놓이고, 행성은 바깥으로 가지에 매달린다 */
       hubRadius: 0.72,
       tapRadius: 34,
-      /** 종이 탭 판정 반경(CSS px). 화면에 보이는 종이 반지름이 이보다 크면 그쪽을 쓴다 */
-      paperTapRadius: 38,
+      /** 카드 탭 판정 반경(CSS px). 화면에 보이는 카드 반지름이 이보다 크면 그쪽을 쓴다 */
+      cardTapRadius: 38,
       burst: { inner: 0.06, spacing: 0.055, pullSpread: 0.85, pullCurve: 1.5, depthJitter: 0.05, spin: 0.06 },
       hourColors: ['#2a5cff', '#2f9dff', '#38d4ff', '#7fe9ff', '#5a7dff', '#8fb4ff'],
     },
     /**
-     * 돌풍에 날리는 종이(위성).
-     * capacityByUnit: 행성 단위별 큰 카드 수(넘친 위성은 overflowScale 크기 종잇조각).
+     * 노드 둘레를 도는 카드(위성). 카드는 기운 원 궤도를 일정한 빠르기로 돌고 늘 카메라를 바라본다.
+     * capacityByUnit: 행성 단위별 카드 수(넘친 노트는 점으로만 보인다).
      * gap·spread·pullCurve: 행성 표면에서 가장 강한 인력 거리와 관련도가 낮을수록 멀어지는 폭·곡선 지수.
-     * speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 종이마다 배율 범위.
-     * wobble·wobbleFreq: 난기류 흔들림 크기와 빈도 범위. wobbleInward: 흔들림이 궤도 안쪽(노드 쪽)으로 파고드는 최대 깊이(궤도 반지름 대비). rollAmp·rollFreq: 제 면 안에서 좌우로 흔들리는 최대 각도·빈도 범위.
-     * flutterAmp·flutterAmp2·flutterFreq: 앞면이 바깥 방향에서 두 축으로 기우는 최대 각도와 빈도 범위. 둘을 더한 각도를 넘지 않아 뒤집히지 않는다.
-     * poleUpBias: 종이가 노드 위·아래(극)를 지날 때 위쪽을 궤도면 법선으로 기울이는 정도. 클수록 극을 지날 때 천천히 돌고, 극에서 먼 곳은 덜 바로 선다.
-     * gust: 돌풍 사인 둘의 빈도·위상, boost 는 돌풍이 가장 셀 때 더해지는 시간 배율, gustWobble 은 흔들림이 커지는 배율
+     * speed·speedJitter: 공전 속도 계수(반지름^1.5 로 나눔)와 카드마다 배율 범위.
      */
     swarm: {
       capacityByUnit: { year: 3, month: 3, day: 8, hour: 14, hour6: 8, min15: 14 },
@@ -339,22 +333,8 @@ export const tuning = {
       pullCurve: 1.6,
       speed: 0.065,
       speedJitter: [0.6, 1.4],
-      wobble: 0.1,
-      wobbleFreq: [0.35, 1.1],
-      wobbleInward: 0.5,
-      rollAmp: 0.16,
-      rollFreq: [0.35, 0.85],
-      flutterAmp: 0.24,
-      flutterAmp2: 0.14,
-      flutterFreq: [0.4, 1.0],
-      poleUpBias: 0.5,
-      gust: { freq: [0.11, 0.27], phase: [0.3, 2.1], boost: 0.7 },
-      gustWobble: 1.4,
     },
     satelliteScale: 0.3,
-    overflowScale: 0.09,
-    /** 종이가 돌면서 빛을 받는 정도(0이면 끈다) */
-    paperShade: 1,
     /** 묶임이 바뀔 때 위성이 새 행성으로 옮겨 가는 속도, 행성이 나타나고 사라지는 속도 */
     regroupRate: 5,
     planetFadeRate: 4,

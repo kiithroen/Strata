@@ -19,10 +19,7 @@ import {
   facingQuaternion,
   flightOffset,
   flightParams,
-  flightQuaternion,
   flightRadius,
-  gust,
-  gustTime,
   nodeColor,
   orbitSpeed,
   planetJitter,
@@ -137,32 +134,10 @@ describe('돌풍에 날리는 종이', () => {
     expect(flightParams('0042')).not.toEqual(flightParams('0043'));
   });
 
-  it('돌풍 세기는 0~1 이고, 돌풍 시계는 미리 적분한 값과 수치 적분이 맞는다', () => {
-    let numeric = 0;
-    const h = 1 / 240;
-    for (let i = 0; i < 240 * 40; i++) {
-      const t = i * h;
-      const g0 = gust(t);
-      expect(g0).toBeGreaterThanOrEqual(0);
-      expect(g0).toBeLessThanOrEqual(1);
-      numeric += ((2 + s.gust.boost * (g0 + gust(t + h))) / 2) * h;
-    }
-    expect(gustTime(0)).toBeCloseTo(0, 12);
-    expect(gustTime(40)).toBeCloseTo(numeric, 4);
-  });
-
-  it('돌풍 시계는 늘 앞으로 가고 빠르기는 1 ~ 1 + boost 다', () => {
-    for (let t = 0; t < 60; t += 0.37) {
-      const rate = (gustTime(t + 1e-4) - gustTime(t)) / 1e-4;
-      expect(rate).toBeGreaterThanOrEqual(1 - 1e-6);
-      expect(rate).toBeLessThanOrEqual(1 + s.gust.boost + 1e-6);
-    }
-  });
-
-  it('종이는 행성 둘레 띠 안에 머물고 관련도가 높을수록 가까우며 난기류만큼만 벗어난다', () => {
+  it('카드는 행성 둘레 띠 안의 원 궤도를 일정한 빠르기로 돌고, 관련도가 높을수록 가깝다', () => {
     const planetR = planetRadius(6);
     const out = new Vector3();
-    const wobbleMax = s.wobble * (1 + s.gustWobble) * Math.sqrt(3);
+    const prev = new Vector3();
     expect(flightRadius(planetR, 1)).toBeCloseTo(planetR + s.gap, 12);
     expect(flightRadius(planetR, 0)).toBeCloseTo(planetR + s.gap + s.spread, 12);
     let prevR = Infinity;
@@ -175,35 +150,17 @@ describe('돌풍에 날리는 종이', () => {
       const f = flightParams(id);
       const affinity = i / (ids.length - 1);
       const r = flightRadius(planetR, affinity);
-      expect(r).toBeGreaterThanOrEqual(planetR + s.gap - 1e-12);
-      expect(r).toBeLessThanOrEqual(planetR + s.gap + s.spread + 1e-12);
-      for (let t = 0; t < 30; t += 1.3) {
-        const d = flightOffset(f, planetR, affinity, gustTime(t), gust(t), out).length();
-        expect(d).toBeLessThanOrEqual(r + wobbleMax + 1e-9);
-        expect(d).toBeGreaterThanOrEqual(r - wobbleMax - 1e-9);
+      // 같은 시간 간격이면 늘 같은 거리(현의 길이)만큼 옮겨 간다
+      const dt = 0.5;
+      const chord = 2 * r * Math.sin(Math.abs(f.speed * orbitSpeed(r) * dt) / 2);
+      flightOffset(f, planetR, affinity, 0, prev);
+      for (let t = dt; t < 30; t += dt) {
+        flightOffset(f, planetR, affinity, t, out);
+        expect(out.length()).toBeCloseTo(r, 9);
+        expect(out.distanceTo(prev)).toBeCloseTo(chord, 9);
+        prev.copy(out);
       }
     });
-  });
-
-  it('돌풍이 가장 세도 종이는 노드 중심 쪽으로 궤도 반지름의 wobbleInward 비율보다 깊이 파고들지 않는다', () => {
-    // 가장 작은 행성의 가장 안쪽 궤도라 흔들림이 궤도 반지름에 견줘 가장 크다
-    const planetR = planetRadius(1);
-    const r = flightRadius(planetR, 1);
-    const floor = r * (1 - s.wobbleInward);
-    const out = new Vector3();
-    let minD = Infinity;
-    let maxD = 0;
-    for (const id of ids) {
-      const f = flightParams(id);
-      for (let tau = 0; tau < 120; tau += 0.05) {
-        const d = flightOffset(f, planetR, 1, tau, 1, out).length();
-        minD = Math.min(minD, d);
-        maxD = Math.max(maxD, d);
-      }
-    }
-    expect(minD).toBeGreaterThanOrEqual(floor - 1e-9);
-    // 바깥쪽 흔들림은 그대로 남는다
-    expect(maxD).toBeGreaterThan(r + s.wobble * (1 + s.gustWobble));
   });
 
   it('궤도면은 한쪽으로 쏠리지 않고 아무 방향으로나 기운다', () => {
@@ -221,91 +178,6 @@ describe('돌풍에 날리는 종이', () => {
     expect(facing).toBeGreaterThan(0);
     expect(edgeOn).toBeGreaterThan(0);
     expect(sum.length() / ids.length).toBeLessThan(0.35);
-  });
-
-  it('종이 앞면은 노드 바깥쪽을 향하고, 팔랑여도 두 기울기를 더한 각도 안이라 뒤집히지 않는다', () => {
-    const q = new Quaternion();
-    const front = new Vector3();
-    const outward = new Vector3();
-    const inPlane = new Vector3();
-    const bound = s.flutterAmp + s.flutterAmp2;
-    for (const id of ids.slice(0, 30)) {
-      const f = flightParams(id);
-      const normal = new Vector3(0, 1, 0).applyQuaternion(f.orbit);
-      let moved = 0;
-      let prev: Quaternion | null = null;
-      for (let t = 0; t < 40; t += 0.37) {
-        flightOffset(f, 0.3, 0.5, gustTime(t), gust(t), outward);
-        flightQuaternion(f, gustTime(t), outward, q);
-        expect(q.length()).toBeCloseTo(1, 9);
-        front.set(0, 0, 1).applyQuaternion(q);
-        // 앞면 기준은 outward 를 궤도면에 투영한 방향이다
-        inPlane.copy(outward).addScaledVector(normal, -outward.dot(normal));
-        expect(front.angleTo(inPlane)).toBeLessThanOrEqual(bound + 1e-6);
-        if (prev) moved = Math.max(moved, q.angleTo(prev));
-        prev = q.clone();
-      }
-      // 제자리에 굳어 있지 않고 적당히 팔랑이되 제 면 안에서 크게 뒤집히지 않는다
-      expect(moved).toBeGreaterThan(0);
-      expect(Math.abs(f.roll)).toBeLessThanOrEqual(s.rollAmp + 1e-12);
-    }
-  });
-
-  /** 궤도 한 바퀴를 촘촘히 돌며 이웃한 두 자세 사이 회전각의 최댓값 */
-  function maxOrbitStep(f: ReturnType<typeof flightParams>, planetR: number, affinity: number, steps: number): number {
-    const r = flightRadius(planetR, affinity);
-    const period = (Math.PI * 2) / Math.abs(f.speed * orbitSpeed(r));
-    const outward = new Vector3();
-    const q = new Quaternion();
-    const prev = new Quaternion();
-    let maxStep = 0;
-    for (let i = 0; i <= steps; i++) {
-      const tau = (period * i) / steps;
-      flightOffset(f, planetR, affinity, tau, 0, outward);
-      flightQuaternion(f, tau, outward, q);
-      if (i > 0) maxStep = Math.max(maxStep, q.angleTo(prev));
-      prev.copy(q);
-    }
-    return maxStep;
-  }
-
-  it('노드 위·아래(극)를 지나는 궤도에서도 종이 자세가 끊기지 않고 이어진다', () => {
-    // 궤도면이 Y축을 품어 종이가 극을 정면으로 지나는 경우
-    const base = flightParams('0007');
-    const poleOrbit = { ...base, orbit: new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), new Vector3(0, 0, 1)) };
-    expect(maxOrbitStep(poleOrbit, 2, 1, 20000)).toBeLessThan(0.05);
-    // 무작위 궤도면 전체
-    for (const id of ids.slice(0, 40)) {
-      expect(maxOrbitStep(flightParams(id), 0.3, 0.5, 5000)).toBeLessThan(0.05);
-    }
-  });
-
-  it('outward 가 정확히 위·아래를 향해도 정상 회전을 낸다', () => {
-    const q = new Quaternion();
-    const front = new Vector3();
-    for (const id of ids.slice(0, 10)) {
-      const f = flightParams(id);
-      for (const dir of [new Vector3(0, 1, 0), new Vector3(0, -1, 0)]) {
-        flightQuaternion(f, 0, dir, q);
-        expect(Number.isFinite(q.x + q.y + q.z + q.w)).toBe(true);
-        expect(q.length()).toBeCloseTo(1, 9);
-        front.set(0, 0, 1).applyQuaternion(q);
-        expect(front.angleTo(dir)).toBeLessThanOrEqual(Math.PI / 2);
-      }
-    }
-  });
-
-  it('카메라를 보지 않는다: 노드 뒤쪽으로 나간 종이는 카메라에 뒷면을 보인다', () => {
-    const q = new Quaternion();
-    const front = new Vector3();
-    const away = new Vector3(0, 0, -1);
-    const f = flightParams('0042');
-    for (let t = 0; t < 20; t += 0.5) {
-      flightQuaternion(f, gustTime(t), away, q);
-      front.set(0, 0, 1).applyQuaternion(q);
-      // 카메라(+Z 쪽)를 향한 성분이 음수면 뒷면이 보인다
-      expect(front.z).toBeLessThan(0);
-    }
   });
 
   it('공전 각속도는 반지름의 1.5 제곱에 반비례한다', () => {

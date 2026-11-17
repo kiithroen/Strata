@@ -17,18 +17,14 @@ export interface FloatParams {
 
 export interface FloatSample {
   y: number;
-  pitch: number;
-  roll: number;
 }
 
 const TAU = Math.PI * 2;
 
-/** 떠 있는 카드의 흔들림. 게임 시간의 함수라서 주사율과 상관없이 같은 값을 낸다. */
-export function floatOffset(time: number, p: FloatParams, out: FloatSample = { y: 0, pitch: 0, roll: 0 }): FloatSample {
+/** 떠 있는 카드의 위아래 흔들림. 기울지는 않는다. 게임 시간의 함수라서 주사율과 상관없이 같은 값을 낸다. */
+export function floatOffset(time: number, p: FloatParams, out: FloatSample = { y: 0 }): FloatSample {
   const w = (TAU * time) / p.period + p.phase;
   out.y = tuning.float.amplitude * Math.sin(w);
-  out.pitch = tuning.float.tiltAmplitude * Math.sin(w * 0.5 + 1.3);
-  out.roll = tuning.float.tiltAmplitude * Math.cos(w * 0.7 + 0.4);
   return out;
 }
 
@@ -63,11 +59,6 @@ export function copyPose(from: Pose, to: Pose): Pose {
   return to;
 }
 
-const tiltQuat = new Quaternion();
-const rollQuat = new Quaternion();
-const axisX = new Vector3(1, 0, 0);
-const axisZ = new Vector3(0, 0, 1);
-
 /**
  * 카드 하나의 움직임. 렌더링과 분리해 두어 노드 환경에서도 시험할 수 있다.
  *
@@ -89,22 +80,19 @@ export class CardMotion {
   /** 흔들림 배율(0~1). 0이면 기본 자세 그대로 멈춰 있다(지층에 눕힌 창) */
   floatScale = 1;
 
-  private readonly sample: FloatSample = { y: 0, pitch: 0, roll: 0 };
+  private readonly sample: FloatSample = { y: 0 };
   private readonly idle = createPose();
   /** 닫히는 동안에도 섞을 수 있게 마지막 펼친 자세를 기억한다 */
   private readonly lastFocus = createPose();
 
   constructor(readonly float: FloatParams) {}
 
-  /** 기본 자세에 흔들림을 더한 떠 있는 자세 */
+  /** 기본 자세에 위아래 흔들림을 더한 떠 있는 자세. 자세(회전)는 기본 자세 그대로다 */
   idlePose(time: number, home: Pose, out: Pose): Pose {
     const s = floatOffset(time, this.float, this.sample);
-    const k = this.floatScale;
     out.position.copy(home.position);
-    out.position.y += s.y * k * home.scale;
-    tiltQuat.setFromAxisAngle(axisX, s.pitch * k);
-    rollQuat.setFromAxisAngle(axisZ, s.roll * k).premultiply(tiltQuat);
-    out.quaternion.copy(home.quaternion).multiply(rollQuat);
+    out.position.y += s.y * this.floatScale * home.scale;
+    out.quaternion.copy(home.quaternion);
     out.scale = home.scale;
     return out;
   }

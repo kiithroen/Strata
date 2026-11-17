@@ -44,7 +44,7 @@
 
 **움직임** (`cardMotion.ts`의 `CardMotion`)
 - 배치(필드·시간축)가 매 프레임 기본 자세(위치·회전·배율)를 넘긴다. 떠 있는 카드는 기본 자세에 흔들림을 더한 자세를 지연 없이 따라간다.
-- 흔들림은 게임 시간의 사인 함수로 위아래(`float.amplitude`)와 기울기(`float.tiltAmplitude`)가 움직인다. 카드마다 위상과 주기(`float.periodMin`~`float.periodMax`)가 다르다. `CardMotion.floatScale`(0~1)을 곱하며, 0이면 기본 자세 그대로 멈춘다.
+- 흔들림은 게임 시간의 사인 함수로 위아래(`float.amplitude`)로만 움직이고 기울지 않는다. 카드마다 위상과 주기(`float.periodMin`~`float.periodMax`)가 다르다. `CardMotion.floatScale`(0~1)을 곱하며, 0이면 기본 자세 그대로 멈춘다.
 - 펼치기는 떠 있는 자세와 펼친 자세를 `focus`(0~1)로 섞는다. `focus`는 `focus.rate`로 지수 접근하므로 같은 게임 시간이면 주사율과 상관없이 같은 자세다. 닫히는 동안에는 마지막 펼친 자세와 섞는다.
 - 펼친 자세는 카메라 정면 `focus.distance` 지점에서 앞면이 카메라를 향한다. 배율은 화면 폭과 높이 중 좁은 쪽에 맞춰 `focus.fill` 비율을 차지한다. 매 프레임 다시 계산하므로 화면비가 바뀌어도 맞춰진다.
 - 하나가 펼쳐지면 나머지는 `focus.othersDim`만큼 어두워진다(`focus.dimRate`로 접근, 가장 어두울 때 밝기는 `look.dimFloor`).
@@ -61,7 +61,6 @@
   - 유리 광택(`glassSheen`, `bevel`): 시선 각도에 따라 카드 유리면에 대각선 반사와 테두리 안쪽 반사광이 은은하게 돈다. 펼친 카드는 꺼진다.
 - 테두리 빛(`card.border`): 셰이더가 카드 겉모양(둥근 사각형, `cardLayout.ts`의 `cornerUv`로 텍스처와 같은 둥글기)까지의 거리로 선을 따라 종류 색을 더한다(`width`, `strength`). 밝아진 선에 블룸이 걸린다. 그 위로 꼬리 달린 빛이 테두리를 따라 돈다(`runnerStrength`, `runnerSpeed`, `runnerTail`). 도는 위치는 카드 가운데에서 본 각도로 재고 카드마다 출발점이 다르다. 빠르기·꼬리·밝기는 노트 번호로 정한 배율(`runnerJitter`, `borderRunner.ts`의 `runnerVariation`)을 곱하고, `runnerJitter.reverse` 비율의 카드는 반대 방향으로 돈다. 펼친 카드는 꺼진다.
 - 카드는 휘지 않는 평평한 유리판(사각형 하나)이다. 무지개빛 위상과 테두리를 도는 빛의 출발점은 노트 번호로 정한 카드별 위상(`uPhase`)만큼 어긋난다.
-- 반짝임(`CardLook.uShade`, 0~1): 카드를 비스듬히 볼수록 종류 색과 무지개빛으로 밝아진다(`card.lod.glint`). 펼치는 동안에는 꺼진다. 우주 보기만 반짝임을 켠다.
 - `setBadge(text)`로 카드 오른쪽 위에 배지를 붙인다(높이 `axis.badgeHeight`). 글자 텍스처는 `widgets/common/labelCache.ts`가 구워 재사용한다.
 
 **갤러리 데모** (`src/gallery/noteCardDemo.ts`)
@@ -114,7 +113,7 @@
 
 파일: `src/widgets/cosmos/`. 시간 ↔ 깊이, 단계, 묶음, 조종은 시간축(`timeAxis/axisModel.ts`)을 그대로 쓴다.
 
-시간 묶음은 빛나는 노드(행성)이고, 노드에서 노트 점이 방사형 선으로 뻗는다. 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다. 노드들은 가장 최근 시점을 원점(`s = 0`)에 두고 3차원 사방에 감겨 퍼지는 로그 구면 나선 위에 안정적으로 자리하며, 카메라는 표준 3D 궤도 조작(회전·팬·연속 줌·노드 포커스)으로 이 시계열 공간을 탐색한다. 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
+시간 묶음은 빛나는 노드(행성)이고, 노드에서 노트 점이 방사형 선으로 뻗는다. 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다. 노드들은 가장 최근 시점을 원점(`s = 0`)에 두고 3차원 사방에 감겨 퍼지는 로그 구면 나선 위에 안정적으로 자리하며, 카메라는 표준 3D 궤도 조작(회전·팬·연속 줌·노드 포커스)으로 이 시계열 공간을 탐색한다. 노트 몇 장은 카드로 노드 둘레를 천천히 돈다.
 
 **행성 노드** (`cosmosModel.ts`)
 - 행성 단위는 `month` 기준 고정 시계열 축척(`choosePlanetUnit`)으로 정하고, 같은 단위 칸의 노트가 한 행성이 되어 그 칸에서 가장 최근 노트의 시각에 놓인다. 줌·이동 중에도 노드 배치와 묶음은 흔들리지 않는다.
@@ -125,7 +124,7 @@
 **노트 점과 살** (`clusterAffinities`, `burstOffset`, `hourColorIndex`)
 - `clusterAffinities`가 묶음 안 각 노트의 관련도(0~1)를 절대 기준으로 구한다. 시간 점수는 묶음 중앙값 시각과의 거리로 `exp(−|dt| / (행성 단위 길이 × cosmos.affinity.timeScale))`이다. 묶음에 태그가 있으면 태그 점수(노트 태그마다 그 태그를 가진 묶음 노트 비율의 평균 ÷ √태그 수)와 `cosmos.affinity.timeWeight` 비율로 섞는다. 몰아 찍은 노트는 모두 노드 가까이에, 흩어진 노트는 멀리 놓인다.
 - k 번째(관련도 높은 순) 노트 점은 노드 둘레의 카메라를 마주 보는 원판에 황금각으로 놓인다. 반지름은 `burst.inner + burst.spacing × √(k + ½) + burst.pullSpread × (1 − 관련도)^burst.pullCurve`이고, 앞뒤로 `burst.depthJitter`만큼 흔들리며 원판 전체가 `burst.spin`으로 돈다. 관련도가 높을수록 노드 가까이에 모이고 낮을수록 긴 살 끝에 놓인다.
-- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 종이로 나는 노트는 살이 카드 중심 뒷면(`noteCard/paperPin.ts`)에 이어지고, 카드 뒤에 그리는 순서로 두어 앞면에서는 카드 테두리에서 멈춘 것처럼 보인다. 그 노트의 점은 감춘다. 종이가 아닌 노트는 살이 점에 닿는다. 종이가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 카드 중심 사이를 그만큼 옮겨 간다.
+- 노드에서 그 노드의 모든 노트로 살(`graph.spokeWidth`, `graph.spokeAlpha`)을 그어 어느 노드 소속인지 보인다. 카드로 도는 노트는 살이 카드 중심 뒷면(`noteCard/paperPin.ts`)에 이어지고, 카드 뒤에 그리는 순서로 두어 앞면에서는 카드 테두리에서 멈춘 것처럼 보인다. 그 노트의 점은 감춘다. 카드가 아닌 노트는 살이 점에 닿는다. 카드가 나타나고 사라지거나 펼쳐지는 동안에는 살 끝이 점과 카드 중심 사이를 그만큼 옮겨 간다.
 - 점과 살 색은 노트가 찍힌 시각을 하루를 `graph.hourColors` 개수로 나눈 칸으로 고른다.
 - 묶음이 바뀌어 다른 노드로 옮겨 갈 때 점은 `RegroupBlend`로 잇는다.
 
@@ -140,26 +139,24 @@
 - 은하 글자와 워드 클라우드, 지층 낱말은 한 글자 묶음(`ScreenLabels`)이다. 매 프레임 화면 사각형을 구해 차례가 높은 글자부터 자리를 잡고, 이미 잡힌 자리와 `look.label.declutter.padPx` 안으로 겹치는 글자는 `declutter.rate`로 옅어져 숨는다(`pickVisible`). 차례는 허브 날짜 > 대표 태그 > 행성 날짜 > 클라우드 낱말(많이 쓰인 낱말이 먼저)이다. `declutter.blockAlpha`보다 옅은 글자(지층 보기에서 옅어진 은하 글자 등)는 자리를 막지 않는다. 숨고 나타나는 정도는 글자 열쇠(노드 키 + 역할, 묶음 키 + 낱말)로 프레임 사이에 잇는다.
 - 가지는 정점을 공유하는 화면 공간 발광 리본(`RibbonBatch`)으로 그려 이음매에 점이 찍히지 않고, 살은 `LineSegments2`, 점·구슬·빛 무리는 거리에 따라 작아지는 점 묶음이다. 구슬 말고는 모두 가산 합성이라 겹칠수록 밝다(`GraphView.ts`).
 
-**날리는 종이** (`flightParams`, `flightOffset`, `flightQuaternion`, `gust`, `gustTime`)
-- 행성 단위별로 `swarm.capacityByUnit`장까지(관련도 높은 노트부터) 종이로 날린다. 나머지는 점으로만 보인다. 종이가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
-- 종이마다 노트 번호로 궤도면(아무 방향으로나 기욺), 공전 방향과 속도 배율(`swarm.speedJitter`), 흔들림 빈도, 제 면 안에서 살짝 흔들리는 빈도(`swarm.rollFreq`), 팔랑이는 축 방향과 빈도(`swarm.flutterFreq`)가 정해진다.
-- 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × (1 − 관련도)^swarm.pullCurve`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)라 관련도가 높은 종이일수록 짧은 실로 노드 가까이에서 빠르게 돈다.
-- 은하 전체에 돌풍이 분다. 세기 `gust(t)`는 느린 사인 둘의 합(0~1, `swarm.gust.freq`, `swarm.gust.phase`)이고, 종이의 움직임은 `1 + gust.boost × gust`를 미리 적분한 돌풍 시계 `gustTime`으로 잰다. 돌풍이 셀수록 빨리 돌고 더 흔들리며, 난기류 흔들림도 `swarm.wobble × (1 + swarm.gustWobble × gust)`로 커진다. 흔들림의 궤도 안쪽(노드 쪽) 성분은 `−한계 × tanh(깊이 / 한계)`로 눌러 궤도 반지름 × `swarm.wobbleInward`보다 깊이 들어가지 않는다. 종이가 노드 중심을 파고들어 바깥 방향이 사라지는 일을 막는다.
-- 종이 자세: 앞면이 노드 바깥쪽(노드에서 종이로 향하는 방향을 궤도면에 투영한 방향)을 향하고 위아래로 바로 선 채, 제 면 안의 작은 기울기(`swarm.rollAmp`)와 수직인 두 축 팔랑임(`swarm.flutterAmp`, `swarm.flutterAmp2`)으로 적당히 흔들린다. 앞면은 바깥 방향에서 두 각도를 더한 만큼까지만 기울어 뒤집히지 않는다. 카메라를 보지 않으므로 노드 뒤쪽 종이는 뒤에서 본 홀로그램이다. 크기는 `card.width × cosmos.satelliteScale`이다.
-- 위쪽은 월드 +Y를 앞면에 수직으로 투영한 벡터에 `swarm.poleUpBias × (앞면·Y)² ×` 궤도면 법선(+Y 쪽)을 더한 방향이다. 노드 위·아래(극)를 지나는 종이도 자세가 끊기지 않고 이어진다.
+**도는 카드** (`flightParams`, `flightOffset`)
+- 행성 단위별로 `swarm.capacityByUnit`장까지(관련도 높은 노트부터) 카드로 노드 둘레를 돈다. 나머지는 점으로만 보인다. 카드가 나타나고 사라지는 것은 `cosmos.regroupRate`로 옅어진다.
+- 카드마다 노트 번호로 궤도면(아무 방향으로나 기욺), 공전 방향과 속도 배율(`swarm.speedJitter`)이 정해진다.
+- 궤도 반지름은 노드 반지름(`cosmos.planetRadius`, 노트 수의 제곱근 × `cosmos.planetGrowth`, 상한 `cosmos.planetMaxRadius`) + `swarm.gap` + `swarm.spread × (1 − 관련도)^swarm.pullCurve`다. 각속도는 `swarm.speed × 속도 배율 / 반지름^1.5`(케플러 3법칙)라 관련도가 높은 카드일수록 노드 가까이에서 빠르게 돈다. 공전 시계로 재는 일정한 빠르기의 원 궤도라 흔들리지 않는다.
+- 카드는 제자리에서 돌거나 기울지 않고 늘 카메라를 바라본다(`facingQuaternion`). 크기는 `card.width × cosmos.satelliteScale`이다.
 - 다른 노드로 옮겨 갈 때만 `RegroupBlend`로 잇고, 그 밖에는 목표 위치를 지연 없이 따른다.
 
 **배경** (`Universe.ts`)
 - 먼지: `dust.count`개 점이 과거(`-s`)와 미래(`+s`) 두 갈래 3D 구면 나선팔(반지름 퍼짐 `dust.spread`, 각도 퍼짐 `dust.angleSpread`, 최대 진행도 `dust.maxArc`)을 따라 원점 주위에 모이고, `dust.halo` 비율은 구 전체에 흩어진다. 시간축이 움직인 거리만큼 흘러가 비행하는 느낌을 준다.
 - 별(`stars.count`, 반지름 `stars.radius`)과 성운 셰이더는 매 프레임 카메라 위치를 따라 이동해 어느 궤도 거리에서도 잘리지 않는다.
 - 성운(`nebula`)은 `bakeSize`가 0이면 매 프레임 화면 해상도로 계산하고, 양수면 원점의 큐브 카메라로 그 크기 큐브맵에 구워 두고 `refreshSeconds`(게임 시간)마다 다시 굽는다. 큐브맵은 sRGB로 저장해 어두운 그러데이션이 띠지지 않게 한다.
-- 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·종이는 카메라에서 잰 거리(`distanceTo(cameraPosition)`) 기준으로 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
+- 우주 보기는 장면 안개를 `cosmos.fogNear`~`cosmos.fogFar`로 바꾸고 바닥 격자를 숨긴다. 노드·카드는 카메라에서 잰 거리(`distanceTo(cameraPosition)`) 기준으로 `cosmos.nearDepth`~`cosmos.fadeNearStart`에서 차오르고 `cosmos.fogFar`~`cosmos.farDepth`에서 사라진다.
 
 **탭과 공전 시계** (`src/gallery/cosmosDemo.ts`)
-- 손가락이 화면에 닿아 있거나 팬 중에는 공전·뒹굴기·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 종이를 누르기 쉽게 하려는 것이다.
+- 손가락이 화면에 닿아 있거나 팬 중에는 공전·은하 회전이 멈추고, 떼면 다시 돈다(`cosmos.holdRate`). 움직이는 카드를 누르기 쉽게 하려는 것이다.
 - 은하가 도는 만큼(`galaxySpinAngle`) 피벗(`target`, `goalTarget`)도 원점 Y축 둘레로 함께 돈다(`rotateTargetsAroundY`). 포커스한 노드·시점은 화면 가운데에 머물고, 시선 각도는 그대로라 주변 은하가 피벗 둘레로 도는 것처럼 보인다.
 - 한 손가락·마우스 왼쪽 끌기로 중심 피벗(`target`) 둘레를 궤도 회전(`CameraRig`)하고, 두 손가락 이동·마우스 오른쪽·가운데·`Shift` 끌기로 화면 평면을 따라 팬(`pan`)하며, 핀치·마우스 휠·트랙패드 핀치로 스냅 없이 연속 거리 줌(`zoomByFactor`)한다. 오른쪽 시간 띠(`src/gallery/timeScrubber.ts`)를 끌거나 누르면 해당 시각의 나선 좌표로 피벗을 부드럽게 옮긴다.
-- 은하에서는 노트를 펼치지 않는다. 탭 광선이 종이에 정확히 맞으면 그 종이가 속한 행성을 고른다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 종이나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 종이 반경은 `graph.paperTapRadius`와 화면에 보이는 종이 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 종이를 고르면 그 종이의 행성을 고른 것으로 친다.
+- 은하에서는 노트를 펼치지 않는다. 탭 광선이 카드에 정확히 맞으면 그 카드가 속한 행성을 고른다. 아니면 탭 자리에서 판정 반경 안의 가장 가까운 카드나 보이는 노드를 고른다(`pickNearest`, 투명해졌거나 카메라 뒤쪽인 노드는 제외). 카드 반경은 `graph.cardTapRadius`와 화면에 보이는 카드 반지름 가운데 큰 쪽, 노드 반경은 `graph.tapRadius`(모두 CSS px)다. 카드를 고르면 그 카드의 행성을 고른 것으로 친다.
 - 은하 탭은 두 단계다(`src/widgets/cosmos/tapApproach.ts`의 `TapApproach`). 처음 고른 노드로는 다가간다: 피벗을 그 노드로 옮기고 거리를 `approach.planetDistance`(행성)·`approach.hubDistance`(허브) 이하로 좁히며, 그 노드의 빛이 `approach.glowRate` 빠르기로 `approach.glowScale`배까지 커진다. 다가간 노드를 다시 고르면 그 노드로 지층 보기에 들어간다(아래 "지층 보기"). 팬·핀치·시간 띠로 시점을 옮기면 다가간 노드를 잊는다. 회전·휠 줌은 피벗을 옮기지 않으니 그대로 둔다. 지층 보기에서 돌아와도 기억하고 있어 한 번 더 탭하면 바로 들어간다.
 - 펼친 상태에서 아무 데나 탭하면 닫는다. 왼쪽 위 시점 표시(`src/gallery/timeReadout.ts`)와 시간 띠 빨간 눈금은 선택한 노드·시간 띠 시각이나 수동 팬 중 피벗에 가장 가까운 노드 시각을 따른다.
 
@@ -170,7 +167,7 @@
 은하(우주 보기)에서 크게 탐색하다가 노드를 고르면, 그 노드가 속한 위 묶음(허브, 예: 달)의 아래 묶음(행성, 예: 날)을 수평 층으로 쌓아 내려다보는 두 번째 단계다. 뒤로 가면 은하로 돌아온다.
 
 **들어가고 나오기**
-- 다가간 행성 노드나 그 행성의 종이를 탭하면 그 행성이 속한 허브의 행성들이 층이 되고, 고른 행성의 층을 바라본다. 다가간 허브 노드를 탭하면 그 허브의 가장 최근 층을 바라본다. 허브가 없으면(가장 큰 단위) 그 행성 하나가 층이다.
+- 다가간 행성 노드나 그 행성의 카드를 탭하면 그 행성이 속한 허브의 행성들이 층이 되고, 고른 행성의 층을 바라본다. 다가간 허브 노드를 탭하면 그 허브의 가장 최근 층을 바라본다. 허브가 없으면(가장 큰 단위) 그 행성 하나가 층이다.
 - 고른 층 판의 중심은 고른 노드 자리이고, 판은 들어갈 때의 카메라 요만큼 돌아 앞에서 보면 창의 글이 바로 읽힌다. 카메라는 고른 층 중심에서 쌓인 층 전체의 가운데 쪽으로 `strata.stackBias`만큼 옮긴 높이(`strataFocusHeight`)로 피벗을 옮기며 `strata.pitch` 각도로 내려다본다. 그래서 고른 층 위아래 층도 화면에 함께 들어온다. 거리는 `strata.distance`이고, 바라보는 층 원판이 화면 폭에 안 들어오면 원판 앞 가장자리에서 반지름이 화면 반폭 × `strata.fitWidth` 안에 들 만큼 물러난다(`strataDistance`). 층을 바꾸거나 화면 비율이 바뀌면 다시 잡는다.
 - 나올 때는 들어가기 전 피벗·거리·각도로 돌아간다. 지층 보기 동안 은하는 멈춰 있어(공전 시계 정지) 돌아오면 보던 자리 그대로다.
 - 왼쪽 아래 `← 은하로` 단추, 층 판 바깥 탭, 브라우저·안드로이드 뒤로, `Esc`로 나온다(펼친 카드가 있으면 `Esc`는 카드를 먼저 닫고, 나올 때는 펼친 카드도 함께 닫는다). 들어갈 때 방문 기록을 하나 쌓고, 단추·`Esc`로 나올 때는 그 기록을 되돌린다.

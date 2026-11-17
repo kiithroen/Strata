@@ -132,8 +132,6 @@ describe('CardMotion 떠 있기', () => {
     for (let i = 0; i < 2000; i++) {
       const s = floatOffset(i * 0.0137, { phase: i * 0.31, period: fl.periodMin });
       expect(Math.abs(s.y)).toBeLessThanOrEqual(fl.amplitude + 1e-12);
-      expect(Math.abs(s.pitch)).toBeLessThanOrEqual(fl.tiltAmplitude + 1e-12);
-      expect(Math.abs(s.roll)).toBeLessThanOrEqual(fl.tiltAmplitude + 1e-12);
     }
   });
 });

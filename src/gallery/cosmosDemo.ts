@@ -26,9 +26,6 @@ import {
   cosmosFade,
   flightOffset,
   flightParams,
-  flightQuaternion,
-  gust,
-  gustTime,
   hourColorIndex,
   nodeColor,
   parentUnit,
@@ -118,9 +115,9 @@ export interface CosmosDemo extends WidgetDemo {
 /**
  * 우주 보기 데모. 시간 묶음은 나선팔 위의 빛나는 노드이고, 노드에서 노트 점이 방사형 선으로 뻗는다.
  * 노드는 한 단계 위 묶음의 허브에 가지로 이어지고 허브끼리는 시간 순서로 이어진다.
- * 노트 몇 장은 노드 둘레를 돌풍에 날리는 종이로 날아다닌다.
- * 은하에서 노드나 종이를 처음 탭하면 그 노드로 다가가고(종이는 그 행성), 다가간 노드를 한 번 더 탭하면
- * 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 종이는 지층 보기에서 탭해야 펼친다.
+ * 노트 몇 장은 카드로 노드 둘레를 천천히 돈다.
+ * 은하에서 노드나 카드를 처음 탭하면 그 노드로 다가가고(카드는 그 행성), 다가간 노드를 한 번 더 탭하면
+ * 그 묶음이 속한 위 묶음을 지층 보기로 펼친다(strataMode.ts). 카드는 지층 보기에서 탭해야 펼친다.
  */
 /** 은하 글자가 겹칠 때 남는 차례: 허브 날짜 > 행성 대표 태그 > 행성 날짜 */
 const LABEL_PRIORITY = { hub: 3, title: 2, date: 1 } as const;
@@ -141,7 +138,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   const look = createCardLook();
   look.uFogNear.value = c.fogNear;
   look.uFogFar.value = c.fogFar;
-  look.uShade.value = c.paperShade;
   const labels = new LabelCache();
   const universe = new Universe(stage.renderer);
   stage.scene.add(universe.group);
@@ -192,9 +188,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   /** 3차원 구면 나선의 기준 시계열 공간(줌·이동 중에도 노드 배치와 묶음이 흔들리지 않도록 고정한다) */
   const spiralState: AxisState = { focusTime: newest, logScale: levelLogScale('month') };
   const controller = new AxisController({ focusTime: newest, logScale: spiralState.logScale });
-  const paperBlends = notes.map(() => new RegroupBlend());
+  const orbitBlends = notes.map(() => new RegroupBlend());
   const dotBlends = notes.map(() => new RegroupBlend());
-  const paperFade = new Float64Array(notes.length);
+  const orbitFade = new Float64Array(notes.length);
   const flights = notes.map((n) => flightParams(n.id));
   const homes = notes.map(createPose);
 
@@ -486,7 +482,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         if (hit) focus.set(hit.card);
         return;
       }
-      // 광선이 종이에 정확히 맞으면 그 종이다. 지층 보기에서는 현재 지층 카드만 펼치고, 은하에서는 그 종이의 행성을 탭한 것으로 친다
+      // 광선이 카드에 정확히 맞으면 그 카드다. 지층 보기에서는 현재 지층 카드만 펼치고, 은하에서는 그 카드의 행성을 탭한 것으로 친다
       const cardHit = focus.pickHit(
         x,
         y,
@@ -497,7 +493,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         else tapNode(planetNodeOfCard(cardHit.card));
         return;
       }
-      // 지층 보기에서 카드를 빗나간 탭은 빈 곳 층 판 선택으로만 넘긴다(종이 여유 반경이 층 전환을 가로채지 않게)
+      // 지층 보기에서 카드를 빗나간 탭은 빈 곳 층 판 선택으로만 넘긴다(카드 여유 반경이 층 전환을 가로채지 않게)
       if (strata.active) {
         const li = strata.pickLayer(x, y);
         if (li >= 0) {
@@ -509,7 +505,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         }
         return;
       }
-      // 은하에서는 탭 자리에서 판정 반경 안의 가장 가까운 종이나 노드를 고른다
+      // 은하에서는 탭 자리에서 판정 반경 안의 가장 가까운 카드나 노드를 고른다
       const rect = canvas.getBoundingClientRect();
       const pxPerUnit = rect.height / (2 * Math.tan((stage.camera.fov * Math.PI) / 360));
       const targets: TapTarget[] = [];
@@ -520,7 +516,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         if (depth < 0.5) continue;
         const half = (Math.hypot(card.layout.worldWidth, card.layout.worldHeight) / 2) * card.mesh.scale.x;
         const sp = screenOf(card.mesh.position);
-        targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.paperTapRadius, (half * pxPerUnit) / depth) });
+        targets.push({ x: sp.x, y: sp.y, radius: Math.max(g.cardTapRadius, (half * pxPerUnit) / depth) });
         picks.push({ card });
       }
       for (const node of nodes) {
@@ -563,7 +559,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
 
   return {
     title: 'COSMOS',
-    hint: '끌기: 회전 · 핀치/휠: 줌 · 우클릭/두손가락: 이동 · 탭: 노드/종이',
+    hint: '끌기: 회전 · 핀치/휠: 줌 · 우클릭/두손가락: 이동 · 탭: 노드/카드',
     controller,
     cameraRig,
     cards,
@@ -634,8 +630,6 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       lastFocusTime = focusNow;
       universe.update(orbitClock, scrollS, cameraPosition);
 
-      const tau = gustTime(orbitClock);
-      const gustNow = gust(orbitClock);
       const spin = g.burst.spin * orbitClock;
       const pose = focus.pose();
       approachGlow = damp(approachGlow, approach.approached ? 1 : 0, c.approach.glowRate, dt);
@@ -680,17 +674,17 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         order.forEach((idx, rank) => {
           const m = cluster.members[idx];
           const affinity = affinities[idx];
-          // 종이: 행성 단위별 큰 카드 수까지만 관련도 순으로 날린다
-          paperFade[m] = damp(paperFade[m], rank < capacity ? 1 : 0, c.regroupRate, dt);
-          flightOffset(flights[m], r, affinity, tau, gustNow, offset);
+          // 카드: 행성 단위별 큰 카드 수까지만 관련도 순으로 노드 둘레 궤도를 돈다. 제자리 회전 없이 늘 카메라를 바라본다
+          orbitFade[m] = damp(orbitFade[m], rank < capacity ? 1 : 0, c.regroupRate, dt);
+          flightOffset(flights[m], r, affinity, orbitClock, offset);
           target.copy(pos).add(offset);
-          const p = paperBlends[m].step(dt, cluster.key, target);
+          const p = orbitBlends[m].step(dt, cluster.key, target);
           const home = homes[m];
           home.position.copy(p);
-          flightQuaternion(flights[m], tau, offset, home.quaternion);
+          facingQuaternion(p, cameraPosition, home.quaternion);
           home.scale = c.satelliteScale;
           const card = cards[m];
-          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * paperFade[m] * (1 - far.cards);
+          const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * orbitFade[m] * (1 - far.cards);
           let fade = strata.blendCard(m, home, baseFade);
           if (fieldMix > 0 && field) {
             // 카드 공간: 카메라 앞 자리로 날아가고, 공간에 없는 카드는 사라진다
@@ -714,12 +708,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
           opened = Math.max(opened, card.motion.focus);
 
-          // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 카드 중심 뒷면에 이어져 그래프 간선처럼 보이고,
-          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 종이는 실을 풀고 점으로 돌아간다
+          // 살: 노드에서 그 노트로 뻗는다. 카드로 도는 노트는 카드 중심 뒷면에 이어져 그래프 간선처럼 보이고,
+          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 카드는 실을 풀고 점으로 돌아간다
           burstOffset(rank, spin, offset, affinity).applyQuaternion(burstQuat);
           target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
-          const tied = paperFade[m] * (1 - card.motion.focus);
+          const tied = orbitFade[m] * (1 - card.motion.focus);
           pinPoint(
             card.mesh.position,
             card.mesh.quaternion,

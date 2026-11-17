@@ -10,15 +10,12 @@ export interface CardLook {
   uFogColor: { value: Color };
   uFogNear: { value: number };
   uFogFar: { value: number };
-  /** 0이면 각도와 상관없이 같은 밝기, 1이면 비스듬히 볼수록 홀로그램 가장자리가 밝아진다(card.lod.glint 배) */
-  uShade: { value: number };
   /** 홀로그램 선 색의 기본값. 재질마다 노트 종류 색(CardMaterialOptions.tint)으로 바꿔 쓴다 */
   uHoloTint: { value: Color };
   uDetailRange: { value: Vector2 };
   uColorRange: { value: Vector2 };
   uFarAlpha: { value: number };
   uFocusAlpha: { value: number };
-  uGlint: { value: number };
   /** 가로 줄무늬: 빈도, 세기, 흐르는 속도 */
   uStripe: { value: Vector3 };
   uIris: { value: number };
@@ -42,13 +39,11 @@ export function createCardLook(): CardLook {
     uFogColor: { value: new Color(l.background) },
     uFogNear: { value: l.fogNear },
     uFogFar: { value: l.fogFar },
-    uShade: { value: 0 },
     uHoloTint: { value: new Color(l.accent) },
     uDetailRange: { value: new Vector2(...lod.detail) },
     uColorRange: { value: new Vector2(...lod.color) },
     uFarAlpha: { value: lod.farAlpha },
     uFocusAlpha: { value: lod.focusAlpha },
-    uGlint: { value: lod.glint },
     uStripe: { value: new Vector3(h.stripeFreq, h.stripeStrength, h.stripeSpeed) },
     uIris: { value: h.iridescence },
     uIrisShift: { value: h.irisShift },
@@ -101,7 +96,6 @@ uniform float uFogFar;
 uniform vec3 uHoloTint;
 uniform float uFarAlpha;
 uniform float uFocusAlpha;
-uniform float uGlint;
 uniform vec3 uStripe;
 uniform float uIris;
 uniform float uIrisShift;
@@ -118,7 +112,6 @@ uniform float uAspect;
 uniform float uDim;
 uniform float uFocus;
 uniform float uFade;
-uniform float uShade;
 varying vec2 vUv;
 varying float vDepth;
 varying vec3 vNormalV;
@@ -167,10 +160,7 @@ void main() {
   float phase = dot(nrm.xy, vec2(0.8, 0.6)) * uIrisShift + dot(viewDir.xy, vec2(-0.6, 0.8)) * uIrisShift * 0.5 + uPhase;
   vec3 rainbow = iris(phase + (vUv.x + vUv.y) * 0.35);
 
-  // 비스듬히 볼수록 가장자리가 밝아지고 무지개빛 막이 돈다
-  float glint = pow(graze, 3.0) * uGlint * uShade * live;
-  color.rgb += mix(uHoloTint, rainbow, 0.2) * glint;
-  color.a = min(1.0, color.a + glint * 0.5 * body);
+  // 비스듬히 볼수록 무지개빛 막이 짙다
   color.rgb += rainbow * uIris * (0.15 + graze) * body * live;
 
   // 가는 가로 줄무늬가 천천히 위로 흐르고 줄 사이는 조금 투명해진다. 빛을 더하지 않아 하얗게 뜨지 않는다.

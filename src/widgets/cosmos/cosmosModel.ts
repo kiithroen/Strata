@@ -310,7 +310,7 @@ export function swarmCapacity(unit: TimeUnit): number {
   return tuning.cosmos.swarm.capacityByUnit[unit];
 }
 
-// ── 돌풍에 날리는 종이 ────────────────────────────────
+// ── 노드 둘레를 도는 카드 ────────────────────────────────
 
 const TAU = Math.PI * 2;
 
@@ -328,24 +328,13 @@ function randomQuaternion(h: number, salt: number, out: Quaternion): Quaternion 
   return out.set(a * Math.sin(u2), a * Math.cos(u2), b * Math.sin(u3), b * Math.cos(u3));
 }
 
-/** 위성(종이) 하나의 비행 성질. 노트 번호로 정해져 같은 노트는 늘 같은 식으로 난다 */
+/** 노드 둘레를 도는 카드 하나의 궤도. 노트 번호로 정해져 같은 노트는 늘 같은 궤도를 돈다 */
 export interface Flight {
   /** XZ 평면의 원을 궤도면으로 돌리는 회전. 궤도면은 아무 방향으로나 기운다 */
   orbit: Quaternion;
   phase: number;
   /** 공전 속도 배율. 음수면 반대로 돈다 */
   speed: number;
-  wobbleFreq: [number, number, number];
-  wobblePhase: [number, number, number];
-  /** 제 면 안에서 좌우로 기우는 기본 각도와 흔들림 빈도 */
-  roll: number;
-  rollFreq: number;
-  /** 앞면을 기울이는 첫째 축의 방향(종이 면 안의 각도). 둘째 축은 그에 수직이다 */
-  rockAxis: number;
-  flutterFreq: number;
-  flutterPhase: number;
-  flutterFreq2: number;
-  flutterPhase2: number;
 }
 
 export function flightParams(noteId: string): Flight {
@@ -356,38 +345,10 @@ export function flightParams(noteId: string): Flight {
     orbit: randomQuaternion(h, 2, new Quaternion()),
     phase: hash01(h, 6) * TAU,
     speed: direction * pick(h, 7, s.speedJitter),
-    wobbleFreq: [pick(h, 8, s.wobbleFreq), pick(h, 9, s.wobbleFreq), pick(h, 10, s.wobbleFreq)],
-    wobblePhase: [hash01(h, 11) * TAU, hash01(h, 12) * TAU, hash01(h, 13) * TAU],
-    roll: (hash01(h, 14) * 2 - 1) * s.rollAmp,
-    rollFreq: pick(h, 20, s.rollFreq),
-    rockAxis: hash01(h, 21) * TAU,
-    flutterFreq: pick(h, 23, s.flutterFreq),
-    flutterPhase: hash01(h, 24) * TAU,
-    flutterFreq2: pick(h, 25, s.flutterFreq),
-    flutterPhase2: hash01(h, 26) * TAU,
   };
 }
 
-/**
- * 은하 전체에 부는 돌풍의 세기(0~1). 느린 사인 둘의 합이라 미리 적분할 수 있다.
- * 종이의 움직임은 gustTime 으로 잰다. 돌풍이 셀수록 시간이 빨리 흐르는 셈이라 빨라지고 더 뒹군다.
- */
-export function gust(time: number): number {
-  const g = tuning.cosmos.swarm.gust;
-  return 0.5 + 0.25 * Math.sin(g.freq[0] * time + g.phase[0]) + 0.25 * Math.sin(g.freq[1] * time + g.phase[1]);
-}
-
-/** 1 + gust.boost × gust(t) 를 0부터 적분한 값. 프레임 간격과 상관없이 게임 시간만으로 정해진다 */
-export function gustTime(time: number): number {
-  const g = tuning.cosmos.swarm.gust;
-  const integral =
-    0.5 * time -
-    (0.25 * (Math.cos(g.freq[0] * time + g.phase[0]) - Math.cos(g.phase[0]))) / g.freq[0] -
-    (0.25 * (Math.cos(g.freq[1] * time + g.phase[1]) - Math.cos(g.phase[1]))) / g.freq[1];
-  return time + g.boost * integral;
-}
-
-/** 행성 중심에서 종이 궤도까지 반지름. 관련도(affinity, 0~1)가 높을수록 행성에 가깝게 당겨진다 */
+/** 행성 중심에서 카드 궤도까지 반지름. 관련도(affinity, 0~1)가 높을수록 행성에 가깝게 당겨진다 */
 export function flightRadius(planetR: number, affinity: number): number {
   const s = tuning.cosmos.swarm;
   const pull = Math.pow(1 - clamp01(affinity), s.pullCurve);
@@ -399,90 +360,11 @@ export function orbitSpeed(radius: number): number {
   return tuning.cosmos.swarm.speed / Math.pow(radius, 1.5);
 }
 
-/**
- * 행성 중심에서 본 종이 위치: 기운 궤도를 돌면서 난기류에 흔들린다.
- * tau 는 gustTime(공전 시계), g 는 그때의 돌풍 세기다. 흔들림 크기는 swarm.wobble × (1 + swarm.gustWobble × g)다.
- * 흔들림의 궤도 안쪽 성분은 궤도 반지름 × swarm.wobbleInward 를 넘지 않게 부드럽게 눌러,
- * 종이가 노드 중심을 파고들어 바깥 방향(자세 기준)이 사라지지 않게 한다.
- */
-export function flightOffset(
-  f: Flight,
-  planetR: number,
-  affinity: number,
-  tau: number,
-  g: number,
-  out: Vector3,
-): Vector3 {
-  const s = tuning.cosmos.swarm;
+/** 행성 중심에서 본 카드 위치: 기운 원 궤도를 일정한 빠르기로 돈다. time 은 공전 시계(초)다 */
+export function flightOffset(f: Flight, planetR: number, affinity: number, time: number, out: Vector3): Vector3 {
   const r = flightRadius(planetR, affinity);
-  const angle = f.phase + f.speed * orbitSpeed(r) * tau;
-  radialDir.set(Math.cos(angle), 0, Math.sin(angle)).applyQuaternion(f.orbit);
-  const w = s.wobble * (1 + s.gustWobble * g);
-  wobbleVec.set(
-    w * Math.sin(f.wobbleFreq[0] * tau + f.wobblePhase[0]),
-    w * Math.sin(f.wobbleFreq[1] * tau + f.wobblePhase[1]),
-    w * Math.sin(f.wobbleFreq[2] * tau + f.wobblePhase[2]),
-  );
-  const radial = wobbleVec.dot(radialDir);
-  if (radial < 0) {
-    // 안쪽 성분을 -limit × tanh(깊이 / limit) 로 바꾼다. 얕을 때는 거의 그대로, 깊어도 limit 을 넘지 않는다
-    const limit = r * s.wobbleInward;
-    wobbleVec.addScaledVector(radialDir, -radial - limit * Math.tanh(-radial / limit));
-  }
-  return out.copy(radialDir).multiplyScalar(r).add(wobbleVec);
-}
-
-const radialDir = new Vector3();
-const wobbleVec = new Vector3();
-
-const FRONT = new Vector3(0, 0, 1);
-const WORLD_UP = new Vector3(0, 1, 0);
-const outwardDir = new Vector3();
-const orbitNormal = new Vector3();
-const upDir = new Vector3();
-const sideDir = new Vector3();
-const alignMatrix = new Matrix4();
-const alignQuat = new Quaternion();
-const rollQuat = new Quaternion();
-const rockQuat = new Quaternion();
-const rockQuat2 = new Quaternion();
-const rockAxis = new Vector3();
-
-/**
- * 종이 자세. 사진·테이프·압정이 있는 앞면(+Z)이 노드 바깥쪽(outward: 노드에서 종이로 향하는 방향)을 향하고,
- * 위아래가 크게 뒤집히지 않도록 바로 선 상태에서 제 면 안 좌우 흔들림(swarm.rollAmp, rollFreq)과
- * 두 축 팔랑임(swarm.flutterAmp, swarm.flutterAmp2)으로 잔잔하게 흔들린다. 노드 뒤쪽 종이는 카메라에 뒷면을 보인다.
- *
- * 앞면 방향은 outward 를 궤도면에 투영한 방향이라 궤도면 법선 n 과 늘 수직이다.
- * 위쪽은 월드 +Y 를 앞면에 수직으로 투영한 벡터에 swarm.poleUpBias × (앞면·Y)² × n 을 더한 방향이다.
- * n 은 +Y 쪽을 향하게 고르므로 두 항의 내적이 음수가 아니고, 합은 극(앞면 ∥ Y)에서도 0 이 되지 않는다.
- * 그래서 종이가 극 근처를 지나도 자세가 끊기지 않고 이어진다.
- */
-export function flightQuaternion(f: Flight, tau: number, outward: Vector3, out: Quaternion): Quaternion {
-  const s = tuning.cosmos.swarm;
-  orbitNormal.set(0, 1, 0).applyQuaternion(f.orbit);
-  if (orbitNormal.y < 0) orbitNormal.negate();
-  outwardDir.copy(outward).addScaledVector(orbitNormal, -outward.dot(orbitNormal));
-  if (outwardDir.lengthSq() < 1e-12) outwardDir.copy(outward);
-  outwardDir.normalize();
-  const facingY = outwardDir.y;
-  upDir
-    .copy(WORLD_UP)
-    .addScaledVector(outwardDir, -facingY)
-    .addScaledVector(orbitNormal, s.poleUpBias * facingY * facingY);
-  // outward 가 궤도면 법선과 겹친 경우에만 n 항이 앞면 성분을 갖는다. 늘 앞면에 수직이 되게 다시 뺀다
-  upDir.addScaledVector(outwardDir, -upDir.dot(outwardDir));
-  if (upDir.lengthSq() < 1e-12) upDir.set(1, 0, 0).addScaledVector(outwardDir, -outwardDir.x);
-  upDir.normalize();
-  sideDir.crossVectors(upDir, outwardDir);
-  alignMatrix.makeBasis(sideDir, upDir, outwardDir);
-  alignQuat.setFromRotationMatrix(alignMatrix);
-  rollQuat.setFromAxisAngle(FRONT, f.roll + s.rollAmp * Math.sin(f.rollFreq * tau + f.flutterPhase));
-  rockAxis.set(Math.cos(f.rockAxis), Math.sin(f.rockAxis), 0);
-  rockQuat.setFromAxisAngle(rockAxis, s.flutterAmp * Math.sin(f.flutterFreq * tau + f.flutterPhase));
-  rockAxis.set(-Math.sin(f.rockAxis), Math.cos(f.rockAxis), 0);
-  rockQuat2.setFromAxisAngle(rockAxis, s.flutterAmp2 * Math.sin(f.flutterFreq2 * tau + f.flutterPhase2));
-  return out.copy(alignQuat).multiply(rollQuat).multiply(rockQuat).multiply(rockQuat2);
+  const angle = f.phase + f.speed * orbitSpeed(r) * time;
+  return out.set(Math.cos(angle) * r, 0, Math.sin(angle) * r).applyQuaternion(f.orbit);
 }
 
 /** 화면 위 탭 후보: 화면 좌표와 판정 반경(CSS px) */
@@ -494,7 +376,7 @@ export interface TapTarget {
 
 /**
  * 탭 자리에서 판정 반경 안에 든 후보 가운데 가장 가까운 후보의 번호. 없으면 -1.
- * 움직이는 종이와 작은 노드를 정확히 맞히지 않아도 고를 수 있게 한다
+ * 움직이는 카드와 작은 노드를 정확히 맞히지 않아도 고를 수 있게 한다
  */
 export function pickNearest(targets: readonly TapTarget[], x: number, y: number): number {
   let best = -1;
