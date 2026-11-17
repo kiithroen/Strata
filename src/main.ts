@@ -62,6 +62,8 @@ for (const widgetId of Object.keys(widgetDemos)) {
   if (widgetId === id) a.className = 'active';
   tabsEl.appendChild(a);
 }
+// 탭 줄이 넘쳐 가로로 밀리면 지금 탭이 보이게 한다
+tabsEl.querySelector('a.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
 /** 고른 파일을 노트로 읽어 우주 보기를 그 노트로 다시 띄운다. 다른 위젯을 보고 있었으면 우주 보기로 바꾼다 */
 async function importFiles(files: File[], progress?: (text: string) => void): Promise<string> {
