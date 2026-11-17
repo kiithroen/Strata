@@ -2,7 +2,7 @@ import { createRng, range } from '../core/random';
 import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 
 /**
- * 개발용 가짜 사진. 풍경, 종이 메모, 화이트보드 세 종류를 시드로 만든다.
+ * 개발용 가짜 사진. 풍경, 메모 스캔(검은 바탕에 글씨만), 화이트보드 세 종류를 시드로 만든다.
  * 사진마다 시드를 들고 있다가 요청한 해상도로 같은 그림을 다시 그린다. 그린 캔버스는 들고 있지 않는다.
  */
 const SIZES: [number, number][] = [
@@ -34,7 +34,7 @@ function drawPhoto(seed: number, width: number, height: number, targetWidth: num
   const rng = createRng(seed);
   const kind = rng();
   if (kind < 0.4) drawLandscape(ctx, width, height, rng);
-  else if (kind < 0.75) drawPaper(ctx, width, height, rng);
+  else if (kind < 0.75) drawScan(ctx, width, height, rng);
   else drawWhiteboard(ctx, width, height, rng);
   addGrain(ctx, width, height, rng);
   return canvas;
@@ -64,31 +64,20 @@ function drawLandscape(ctx: CanvasRenderingContext2D, w: number, h: number, rng:
   }
 }
 
-function drawPaper(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number): void {
-  ctx.fillStyle = `hsl(${range(rng, 20, 40)}, 12%, ${range(rng, 22, 32)}%)`;
+/** 메모 스캔: 종이와 줄을 지우고 글씨만 밝게 남긴 검은 바탕 */
+function drawScan(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number): void {
+  ctx.fillStyle = `hsl(220, 12%, ${range(rng, 3, 6)}%)`;
   ctx.fillRect(0, 0, w, h);
-  ctx.save();
-  ctx.translate(w / 2, h / 2);
-  ctx.rotate(range(rng, -0.12, 0.12));
-  const pw = w * 0.78;
-  const ph = h * 0.82;
-  ctx.fillStyle = `hsl(48, 40%, ${range(rng, 86, 93)}%)`;
-  ctx.fillRect(-pw / 2, -ph / 2, pw, ph);
-  ctx.strokeStyle = 'rgba(80, 120, 200, 0.35)';
-  ctx.lineWidth = 1;
-  const gap = ph / 18;
-  for (let y = -ph / 2 + gap * 2; y < ph / 2; y += gap) {
-    ctx.beginPath();
-    ctx.moveTo(-pw / 2, y);
-    ctx.lineTo(pw / 2, y);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = 'rgba(30, 30, 60, 0.75)';
+  ctx.strokeStyle = `hsla(${range(rng, 190, 230)}, 20%, ${range(rng, 78, 88)}%, 0.85)`;
   ctx.lineWidth = 2;
-  for (let y = -ph / 2 + gap * 2; y < ph / 2 - gap; y += gap) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const gap = h / 16;
+  const left = w * 0.1;
+  for (let y = gap * 2; y < h - gap; y += gap) {
     if (rng() < 0.2) continue;
-    let x = -pw / 2 + pw * 0.08;
-    const end = -pw / 2 + pw * range(rng, 0.45, 0.92);
+    let x = left + (rng() < 0.15 ? w * 0.06 : 0);
+    const end = left + w * range(rng, 0.35, 0.78);
     ctx.beginPath();
     ctx.moveTo(x, y - gap * 0.3);
     while (x < end) {
@@ -97,7 +86,6 @@ function drawPaper(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () 
     }
     ctx.stroke();
   }
-  ctx.restore();
 }
 
 function drawWhiteboard(ctx: CanvasRenderingContext2D, w: number, h: number, rng: () => number): void {
