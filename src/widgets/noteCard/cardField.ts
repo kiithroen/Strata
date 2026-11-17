@@ -9,7 +9,10 @@ const yawQuat = new Quaternion();
 
 /**
  * 카드 공간 보기의 배치: 카메라 앞 시야 원뿔에 카드를 흩고(generateField), 앞뒤로 날아 들어가며 훑는다.
- * 카드 수가 field.count 보다 많으면 그만큼 깊게 늘어난다. 자리는 가까운 것부터 정렬돼 있어 번호가 작을수록 앞이다.
+ * 깊이 범위는 cardField.depthNear 부터 카드 수 / cardField.cardsPerDepth(최소 cardField.minSpan)만큼이라 카드가 적으면 얕고 촘촘하다.
+ * cardField.spreadDepth 보다 깊은 자리는 그 깊이의 폭으로 퍼져 긴 통로가 된다. 자리는 가까운 것부터 정렬돼 있어 번호가 작을수록 앞이다.
+ * 세로로 긴 화면(가로/세로 비율 a < 1)에서는 깊이를 1/√a 배로 늘려 카드가 화면 폭에 비해 너무 크지 않게 하고,
+ * 위아래 퍼짐도 1/√a 배로 늘리되 cardField.fitHeight 를, 좌우 퍼짐은 화면 반폭 × cardField.fitWidth 를 넘지 않게 한다.
  * 자세는 카메라 공간(카메라가 원점에서 -z 를 봄)이다. 앞뒤 이동(offset)은 게임 시간 지수 접근으로 목표를 따라간다.
  */
 export class CardField {
@@ -20,12 +23,24 @@ export class CardField {
   offset = 0;
   private goal = 0;
 
-  constructor(count: number, seed: number, fovDeg: number) {
+  /** aspect 는 화면 가로/세로 비율이다 */
+  constructor(count: number, seed: number, fovDeg: number, aspect = 1) {
+    const c = tuning.cardField;
     const f = tuning.field;
-    const far = f.depthNear + (f.depthFar - f.depthNear) * Math.max(1, count / f.count);
-    this.slots = generateField(count, seed, fovDeg, far).sort((a, b) => a.depth - b.depth);
-    const deepest = this.slots.length > 0 ? this.slots[this.slots.length - 1].depth : f.depthNear;
-    this.maxOffset = Math.max(0, deepest - f.depthNear);
+    // 크기가 0인 순간처럼 비율을 알 수 없으면 정사각형으로 본다
+    if (!(aspect > 0 && Number.isFinite(aspect))) aspect = 1;
+    const tall = 1 / Math.sqrt(Math.min(1, aspect));
+    const near = c.depthNear * tall;
+    const far = near + Math.max(c.minSpan, count / c.cardsPerDepth) * tall;
+    this.slots = generateField(count, seed, fovDeg, {
+      depthNear: near,
+      depthFar: far,
+      spreadDepth: c.spreadDepth * tall,
+      spreadX: Math.min(f.spreadX * c.spread, aspect * c.fitWidth),
+      spreadY: Math.min(f.spreadY * c.spread * tall, c.fitHeight),
+    }).sort((a, b) => a.depth - b.depth);
+    const deepest = this.slots.length > 0 ? this.slots[this.slots.length - 1].depth : near;
+    this.maxOffset = Math.max(0, deepest - near);
   }
 
   get goalOffset(): number {

@@ -12,14 +12,29 @@ export interface FieldSlot {
   floatPeriod: number;
 }
 
+/** 자리 범위. 없는 값은 field 설정을 쓴다 */
+export interface FieldRange {
+  depthNear?: number;
+  depthFar?: number;
+  /** 이보다 깊은 자리는 이 깊이에서의 폭으로 퍼진다(긴 통로) */
+  spreadDepth?: number;
+  /** 좌우·위아래 퍼짐(그 깊이의 화면 반높이 대비). 없으면 field.spreadX·spreadY */
+  spreadX?: number;
+  spreadY?: number;
+}
+
 /**
  * 시야 원뿔 안에 카드 자리를 고르게 흩는다. 화면 좌표(깊이로 나눈 x, y)에서
  * 기존 자리와 가장 먼 후보를 고르는 방식이라 화면에서 겹침이 적다.
- * 시드가 같으면 같은 배치가 나온다. depthFar 를 field.depthFar 보다 깊게 주면 그보다 깊은 자리는
- * field.depthFar 에서의 폭으로 퍼져, 앞으로 날아 들어가며 훑는 긴 통로가 된다.
+ * 시드가 같으면 같은 배치가 나온다. range 로 깊이와 퍼짐을 바꿀 수 있다.
  */
-export function generateField(count: number, seed: number, fovDeg: number, depthFar: number = tuning.field.depthFar): FieldSlot[] {
+export function generateField(count: number, seed: number, fovDeg: number, range_: FieldRange = {}): FieldSlot[] {
   const f = tuning.field;
+  const near = range_.depthNear ?? f.depthNear;
+  const far = range_.depthFar ?? f.depthFar;
+  const spreadDepth = range_.spreadDepth ?? far;
+  const spreadX = range_.spreadX ?? f.spreadX;
+  const spreadY = range_.spreadY ?? f.spreadY;
   const fl = tuning.float;
   const rng = createRng(seed);
   const halfTan = Math.tan((fovDeg * Math.PI) / 360);
@@ -35,8 +50,8 @@ export function generateField(count: number, seed: number, fovDeg: number, depth
       const v = range(rng, -1, 1);
       let nearest = Infinity;
       for (const p of picked) {
-        const du = (u - p.u) * f.spreadX;
-        const dv = (v - p.v) * f.spreadY;
+        const du = (u - p.u) * spreadX;
+        const dv = (v - p.v) * spreadY;
         nearest = Math.min(nearest, du * du + dv * dv);
       }
       if (nearest > bestScore) {
@@ -47,11 +62,11 @@ export function generateField(count: number, seed: number, fovDeg: number, depth
     }
     picked.push({ u: bestU, v: bestV });
 
-    const depth = range(rng, f.depthNear, depthFar);
-    const half = Math.min(depth, f.depthFar) * halfTan;
+    const depth = range(rng, near, far);
+    const half = Math.min(depth, spreadDepth) * halfTan;
     slots.push({
-      x: bestU * f.spreadX * half,
-      y: bestV * f.spreadY * half,
+      x: bestU * spreadX * half,
+      y: bestV * spreadY * half,
       depth,
       yaw: range(rng, -f.yawMax, f.yawMax),
       floatPhase: range(rng, 0, Math.PI * 2),

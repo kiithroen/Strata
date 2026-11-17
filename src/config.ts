@@ -137,10 +137,20 @@ export const tuning = {
 
   /**
    * 카드 공간 보기(카드 보기의 3D 모드): field 배치로 흩은 카드 사이를 앞뒤로 날아 훑는다.
+   * depthNear 는 가장 가까운 자리의 깊이, cardsPerDepth 는 깊이 1 에 놓는 카드 수(깊이 범위는 최소 minSpan),
+   * spreadDepth 는 퍼지는 폭이 더 넓어지지 않는 깊이, spread 는 field.spreadX·spreadY 에 곱하는 배율,
+   * fitWidth·fitHeight 는 카드 중심이 퍼지는 좌우·위아래 폭의 상한(화면 반폭·반높이 대비)이다. 세로 화면에서 깊이·위아래 퍼짐을 늘리는 규칙은 cardField.ts 에 있다.
    * dollyPerPx 는 세로 끌기 1px, wheelDolly 는 휠 deltaY 1, pinchDolly 는 핀치 배율 로그 1 만큼 들어가는 거리,
    * dollyRate 는 앞뒤 이동이 목표를 따라가는 속도(1/초), nearFade 는 카메라에서 이 거리 범위로 다가오면 카드가 사라지는 구간이다
    */
   cardField: {
+    depthNear: 4.4,
+    cardsPerDepth: 3,
+    minSpan: 4,
+    spreadDepth: 8,
+    spread: 0.95,
+    fitWidth: 0.7,
+    fitHeight: 0.85,
     dollyPerPx: 0.04,
     wheelDolly: 0.012,
     pinchDolly: 6,

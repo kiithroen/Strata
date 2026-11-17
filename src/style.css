@@ -326,6 +326,8 @@ body {
 
 .strata-actions button,
 .card-list-close {
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
   background: color-mix(in srgb, var(--bg) 70%, transparent);
@@ -387,11 +389,13 @@ body.card-view-open .strata-actions {
 
 .card-list-toggle {
   display: flex;
+  flex-shrink: 0;
   margin-left: auto;
   border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
 }
 
 .card-list-mode {
+  white-space: nowrap;
   padding: 8px 12px;
   border: 0;
   background: color-mix(in srgb, var(--bg) 70%, transparent);
@@ -409,6 +413,11 @@ body.card-view-open .strata-actions {
 }
 
 .card-list-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
   letter-spacing: 0.06em;
   color: var(--text-dim);

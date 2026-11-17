@@ -190,8 +190,9 @@
 지층 보기의 `카드 보기`로 그 지층에 깔린 노트만 모아 본다. 머리 줄의 토글로 **공간**(3D 카드 공간, 처음 열 때)과 **목록**(2D 카드 목록)을 오간다. 같은 노트 묶음이고 모드를 바꿔도 방문 기록은 쌓지 않는다. 카드 보기 동안에는 우주 보기의 HUD, 시점 표시, 시간 띠, 설정 단추, 지층 단추를 숨긴다.
 
 **공간 모드** (`CardField`)
-- 노트 카드 위젯처럼 카메라 앞 시야 원뿔에 카드를 흩는다(`generateField`, 시드 `field.seed`). 최근 노트가 앞자리다. 카드가 `field.count`보다 많으면 그 비율만큼 깊이(`field.depthNear`~)가 늘고, `field.depthFar`보다 깊은 자리는 `field.depthFar`에서의 폭으로 퍼져 긴 통로가 된다.
-- 세로 끌기(`cardField.dollyPerPx`, 위로 끌면 앞으로), 휠(`cardField.wheelDolly`), 핀치(`cardField.pinchDolly`)로 0~(가장 깊은 자리 − `field.depthNear`) 사이를 앞뒤로 날아 훑는다. 실제 이동은 목표를 `cardField.dollyRate`로 지수 접근한다. 카메라에서 `cardField.nearFade` 범위로 다가온 카드는 사라진다. 카메라 회전·팬·줌은 멈춘다.
+- 노트 카드 위젯처럼 카메라 앞 시야 원뿔에 카드를 흩는다(`generateField`, 시드 `field.seed`). 최근 노트가 앞자리다. 깊이는 `cardField.depthNear`부터 카드 수 / `cardField.cardsPerDepth`만큼(최소 `cardField.minSpan`)이라 카드가 적으면 얕고 촘촘하다. 퍼짐은 `field.spreadX`·`spreadY` × `cardField.spread`이고, `cardField.spreadDepth`보다 깊은 자리는 그 깊이에서의 폭으로 퍼져 긴 통로가 된다.
+- 세로로 긴 화면(가로/세로 비율 a < 1)에서는 깊이를 1/√a 배로 늘리고 위아래 퍼짐도 1/√a 배로 늘린다. 카드 중심은 좌우로 화면 반폭 × `cardField.fitWidth`, 위아래로 반높이 × `cardField.fitHeight`를 넘지 않는다. 화면 비율이 바뀌면(회전, 폴더블) 같은 카드로 다시 배치하고 들어간 비율을 이어 간다.
+- 세로 끌기(`cardField.dollyPerPx`, 위로 끌면 앞으로), 휠(`cardField.wheelDolly`), 핀치(`cardField.pinchDolly`)로 0~(가장 깊은 자리 − 가장 가까운 자리 깊이) 사이를 앞뒤로 날아 훑는다. 실제 이동은 목표를 `cardField.dollyRate`로 지수 접근한다. 카메라에서 `cardField.nearFade` 범위로 다가온 카드는 사라진다. 카메라 회전·팬·줌은 멈춘다.
 - 자세는 카메라 공간이라 매 프레임 카메라 앞에 놓인다. 들어간 정도(0~1)는 `strata.transitionRate`로 접근하고, 지층 자세와 공간 자세를 그만큼 섞는다. 공간에 없는 카드, 층 판·층 낱말(`StrataMode.veil`), 은하 그래프는 사라지고 별 배경만 남는다. 카드는 노트 카드처럼 다시 떠 흔들린다(종이 휨은 없다).
 - 카드를 탭하면 펼치고, 펼친 상태에서 탭하거나 `Esc`를 누르면 닫는다.
 

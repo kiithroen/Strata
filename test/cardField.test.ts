@@ -8,14 +8,31 @@ const f = tuning.field;
 const fovDeg = tuning.camera.fovDeg;
 
 describe('CardField', () => {
-  it('자리는 가까운 것부터이고 카드가 많으면 그만큼 깊어진다', () => {
-    const few = new CardField(f.count, 1, fovDeg);
-    const many = new CardField(f.count * 4, 1, fovDeg);
+  it('자리는 가까운 것부터이고, 깊이 범위는 카드 수에 비례하되 최소 범위가 있다', () => {
+    const c = tuning.cardField;
+    const deepest = (field: CardField) => field.slots[field.slots.length - 1].depth;
+    const few = new CardField(3, 1, fovDeg);
+    for (const s of few.slots) {
+      expect(s.depth).toBeGreaterThanOrEqual(c.depthNear);
+      expect(s.depth).toBeLessThanOrEqual(c.depthNear + c.minSpan);
+    }
+    const count = Math.ceil(c.minSpan * c.cardsPerDepth * 5);
+    const many = new CardField(count, 1, fovDeg);
     for (let i = 1; i < many.slots.length; i++) expect(many.slots[i].depth).toBeGreaterThanOrEqual(many.slots[i - 1].depth);
-    const deepest = (c: CardField) => c.slots[c.slots.length - 1].depth;
-    expect(deepest(few)).toBeLessThanOrEqual(f.depthFar);
-    expect(deepest(many)).toBeGreaterThan(f.depthFar * 2);
-    expect(many.maxOffset).toBeCloseTo(deepest(many) - f.depthNear, 9);
+    expect(deepest(many)).toBeLessThanOrEqual(c.depthNear + count / c.cardsPerDepth);
+    expect(deepest(many)).toBeGreaterThan(c.depthNear + c.minSpan * 3);
+    expect(many.maxOffset).toBeCloseTo(deepest(many) - c.depthNear, 9);
+  });
+
+  it('cardField.spreadDepth 보다 깊어도 그 깊이의 폭 안에 퍼진다', () => {
+    const c = tuning.cardField;
+    const halfTan = Math.tan((fovDeg * Math.PI) / 360);
+    const field = new CardField(Math.ceil(c.minSpan * c.cardsPerDepth * 5), 6, fovDeg);
+    for (const s of field.slots) {
+      const half = Math.min(s.depth, c.spreadDepth) * halfTan;
+      expect(Math.abs(s.x)).toBeLessThanOrEqual(f.spreadX * c.spread * half + 1e-9);
+      expect(Math.abs(s.y)).toBeLessThanOrEqual(f.spreadY * c.spread * half + 1e-9);
+    }
   });
 
   it('앞뒤 이동 목표는 0~maxOffset 으로 잘린다', () => {
@@ -56,11 +73,30 @@ describe('CardField', () => {
   });
 });
 
+describe('CardField 화면 비율', () => {
+  const c = tuning.cardField;
+  const halfTan = Math.tan((fovDeg * Math.PI) / 360);
+
+  it('세로로 긴 화면에서는 1/√비율만큼 멀리 두고, 좌우·위아래 퍼짐은 화면 안 상한을 넘지 않는다', () => {
+    const aspect = 0.45;
+    const tall = 1 / Math.sqrt(aspect);
+    const wide = new CardField(40, 7, fovDeg, 1.8);
+    const narrow = new CardField(40, 7, fovDeg, aspect);
+    expect(narrow.slots[0].depth).toBeGreaterThanOrEqual(c.depthNear * tall - 1e-9);
+    expect(wide.slots[0].depth).toBeLessThan(c.depthNear * tall);
+    for (const s of narrow.slots) {
+      const half = Math.min(s.depth, c.spreadDepth * tall) * halfTan;
+      expect(Math.abs(s.x)).toBeLessThanOrEqual(aspect * c.fitWidth * half + 1e-9);
+      expect(Math.abs(s.y)).toBeLessThanOrEqual(c.fitHeight * half + 1e-9);
+    }
+  });
+});
+
 describe('generateField 긴 통로', () => {
   it('field.depthFar 보다 깊은 자리는 그 깊이의 폭 안에 퍼진다', () => {
     const halfTan = Math.tan((fovDeg * Math.PI) / 360);
     const far = f.depthFar * 3;
-    const slots = generateField(f.count * 3, 5, fovDeg, far);
+    const slots = generateField(f.count * 3, 5, fovDeg, { depthFar: far, spreadDepth: f.depthFar });
     expect(slots.some((s) => s.depth > f.depthFar)).toBe(true);
     for (const s of slots) {
       expect(s.depth).toBeLessThanOrEqual(far);

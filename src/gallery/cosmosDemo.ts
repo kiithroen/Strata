@@ -280,6 +280,15 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
   /** 카드 공간 보기로 들어간 정도(0~1) */
   let fieldMix = 0;
   const fieldPose = createPose();
+  const buildField = (count: number) => new CardField(count, tuning.field.seed, stage.camera.fov, stage.camera.aspect);
+  // 화면 비율이 바뀌면(회전, 폴더블 접기·펼치기) 같은 카드로 다시 배치하고 들어간 비율을 이어 간다
+  const stopFieldResize = stage.onResize(() => {
+    if (!field || !cardList.open) return;
+    const old = field;
+    field = buildField(old.slots.length);
+    if (old.maxOffset > 0) field.dolly((old.goalOffset / old.maxOffset) * field.maxOffset);
+    field.offset = field.goalOffset;
+  });
   const fieldOn = (): boolean => field !== null && cardList.open && cardList.mode === 'space';
   /** 목록은 층별로 펼치고 바라보는 층을 맨 위에 둔다 */
   const openCardList = () => {
@@ -287,7 +296,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     focus.set(null);
     const groups = strata.groups().map((g) => ({ ...g, label: planetByKey.get(g.key)?.date ?? g.label }));
     const members = groups.flatMap((g) => g.members).sort((a, b) => notes[b].time - notes[a].time);
-    field = new CardField(members.length, tuning.field.seed, stage.camera.fov);
+    field = buildField(members.length);
     fieldSlotOf.fill(-1);
     members.forEach((m, i) => (fieldSlotOf[m] = i));
     cardList.show(buildCardSections(groups, notes, photos), strata.focusKey ?? undefined);
@@ -733,6 +742,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       scrubber.update();
     },
     dispose() {
+      stopFieldResize();
       cardList.dispose();
       strata.dispose();
       stopGestures();
