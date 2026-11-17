@@ -47,7 +47,7 @@ import { createCardLook } from '../widgets/noteCard/cardMaterial';
 import { CardField } from '../widgets/noteCard/cardField';
 import { createPose } from '../widgets/noteCard/cardMotion';
 import { NoteCard } from '../widgets/noteCard/NoteCard';
-import { pinPoint } from '../widgets/noteCard/paperPin';
+import { cardEdgePoint } from '../widgets/noteCard/cardEdge';
 import {
   AxisController,
   clusterNotes,
@@ -709,18 +709,20 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
           opened = Math.max(opened, card.motion.focus);
 
-          // 살: 노드에서 그 노트로 뻗는다. 카드로 도는 노트는 카드 중심 뒷면에 이어져 그래프 간선처럼 보이고,
+          // 살: 노드에서 그 노트로 뻗는다. 카드로 도는 노트는 카드 중심을 향하되 화면에서 카드 테두리에서 멈추고,
           // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 카드는 실을 풀고 점으로 돌아간다
           burstOffset(rank, spin, offset, affinity).applyQuaternion(burstQuat);
           target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = orbitFade[m] * (1 - card.motion.focus);
-          pinPoint(
+          const cardScale = card.mesh.scale.x;
+          cardEdgePoint(
+            pos,
+            cameraPosition,
             card.mesh.position,
             card.mesh.quaternion,
-            card.mesh.scale.x,
-            card.layout.worldWidth,
-            -tuning.card.pin.lift,
+            (card.layout.worldWidth * cardScale) / 2,
+            (card.layout.worldHeight * cardScale) / 2,
             pinWorld,
           );
           spokeEnd.copy(dotP).lerp(pinWorld, tied);

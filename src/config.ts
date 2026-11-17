@@ -129,8 +129,6 @@ export const tuning = {
     memo: { widthScales: [0.6, 0.92], fullText: 40, aspect: [0.5, 1.3], titleRatio: 0.07, bodyRatio: 0.058, lineHeight: 1.45 },
     /** 긴 문서는 1:√2 세로 비율이다. 기준 폭 대비 배율 */
     doc: { widthScale: 1.05 },
-    /** 카드 중심에서 연결 선이 닿는 뒷면 오프셋(폭 대비) */
-    pin: { lift: 0.012 },
   },
 
   float: {
