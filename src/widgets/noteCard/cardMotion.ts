@@ -86,6 +86,8 @@ export class CardMotion {
 
   focused = false;
   dimTarget = 0;
+  /** 흔들림 배율(0~1). 0이면 기본 자세 그대로 멈춰 있다(지층에 눕힌 창) */
+  floatScale = 1;
 
   private readonly sample: FloatSample = { y: 0, pitch: 0, roll: 0 };
   private readonly idle = createPose();
@@ -97,10 +99,11 @@ export class CardMotion {
   /** 기본 자세에 흔들림을 더한 떠 있는 자세 */
   idlePose(time: number, home: Pose, out: Pose): Pose {
     const s = floatOffset(time, this.float, this.sample);
+    const k = this.floatScale;
     out.position.copy(home.position);
-    out.position.y += s.y * home.scale;
-    tiltQuat.setFromAxisAngle(axisX, s.pitch);
-    rollQuat.setFromAxisAngle(axisZ, s.roll).premultiply(tiltQuat);
+    out.position.y += s.y * k * home.scale;
+    tiltQuat.setFromAxisAngle(axisX, s.pitch * k);
+    rollQuat.setFromAxisAngle(axisZ, s.roll * k).premultiply(tiltQuat);
     out.quaternion.copy(home.quaternion).multiply(rollQuat);
     out.scale = home.scale;
     return out;

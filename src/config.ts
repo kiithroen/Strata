@@ -341,9 +341,18 @@ export const tuning = {
     /** 카메라가 층을 내려다보는 각(라디안)과 거리 */
     pitch: 0.8,
     distance: 5.2,
-    /** 지층 보기 동안 은하 그래프의 밝기 배율과 종이 휨 배율 */
+    /** 지층 보기 동안 은하 그래프의 밝기 배율 */
     galaxyDim: 0.03,
-    bend: 0.2,
+  },
+
+  /**
+   * 2D 카드 목록(지층 보기의 노트를 읽기 좋게 펼친 HTML 화면).
+   * minColumnPx 는 칸의 최소 폭(CSS px), photoAspect 는 사진 칸 높이/폭 비율의 범위, preloadPx 는 화면 밖 얼마나 미리 사진을 디코딩할지(CSS px)다
+   */
+  cardList: {
+    minColumnPx: 168,
+    photoAspect: [0.6, 1.4],
+    preloadPx: 480,
   },
 
   /**

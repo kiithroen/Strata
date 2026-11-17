@@ -13,6 +13,7 @@ import { ScreenLabels } from '../widgets/common/screenLabels';
 import {
   RegroupBlend,
   buildHubs,
+  bucketLabel,
   burstOffset,
   clusterAffinities,
   facingQuaternion,
@@ -57,6 +58,8 @@ import {
 import { createTimeReadout } from './timeReadout';
 import { createTimeScrubber } from './timeScrubber';
 import { CardFocus } from './cardFocus';
+import { CardListMode } from './cardListMode';
+import { buildCardSections } from '../widgets/cardList/cardListModel';
 import { StrataMode } from './strataMode';
 import type { StrataLayerInput } from '../widgets/strata/strataLayout';
 import type { Stage, WidgetDemo } from './stage';
@@ -91,6 +94,10 @@ export interface CosmosDemo extends WidgetDemo {
   strataState(): { active: boolean; mix: number; layers: number; focus: number };
   /** 화면 좌표(CSS px)에서 처음 닿는 층 판 번호. 없으면 -1 */
   pickStrataLayer(x: number, y: number): number;
+  /** 지층 보기의 노트를 2D 카드 목록으로 연다(`카드로 보기` 단추와 같다) */
+  openCardList(): void;
+  /** 2D 카드 목록 상태: 열림, 카드 수, 사진을 아직 받지 않은 칸 수 */
+  cardListState(): { open: boolean; cards: number; waitingPhotos: number };
 }
 
 /**
@@ -192,6 +199,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       size: g.nodeSize * (1 + 0.15 * Math.sqrt(n)),
       glowSize: g.glowSize * (0.6 + 0.12 * Math.sqrt(n)),
       label: planetLabel(unit, floorTo(unit, cluster.anchorTime), n),
+      /** 2D 카드 목록의 묶음 머리 글자(장수는 목록이 따로 붙인다) */
+      date: bucketLabel(unit, floorTo(unit, cluster.anchorTime)),
       /** 멀리서 보이는 태그 워드 클라우드 */
       words: layoutCloud(topTags(cluster.members.map((m) => notes[m].tags), tuning.cloud.maxWords)),
       affinities,
@@ -206,6 +215,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     label: planetLabel(parent ?? unit, hub.bucket, hub.notes),
     node: { kind: 'hub', key: hub.key, anchorTime: hub.anchorTime, position: new Vector3() } as CosmosNode,
   }));
+  const planetByKey = new Map(planets.map((p) => [p.cluster.key, p]));
   const nodes: CosmosNode[] = [...planets.map((p) => p.node), ...hubViews.map((h) => h.node)];
   let pinnedTime: number | null = newest;
   /** 먼지 흐름을 재는 지난 프레임의 시점 */
@@ -250,13 +260,29 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     initialDistance: c.initialDistance,
   });
 
+  const cardList = new CardListMode('← 지층으로');
+  /** 지층에 깔린 노트만 층별로 2D 카드 목록에 펼치고, 바라보는 층을 맨 위에 둔다 */
+  const openCardList = () => {
+    if (!strata.active) return;
+    focus.set(null);
+    const groups = strata.groups().map((g) => ({ ...g, label: planetByKey.get(g.key)?.date ?? g.label }));
+    cardList.show(buildCardSections(groups, notes, photos), strata.focusKey ?? undefined);
+  };
   const strata = new StrataMode(stage, cameraRig, labels, {
     onEscape: () => {
+      if (cardList.open) {
+        cardList.close();
+        return true;
+      }
       if (!focus.focused) return false;
       focus.set(null);
       return true;
     },
-    onLeave: () => focus.set(null),
+    onLeave: () => {
+      cardList.dismiss();
+      focus.set(null);
+    },
+    onCards: () => openCardList(),
   });
   let strataWasActive = false;
 
@@ -394,6 +420,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
         if (li >= 0) {
           strata.focusLayer(li);
           pinnedTime = strata.focusTime;
+        } else {
+          // 층 판 바깥을 탭하면 은하로 나간다
+          strata.exit();
         }
         return;
       }
@@ -466,6 +495,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
     enterStrata,
     exitStrata: () => strata.exit(),
     pickStrataLayer: (x, y) => strata.pickLayer(x, y),
+    openCardList,
+    cardListState: () => ({ open: cardList.open, ...cardList.stats() }),
     strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
       look.uTime.value = time;
@@ -473,7 +504,8 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       strata.update(dt);
       const mix = strata.mix;
       graph.alphaScale = 1 - mix * (1 - tuning.strata.galaxyDim);
-      look.uBend.value = 1 - mix * (1 - tuning.strata.bend);
+      // 지층에 눕힌 창은 종이 휨과 떠 있는 흔들림 없이 판 위에 가만히 놓인다
+      look.uBend.value = 1 - mix;
       if (strata.active) {
         pinnedTime = strata.focusTime;
         if (pinnedTime !== null) controller.target.focusTime = pinnedTime;
@@ -541,6 +573,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
           const card = cards[m];
           const baseFade = cosmosFade(p.distanceTo(cameraPosition)) * planet.fade * paperFade[m] * (1 - far.cards);
           const fade = strata.blendCard(m, home, baseFade);
+          card.motion.floatScale = 1 - mix;
           card.update(dt, time, home, card === focus.focused ? pose : null, Math.max(card.motion.focus, fade));
 
           // 살: 노드에서 그 노트로 뻗는다. 종이로 나는 노트는 창 제목 줄의 고리에 실로 묶이고,
@@ -625,6 +658,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData): CosmosDemo {
       scrubber.update();
     },
     dispose() {
+      cardList.dispose();
       strata.dispose();
       stopGestures();
       stopResize();

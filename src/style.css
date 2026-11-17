@@ -311,11 +311,21 @@ body {
 }
 
 /* 지층 보기에서 은하로 돌아가는 단추 */
-.strata-back {
+.strata-actions {
   position: fixed;
   left: 16px;
   bottom: calc(env(safe-area-inset-bottom) + 48px);
   z-index: 20;
+  display: flex;
+  gap: 8px;
+}
+
+.strata-actions[hidden] {
+  display: none;
+}
+
+.strata-actions button,
+.card-list-close {
   padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 45%, transparent);
   background: color-mix(in srgb, var(--bg) 70%, transparent);
@@ -326,6 +336,147 @@ body {
   cursor: pointer;
 }
 
-.strata-back[hidden] {
+.card-list {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.card-list[hidden] {
   display: none;
+}
+
+.card-list-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.card-list-title {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.card-list-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 24px);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.card-list-section {
+  padding-top: 18px;
+}
+
+.card-list-heading {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.card-list-heading::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--accent);
+}
+
+.card-list-count {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.card-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--card-list-col), 100%), 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.card-item {
+  --card-tint: var(--accent);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--card-tint) 45%, transparent);
+  background: color-mix(in srgb, var(--card-tint) 6%, var(--bg));
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  min-width: 0;
+}
+
+.card-item.card-memo {
+  background: color-mix(in srgb, var(--card-tint) 16%, var(--bg));
+}
+
+.card-item-photo {
+  margin: -10px -10px 0;
+  background: color-mix(in srgb, var(--card-tint) 10%, var(--bg));
+  overflow: hidden;
+}
+
+.card-item-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.card-item-canvas.loaded {
+  opacity: 1;
+}
+
+.card-item-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.card-item-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--text) 88%, transparent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.card-item.card-doc .card-item-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 12;
+  overflow: hidden;
+}
+
+.card-item-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.card-item-tag {
+  color: var(--card-tint);
 }

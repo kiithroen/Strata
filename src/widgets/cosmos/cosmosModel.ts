@@ -450,26 +450,26 @@ function pad2(n: number): string {
   return n.toString().padStart(2, '0');
 }
 
-/** 행성 글자: 행성 단위의 날짜와 위성 수 */
-export function planetLabel(unit: TimeUnit, bucketStart: number, count: number): string {
+/** 묶음 칸의 날짜 글자(단위에 맞춘 현지 날짜) */
+export function bucketLabel(unit: TimeUnit, bucketStart: number): string {
   const d = new Date(bucketStart);
   const mo = pad2(d.getMonth() + 1);
   const day = pad2(d.getDate());
-  let date: string;
   switch (unit) {
     case 'year':
-      date = `${d.getFullYear()}`;
-      break;
+      return `${d.getFullYear()}`;
     case 'month':
-      date = `${d.getFullYear()}.${mo}`;
-      break;
+      return `${d.getFullYear()}.${mo}`;
     case 'day':
-      date = `${mo}.${day}`;
-      break;
+      return `${mo}.${day}`;
     default:
-      date = `${mo}.${day} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+      return `${mo}.${day} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   }
-  return `${date} · ${count}`;
+}
+
+/** 행성 글자: 행성 단위의 날짜와 위성 수 */
+export function planetLabel(unit: TimeUnit, bucketStart: number, count: number): string {
+  return `${bucketLabel(unit, bucketStart)} · ${count}`;
 }
 
 // ── 묶임이 바뀔 때의 이동 ─────────────────────────────

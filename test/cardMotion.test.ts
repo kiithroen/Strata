@@ -115,6 +115,18 @@ describe('CardMotion 떠 있기', () => {
     }
   });
 
+  it('흔들림 배율이 0이면 기본 자세 그대로다', () => {
+    const m = new CardMotion(FLOAT);
+    m.floatScale = 0;
+    const home = makeHome();
+    home.position.set(1, 2, -3);
+    for (const time of [0.3, 1.7, 4.1]) {
+      const idle = m.idlePose(time, home, createPose());
+      expect(idle.position.distanceTo(home.position)).toBeLessThan(1e-12);
+      expect(idle.quaternion.angleTo(home.quaternion)).toBeLessThan(1e-6);
+    }
+  });
+
   it('흔들림이 설정한 진폭을 넘지 않는다', () => {
     const fl = tuning.float;
     for (let i = 0; i < 2000; i++) {

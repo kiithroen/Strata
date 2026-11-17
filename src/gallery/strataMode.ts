@@ -31,6 +31,8 @@ export interface StrataModeHooks {
   /** Esc 를 눌렀을 때 지층을 나가기 전에 먼저 닫을 것(펼친 카드 등)이 있으면 true 를 낸다 */
   onEscape?: () => boolean;
   onLeave?: () => void;
+  /** 있으면 `카드로 보기` 단추를 띄우고, 누르면 부른다 */
+  onCards?: () => void;
 }
 
 const AXIS_Y = new Vector3(0, 1, 0);
@@ -58,7 +60,7 @@ export class StrataMode {
   private saved: Saved | null = null;
   private pushed = false;
   private readonly view: StrataView;
-  private readonly back: HTMLButtonElement;
+  private readonly actions: HTMLDivElement;
   private readonly pose = createPose();
   private readonly raycaster = new Raycaster();
   private readonly ndc = new Vector2();
@@ -87,13 +89,20 @@ export class StrataMode {
   ) {
     this.view = new StrataView(labels);
     stage.scene.add(this.view.group);
-    this.back = document.createElement('button');
-    this.back.type = 'button';
-    this.back.className = 'strata-back';
-    this.back.textContent = '← 은하로';
-    this.back.hidden = true;
-    this.back.addEventListener('click', () => this.exit());
-    document.body.appendChild(this.back);
+    this.actions = document.createElement('div');
+    this.actions.className = 'strata-actions';
+    this.actions.hidden = true;
+    const button = (text: string, onClick: () => void) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = text;
+      b.addEventListener('click', onClick);
+      this.actions.appendChild(b);
+    };
+    button('← 은하로', () => this.exit());
+    const onCards = hooks?.onCards;
+    if (onCards) button('카드로 보기', onCards);
+    document.body.appendChild(this.actions);
     window.addEventListener('popstate', this.onPop);
     window.addEventListener('keydown', this.onKey);
   }
@@ -115,7 +124,7 @@ export class StrataMode {
     this.rig.focusPoint(origin);
     this.rig.setGoalDistance(s.distance);
     this.rig.orbitTo(s.pitch, this.frame.yaw);
-    this.back.hidden = false;
+    this.actions.hidden = false;
     if (!this.pushed) {
       if (!isStrataHistoryState(history.state)) history.pushState({ strata: true }, '');
       this.pushed = true;
@@ -134,6 +143,16 @@ export class StrataMode {
 
   hasCard(index: number): boolean {
     return this.placed.has(index);
+  }
+
+  /** 층마다 열쇠, 날짜 글자, 깔린 노트 번호(최근 층부터) */
+  groups(): { key: string; label: string; members: number[] }[] {
+    return this.layers.map((layer) => ({ key: layer.key, label: layer.label, members: layer.tiles.map((t) => t.index) }));
+  }
+
+  /** 바라보는 층의 열쇠 */
+  get focusKey(): string | null {
+    return this.layers[this.focus]?.key ?? null;
   }
 
   get focusTime(): number | null {
@@ -232,14 +251,14 @@ export class StrataMode {
   dispose(): void {
     window.removeEventListener('popstate', this.onPop);
     window.removeEventListener('keydown', this.onKey);
-    this.back.remove();
+    this.actions.remove();
     this.stage.scene.remove(this.view.group);
     this.view.dispose();
   }
 
   private leave(): void {
     this.active = false;
-    this.back.hidden = true;
+    this.actions.hidden = true;
     this.hooks?.onLeave?.();
     const saved = this.saved;
     if (saved) {
