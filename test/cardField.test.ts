@@ -1,4 +1,3 @@
-import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { CardField } from '../src/widgets/noteCard/cardField';
@@ -73,25 +72,19 @@ describe('CardField', () => {
     expect(field.fade(0)).toBe(0);
   });
 
-  it('자리 여럿의 가운데는 그 자리들의 카메라 공간 평균이고, 그 깊이에서 가까워지면 사라진다', () => {
+  it('지금 훑는 자리는 처음엔 첫 자리, 들어간 만큼 뒤 자리, 끝까지 들어가면 마지막 자리다', () => {
     const field = new CardField(f.count, 5, fovDeg);
-    const [d0, d1] = tuning.cardField.nearFade;
-    const pick = [1, 4, 7];
-    const pose = createPose();
-    const mean = new Vector3();
-    for (const i of pick) mean.add(field.localPose(i, pose).position);
-    mean.divideScalar(pick.length);
-    const out = new Vector3();
-    field.centroid(pick, out);
-    expect(out.distanceTo(mean)).toBeLessThan(1e-9);
-    // 가운데 깊이를 사라지는 구간 가운데로 데려오면 반쯤 보인다
-    field.dolly(-mean.z - (d0 + d1) / 2);
-    for (let i = 0; i < 600; i++) field.step(1 / 60);
-    const seen = field.centroid(pick, out);
-    expect(out.z).toBeCloseTo(-(d0 + d1) / 2, 3);
-    expect(seen).toBeGreaterThan(0.2);
-    expect(seen).toBeLessThan(0.8);
-    expect(field.centroid([], out)).toBe(0);
+    const settle = (goal: number) => {
+      field.dolly(goal - field.goalOffset);
+      for (let i = 0; i < 600; i++) field.step(1 / 60);
+    };
+    expect(field.frontSlot()).toBe(0);
+    // 다섯째 자리가 기준 깊이(cardField.depthNear, 정사각형 화면)에 오도록 들어간다
+    settle(field.slots[4].depth - tuning.cardField.depthNear);
+    expect(field.frontSlot()).toBe(4);
+    settle(field.maxOffset);
+    expect(field.frontSlot()).toBe(field.slots.length - 1);
+    expect(new CardField(0, 5, fovDeg).frontSlot()).toBe(-1);
   });
 });
 

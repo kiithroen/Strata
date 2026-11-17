@@ -407,6 +407,66 @@ body.card-view-open .strata-actions {
   display: none;
 }
 
+/* 공간 모드에서 지금 훑는 층: 머리 아래 한 줄에 층 이름·몇째 층·장수와 태그 낱말 */
+.card-list-layer {
+  display: none;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 0 16px 12px;
+  pointer-events: none;
+  text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg);
+}
+
+.card-list.space .card-list-layer:not([hidden]) {
+  display: flex;
+}
+
+.card-list-layer.changed {
+  animation: card-list-layer-in 0.35s ease-out;
+}
+
+@keyframes card-list-layer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.card-list-layer-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.card-list-layer-name::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  background: var(--accent);
+}
+
+.card-list-layer-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.card-list-layer-words {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+
+.card-list-layer-word {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .card-list-toggle {
   display: flex;
   flex-shrink: 0;

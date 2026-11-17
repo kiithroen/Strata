@@ -1,4 +1,4 @@
-import { CardListView, type CardViewMode } from '../widgets/cardList/CardListView';
+import { CardListView, type CardLayerInfo, type CardViewMode } from '../widgets/cardList/CardListView';
 import type { CardListSection } from '../widgets/cardList/cardListModel';
 
 function isCardListHistoryState(state: unknown): boolean {
@@ -39,6 +39,11 @@ export class CardListMode {
 
   setMode(mode: CardViewMode): void {
     this.view.setMode(mode);
+  }
+
+  /** 공간 모드 머리 아래에 지금 훑는 층을 적는다(null 이면 감춘다) */
+  setLayer(info: CardLayerInfo | null): void {
+    this.view.setLayer(info);
   }
 
   stats(): { cards: number; waitingPhotos: number } {

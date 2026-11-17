@@ -6,6 +6,15 @@ import { countItems, photoBoxRatio, type CardListItem, type CardListSection } fr
 /** 카드 보기 방식: 3D 공간(목록 화면은 머리만 남기고 뒤의 3D 화면을 보인다) 또는 2D 목록 */
 export type CardViewMode = 'space' | 'list';
 
+/** 공간 모드 머리 아래에 적는 지금 훑는 층: 층 이름, 몇째 층인지(0부터)와 층 수, 그 층의 카드 수, 태그 낱말(많이 쓰인 것부터, 쓰인 정도 0~1) */
+export interface CardLayerInfo {
+  label: string;
+  index: number;
+  total: number;
+  count: number;
+  words: readonly { text: string; weight: number }[];
+}
+
 export interface CardListOptions {
   /** 닫기 단추 글자 */
   closeLabel: string;
@@ -22,6 +31,7 @@ export interface CardListOptions {
 export class CardListView {
   private readonly root: HTMLDivElement;
   private readonly title: HTMLSpanElement;
+  private readonly layer: HTMLDivElement;
   private readonly body: HTMLDivElement;
   private readonly observer: IntersectionObserver;
   private readonly pending = new Map<Element, PhotoSource>();
@@ -65,8 +75,10 @@ export class CardListView {
       this.current = 'space';
     }
     this.applyMode();
+    this.layer = el('div', 'card-list-layer');
+    this.layer.hidden = true;
     this.body = el('div', 'card-list-body');
-    this.root.append(head, this.body);
+    this.root.append(head, this.layer, this.body);
     document.body.appendChild(this.root);
     this.observer = new IntersectionObserver((entries) => this.onIntersect(entries), {
       root: this.body,
@@ -108,9 +120,39 @@ export class CardListView {
     return { cards: this.body.querySelectorAll('.card-item').length, waitingPhotos: this.pending.size };
   }
 
+  /**
+   * 공간 모드 머리 아래 줄에 지금 훑는 층의 이름과 태그를 적는다. null 이면 감춘다.
+   * 낱말 크기는 cloud.px 범위, 색은 강조색에서 많이 쓰인 낱말일수록 흰색 쪽이다(워드 클라우드와 같은 규칙).
+   */
+  setLayer(info: CardLayerInfo | null): void {
+    this.layer.replaceChildren();
+    this.layer.hidden = info === null;
+    if (!info) return;
+    const c = tuning.cloud;
+    const name = el('span', 'card-list-layer-name');
+    name.textContent = info.label;
+    const meta = el('span', 'card-list-layer-meta');
+    meta.textContent = info.total > 1 ? `${info.index + 1}/${info.total} · ${info.count}장` : `${info.count}장`;
+    const words = el('span', 'card-list-layer-words');
+    for (const w of info.words) {
+      const t = el('span', 'card-list-layer-word');
+      t.textContent = w.text;
+      t.style.fontSize = `${Math.round(c.px[0] + (c.px[1] - c.px[0]) * w.weight)}px`;
+      t.style.color = `color-mix(in srgb, white ${Math.round(w.weight * 100)}%, var(--accent))`;
+      t.style.opacity = String(c.alpha * (0.75 + 0.25 * w.weight));
+      words.append(t);
+    }
+    this.layer.append(name, meta, words);
+    // 층이 바뀔 때마다 살짝 나타나는 움직임을 다시 튼다
+    this.layer.classList.remove('changed');
+    void this.layer.offsetWidth;
+    this.layer.classList.add('changed');
+  }
+
   /** focusKey 묶음이 맨 위에 오도록 펼친다 */
   show(sections: readonly CardListSection[], focusKey?: string): void {
     this.reset();
+    this.setLayer(null);
     const gen = ++this.generation;
     this.count = countItems(sections);
     this.applyMode();

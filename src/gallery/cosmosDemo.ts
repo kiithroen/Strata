@@ -7,7 +7,7 @@ import { createFakeNoteData, type NoteData } from '../dev/noteData';
 import { listenGestures } from '../input/gesture';
 import { CameraRig } from '../widgets/camera/cameraRig';
 import { drawCloud } from '../widgets/cloud/CloudView';
-import { farCardHide, layoutCloud, screenFraction, topTags, type PlacedWord } from '../widgets/cloud/wordCloud';
+import { farCardHide, layoutCloud, screenFraction, topTags } from '../widgets/cloud/wordCloud';
 import { LabelCache } from '../widgets/common/labelCache';
 import { ScreenLabels } from '../widgets/common/screenLabels';
 import {
@@ -53,7 +53,7 @@ import { createTimeScrubber } from './timeScrubber';
 import { CardFocus } from './cardFocus';
 import { CardListMode } from './cardListMode';
 import { buildCardSections } from '../widgets/cardList/cardListModel';
-import type { CardViewMode } from '../widgets/cardList/CardListView';
+import type { CardLayerInfo, CardViewMode } from '../widgets/cardList/CardListView';
 import { StrataMode } from './strataMode';
 import type { StrataLayerInput } from '../widgets/strata/strataLayout';
 import type { Stage, WidgetDemo } from './stage';
@@ -309,9 +309,11 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     () => focus.set(null),
   );
   let field: CardField | null = null;
-  /** 카드 공간의 층별 카드 무리: 그 무리 가운데에 층의 워드 클라우드를 띄운다 */
-  let fieldGroups: { key: string; words: readonly PlacedWord[]; slots: number[] }[] = [];
-  const fieldCloudAt = new Vector3();
+  /** 카드 공간의 층들(최근 것부터)과 자리 번호 → 층 번호. 공간 모드 머리에 맨 앞 카드의 층을 적는다 */
+  let fieldLayers: CardLayerInfo[] = [];
+  let fieldLayerOfSlot = new Int32Array(0);
+  /** 머리에 적은 층 번호(-1 이면 비움) */
+  let shownLayer = -1;
   /** 노트 번호 → 카드 공간 자리 번호(-1 이면 공간에 없음). 최근 노트가 앞자리다 */
   const fieldSlotOf = new Int32Array(notes.length).fill(-1);
   /** 카드 공간 보기로 들어간 정도(0~1) */
@@ -336,8 +338,17 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     field = buildField(members.length);
     fieldSlotOf.fill(-1);
     members.forEach((m, i) => (fieldSlotOf[m] = i));
-    fieldGroups = groups.map((grp) => ({ key: grp.key, words: grp.words, slots: grp.members.map((m) => fieldSlotOf[m]) }));
+    fieldLayerOfSlot = new Int32Array(members.length);
+    groups.forEach((grp, li) => grp.members.forEach((m) => (fieldLayerOfSlot[fieldSlotOf[m]] = li)));
+    fieldLayers = groups.map((grp, li) => ({
+      label: grp.label,
+      index: li,
+      total: groups.length,
+      count: grp.members.length,
+      words: grp.words,
+    }));
     cardList.show(buildCardSections(groups, notes, photos), strata.focusKey ?? undefined);
+    shownLayer = -1;
   };
   const strata = new StrataMode(stage, cameraRig, labels, {
     onEscape: () => {
@@ -654,12 +665,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       graph.begin();
       screenLabels.begin();
       strata.measure(cameraPosition, p11, screenLabels);
-      if (fieldMix > 0 && field) {
-        for (const grp of fieldGroups) {
-          const seen = field.centroid(grp.slots, fieldCloudAt);
-          fieldCloudAt.applyQuaternion(stage.camera.quaternion).add(stage.camera.position);
-          drawCloud(screenLabels, fieldCloudAt, grp.words, fieldMix * seen, cameraPosition, `field:${grp.key}`, { onTop: true });
-        }
+      // 카드 공간 머리 아래에 맨 앞에 보이는 카드의 층 이름과 태그를 적는다
+      const front = fieldOn() && field ? field.frontSlot() : -1;
+      const layerNow = front >= 0 ? fieldLayerOfSlot[front] : -1;
+      if (layerNow !== shownLayer) {
+        shownLayer = layerNow;
+        cardList.setLayer(layerNow >= 0 ? fieldLayers[layerNow] : null);
       }
       // 시점이 옮겨 간 시간 거리만큼 먼지가 나선팔을 따라 흐른다(과거로 가면 음수)
       const focusNow = controller.current.focusTime;

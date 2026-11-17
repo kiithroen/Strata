@@ -12,8 +12,6 @@ export interface CloudOptions {
   tint?: Color;
   /** 가장 많이 쓰인 낱말(첫 낱말)의 겹침 정리 차례. 없으면 다른 낱말처럼 쓰인 정도다 */
   leadPriority?: number;
-  /** 앞의 카드에 가리지 않게 위에 그린다(카드 공간) */
-  onTop?: boolean;
 }
 
 /**
@@ -32,7 +30,7 @@ export function drawCloud(
   opts: CloudOptions = {},
 ): void {
   if (alpha < 0.01 || words.length === 0) return;
-  const { tint, leadPriority, onTop } = opts;
+  const { tint, leadPriority } = opts;
   const c = tuning.cloud;
   if (tint) accent.copy(tint);
   else accent.set(tuning.look.accent);
@@ -46,7 +44,6 @@ export function drawCloud(
       color,
       style: 'title',
       priority: i === 0 && leadPriority !== undefined ? leadPriority : w.weight,
-      onTop,
       key: `${key}\u0000${w.text}`,
     });
   });

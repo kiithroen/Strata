@@ -22,6 +22,8 @@ export class CardField {
   /** 지금 앞으로 들어간 거리 */
   offset = 0;
   private goal = 0;
+  /** 가장 가까운 자리가 놓일 수 있는 깊이(세로 화면 배율 포함). 앞뒤 이동의 기준이다 */
+  private readonly near: number;
 
   /** aspect 는 화면 가로/세로 비율이다 */
   constructor(count: number, seed: number, fovDeg: number, aspect = 1) {
@@ -31,6 +33,7 @@ export class CardField {
     if (!(aspect > 0 && Number.isFinite(aspect))) aspect = 1;
     const tall = 1 / Math.sqrt(Math.min(1, aspect));
     const near = c.depthNear * tall;
+    this.near = near;
     const far = near + Math.max(c.minSpan, count / c.cardsPerDepth) * tall;
     this.slots = generateField(count, seed, fovDeg, {
       depthNear: near,
@@ -71,23 +74,20 @@ export class CardField {
   }
 
   /**
-   * 자리 여럿(slots 번호)의 가운데: out 에 카메라 공간 평균 자리를 넣고, 그 깊이의 보이는 정도를 낸다.
-   * 카드 공간에서 층별 카드 무리 위에 워드 클라우드를 띄울 자리다. 자리가 없으면 0 이다.
+   * 지금 훑는 자리: 카메라에서 거리가 가장 가까운 자리가 놓이는 깊이(cardField.depthNear 기준)에 가장 가까운 자리 번호.
+   * 처음에는 첫 자리, 끝까지 들어가면 마지막 자리다. 자리가 없으면 -1 이다. 카드 공간 머리에 지금 훑는 층을 적을 때 쓴다.
    */
-  centroid(indices: readonly number[], out: Vector3): number {
-    out.set(0, 0, 0);
-    if (indices.length === 0) return 0;
-    let depth = 0;
-    for (const i of indices) {
-      const s = this.slots[i];
-      out.x += s.x;
-      out.y += s.y;
-      depth += s.depth;
+  frontSlot(): number {
+    let best = -1;
+    let bestGap = Infinity;
+    for (let i = 0; i < this.slots.length; i++) {
+      const gap = Math.abs(this.slots[i].depth - this.offset - this.near);
+      if (gap < bestGap) {
+        best = i;
+        bestGap = gap;
+      }
     }
-    const n = indices.length;
-    depth /= n;
-    out.set(out.x / n, out.y / n, -(depth - this.offset));
-    return this.fadeAt(depth);
+    return best;
   }
 
   private fadeAt(depth: number): number {
