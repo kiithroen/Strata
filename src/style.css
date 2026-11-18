@@ -766,10 +766,19 @@ body.card-view-open .strata-actions {
   padding: 4px 16px 16px;
 }
 
+/* 가상 스크롤: 높이만 잡는 판 위에 화면 근처 줄의 칸만 옮겨 놓는다. 열 수는 스크립트가 정한다 */
+.explorer-spacer {
+  position: relative;
+}
+
 .explorer-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(var(--explorer-col), 100%), 1fr));
   gap: 10px;
+  will-change: transform;
 }
 
 .explorer-tile {
@@ -815,6 +824,9 @@ body.card-view-open .strata-actions {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.explorer-thumb-image.fade {
   animation: explorer-fade 200ms ease;
 }
 
