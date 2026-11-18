@@ -14,6 +14,8 @@ export interface CardLook {
   uHoloTint: { value: Color };
   uDetailRange: { value: Vector2 };
   uColorRange: { value: Vector2 };
+  /** 읽는 크기 범위. 이 범위에서 글자를 가리는 홀로그램 효과가 걷히고 사진 선이 원래 사진으로 돌아온다 */
+  uReadRange: { value: Vector2 };
   uFarAlpha: { value: number };
   uFocusAlpha: { value: number };
   /** 가로 줄무늬: 빈도, 세기, 흐르는 속도 */
@@ -66,6 +68,7 @@ export function createCardLook(): CardLook {
     uHoloTint: { value: new Color(l.accent) },
     uDetailRange: { value: new Vector2(...lod.detail) },
     uColorRange: { value: new Vector2(...lod.color) },
+    uReadRange: { value: new Vector2(...lod.read) },
     uFarAlpha: { value: lod.farAlpha },
     uFocusAlpha: { value: lod.focusAlpha },
     uStripe: { value: new Vector3(h.stripeFreq, h.stripeStrength, h.stripeSpeed) },
@@ -88,20 +91,22 @@ export function createCardLook(): CardLook {
 }
 
 /**
- * 카드는 평평한 유리판이다. 카드 높이가 화면 높이에서 차지하는 비율로 단순한 모양 ↔ 제대로 된 모양(vDetail), 흑백 ↔ 제 색(vColor)을 정한다.
- * 카드 중심 하나로 재서 한 장 안에서는 같다.
+ * 카드는 평평한 유리판이다. 카드 높이가 화면 높이에서 차지하는 비율로 단순한 모양 ↔ 제대로 된 모양(vDetail), 흑백 ↔ 제 색(vColor),
+ * 훑는 크기 ↔ 읽는 크기(vRead)를 정한다. 카드 중심 하나로 재서 한 장 안에서는 같다.
  */
 const vertexShader = /* glsl */ `
 uniform float uFocus;
 uniform vec2 uCardSize;
 uniform vec2 uDetailRange;
 uniform vec2 uColorRange;
+uniform vec2 uReadRange;
 varying vec2 vUv;
 varying float vDepth;
 varying vec3 vNormalV;
 varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
+varying float vRead;
 void main() {
   vUv = uv;
   vec4 center = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
@@ -109,6 +114,7 @@ void main() {
   float screen = uCardSize.y * scaleY * projectionMatrix[1][1] * 0.5 / max(-center.z, 1e-3);
   vDetail = max(smoothstep(uDetailRange.x, uDetailRange.y, screen), uFocus);
   vColor = max(smoothstep(uColorRange.x, uColorRange.y, screen), uFocus);
+  vRead = max(smoothstep(uReadRange.x, uReadRange.y, screen), uFocus);
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vDepth = -mv.z;
   vViewPos = mv.xyz;
@@ -159,6 +165,7 @@ varying vec3 vNormalV;
 varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
+varying float vRead;
 
 // 감마 밝기(사람 눈에 고르게). bias 는 밉맵 단계를 더 흐리게 고른다
 float gammaLum(vec2 p, float bias) {
@@ -179,6 +186,8 @@ vec3 iris(float t) {
 
 void main() {
   float live = 1.0 - uFocus;
+  // 글자·사진 위에 얹히는 효과(색 갈라짐, 무지개빛, 줄무늬, 광택, 사진 선)의 세기. 읽는 크기로 다가오면 걷힌다. 테두리 빛은 live 를 그대로 쓴다
+  float veil = live * (1.0 - vRead);
   vec3 nrm = normalize(vNormalV);
   vec3 viewDir = normalize(-vViewPos);
   float facing = abs(dot(nrm, viewDir));
@@ -186,9 +195,9 @@ void main() {
 
   // 양면 홀로그램: 뒤에서 봐도 글자가 바로 읽히게 가로를 뒤집는다
   vec2 uv = vec2(gl_FrontFacing ? vUv.x : 1.0 - vUv.x, vUv.y);
-  // 선의 빨강·파랑이 옆으로 살짝 갈라진다(비스듬할수록 더). 펼친 카드는 글이 또렷하게 갈라지지 않는다
+  // 선의 빨강·파랑이 옆으로 살짝 갈라진다(비스듬할수록 더). 읽는 크기의 카드는 글이 또렷하게 갈라지지 않는다
   vec4 detail = texture2D(map, uv);
-  vec2 split = vec2(uChroma * (0.4 + graze) * live, 0.0);
+  vec2 split = vec2(uChroma * (0.4 + graze) * veil, 0.0);
   detail.r = texture2D(map, uv + split).r;
   detail.b = texture2D(map, uv - split).b;
   vec4 color = mix(texture2D(mapSimple, uv), detail, vDetail);
@@ -203,8 +212,8 @@ void main() {
   color.a = mix(color.a, max(color.a, uFocusAlpha * body), uFocus);
 
   // 사진 홀로그램: 사진 칸을 카드 색 가로 선으로 다시 그린다. 선은 흐린 사진 밝기만큼 휘고 굵어지며 천천히 흐른다.
-  // 선이 화면에서 너무 촘촘하면(멀리 있는 카드) 물결무늬가 생기지 않게 선이 덮는 평균 밝기로 칠한다. 펼친 카드는 원래 사진이다
-  if (uPhotoOn > 0.5 && uPhotoOn < 1.5 && uPhotoRect.z > uPhotoRect.x && live > 0.0) {
+  // 선이 화면에서 너무 촘촘하면(멀리 있는 카드) 물결무늬가 생기지 않게 선이 덮는 평균 밝기로 칠한다. 읽는 크기로 다가오면 원래 사진으로 돌아온다
+  if (uPhotoOn > 0.5 && uPhotoOn < 1.5 && uPhotoRect.z > uPhotoRect.x && veil > 0.0) {
     vec2 lo = uPhotoRect.xy;
     vec2 hi = uPhotoRect.zw;
     float inside = step(lo.x, uv.x) * step(uv.x, hi.x) * step(lo.y, uv.y) * step(uv.y, hi.y);
@@ -217,12 +226,12 @@ void main() {
     float line = 1.0 - smoothstep(thick - aa, thick + aa, fromCenter);
     line = mix(line, thick, smoothstep(0.25, 0.5, fwidth(ly)));
     vec3 holo = uHoloTint * (uPhotoTone.x * l + (1.0 - uPhotoTone.x) * line * (0.35 + 0.65 * l)) * uPhotoTone.y;
-    color.rgb = mix(color.rgb, holo, inside * live);
+    color.rgb = mix(color.rgb, holo, inside * veil);
   }
 
   // 사진 선화: 둘레 평균보다 어두운 획(흰 바탕의 글자)과 밝기가 갑자기 바뀌는 윤곽만 카드 색 선으로 남기고 나머지는 비운다.
-  // 이웃 거리를 화면 px 로 잡아(fwidth) 카드가 멀어도 가까워도 선 굵기가 비슷하다. 펼친 카드는 원래 사진이다
-  if (uPhotoOn > 1.5 && uPhotoRect.z > uPhotoRect.x && live > 0.0) {
+  // 이웃 거리를 화면 px 로 잡아(fwidth) 카드가 멀어도 가까워도 선 굵기가 비슷하다. 읽는 크기로 다가오면 원래 사진으로 돌아온다
+  if (uPhotoOn > 1.5 && uPhotoRect.z > uPhotoRect.x && veil > 0.0) {
     vec2 lo = uPhotoRect.xy;
     vec2 hi = uPhotoRect.zw;
     float inside = step(lo.x, uv.x) * step(uv.x, hi.x) * step(lo.y, uv.y) * step(uv.y, hi.y);
@@ -242,8 +251,8 @@ void main() {
     float around = gammaLum(uv, uSketchTone.x);
     float ink = smoothstep(uSketchRange.z, uSketchRange.w, around - here);
     float stroke = max(edge, ink);
-    color.rgb = mix(color.rgb, uHoloTint * uSketchTone.w * stroke, inside * live);
-    color.a = mix(color.a, color.a * mix(uSketchTone.z, 1.0, stroke), inside * live);
+    color.rgb = mix(color.rgb, uHoloTint * uSketchTone.w * stroke, inside * veil);
+    color.a = mix(color.a, color.a * mix(uSketchTone.z, 1.0, stroke), inside * veil);
   }
 
   // 그림 밝기 누르기: 무릎 위 밝기는 천장에 다가갈 뿐 넘지 않아 흰 바탕 사진이 블룸에 번지지 않는다. 펼친 카드는 제 밝기다
@@ -257,14 +266,14 @@ void main() {
   vec3 rainbow = iris(phase + (vUv.x + vUv.y) * 0.35);
 
   // 비스듬히 볼수록 무지개빛 막이 짙다
-  color.rgb += rainbow * uIris * (0.15 + graze) * body * live;
+  color.rgb += rainbow * uIris * (0.15 + graze) * body * veil;
 
   // 가는 가로 줄무늬가 천천히 위로 흐르고 줄 사이는 조금 투명해진다. 빛을 더하지 않아 하얗게 뜨지 않는다.
   // 줄이 화면에서 너무 촘촘해지면(멀리 있는 카드) 물결무늬가 생기지 않게 옅어진다
   float sy = (vUv.y - uTime * uStripe.z) * uStripe.x;
   float stripe = pow(0.5 + 0.5 * sin(sy * 6.28318530718), 2.0);
   float fine = 1.0 - smoothstep(0.3, 0.6, fwidth(sy));
-  color.a *= 1.0 - uStripe.y * (1.0 - stripe) * fine * live;
+  color.a *= 1.0 - uStripe.y * (1.0 - stripe) * fine * veil;
 
   // 테두리 빛: 겉모양 선을 따라 종류 색을 더해 블룸이 걸리게 하고, 그 위로 꼬리 달린 빛이 테두리를 따라 돈다.
   // 도는 위치는 카드 가운데에서 본 각도로 잰다. 카드마다 출발점이 다르다
@@ -282,7 +291,7 @@ void main() {
   // 유리 표면 광택: 시선 각도에 따른 은은한 대각선 반사와 윗변·왼쪽 안쪽 베벨 하이라이트
   float diag = (vUv.x * 0.65 + vUv.y * 0.85) + dot(viewDir.xy, vec2(0.45, 0.55));
   float sheenBand = pow(max(0.0, 1.0 - abs(fract(diag * 0.45) - 0.5) * 2.4), 3.0);
-  float sheen = sheenBand * uGlass.x * (0.45 + graze * 0.85) * body * live;
+  float sheen = sheenBand * uGlass.x * (0.45 + graze * 0.85) * body * veil;
   float topLeft = smoothstep(-0.3, 0.7, vUv.y - vUv.x * 0.7);
   float bevel = exp(-abs(edgeD - uBorder.x * 1.4) / max(uBorder.x * 0.9, 0.002)) * uGlass.y * (0.35 + 0.65 * topLeft) * body * live;
   color.rgb += mix(uHoloTint, vec3(1.0), 0.55) * (sheen + bevel * 0.5);

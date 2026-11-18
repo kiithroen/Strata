@@ -30,7 +30,7 @@ export const tuning = {
     background: '#020814',
     accent: '#38d4ff',
     text: '#d3f1ff',
-    textDim: '#5e8aa6',
+    textDim: '#7ea4bd',
     fogNear: 6,
     fogFar: 22,
     focusEdgeWidth: 0.012,
@@ -68,7 +68,8 @@ export const tuning = {
     },
     /**
      * 홀로그램 색. kinds 는 사진·문서의 선·글자 색, memoColors 는 메모가 고르는 포스트잇 색이다. 멀리서 흑백으로 바꿀 때도 그 카드 색으로 물든다.
-     * fill 은 카드 바탕, 나머지는 선 색에서 낸 흐린 선·옅은 선·빈 사진 칸의 불투명도, glowRatio 는 선과 글자의 빛 번짐(폭 대비)이다
+     * fill 은 카드 바탕, 나머지는 선 색에서 낸 흐린 선·옅은 선·빈 사진 칸의 불투명도, glowRatio 는 선과 제목 글자의 빛 번짐(폭 대비)이다.
+     * 본문 글자에는 빛 번짐을 두지 않는다
      */
     holo: {
       kinds: { photo: '#48d6ff', doc: '#7fa4ff' },
@@ -80,19 +81,21 @@ export const tuning = {
       glowRatio: 0.016,
       /** 메모·문서 바탕에 까는 종류 색 유리 그라데이션의 위·아래 불투명도, 문서 괘선의 불투명도 */
       washAlpha: [0.5, 0.26],
-      docWashAlpha: [0.4, 0.18],
-      ruleAlpha: 0.18,
-      /** 메모·문서 글자색이 카드 색에서 흰색 쪽으로 밝아지는 비율 */
+      docWashAlpha: [0.3, 0.12],
+      ruleAlpha: 0.12,
+      /** 메모·문서의 제목·본문 글자색이 카드 색에서 흰색 쪽으로 밝아지는 비율 */
       inkLift: 0.6,
+      bodyInkLift: 0.9,
     },
     /** 멀리서 쓰는 단순한 모양: 사진 모자이크 가로 칸 수, 글 줄 막대 높이·간격(텍스처 폭 대비) */
     simple: { photoBlocks: 9, barRatio: 0.045, barGapRatio: 0.085 },
     /**
      * 멀고 가까움에 따른 모습. 값은 카드 높이가 화면 높이에서 차지하는 비율이다.
      * detail 범위에서 단순한 모양이 제대로 된 모양으로, color 범위에서 흑백이 제 색으로 바뀐다.
+     * read 범위에서 글자·사진 위에 얹힌 홀로그램 효과(색 갈라짐·무지개빛·줄무늬·광택·사진 선)가 걷힌다. 테두리 빛은 남는다.
      * farAlpha 는 단순한 모양일 때의 불투명도 배율, focusAlpha 는 펼친 카드 바탕의 최소 불투명도(뒤가 비쳐 글이 흐려지지 않게)다
      */
-    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], farAlpha: 0.78, focusAlpha: 0.94 },
+    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], read: [0.14, 0.3], farAlpha: 0.78, focusAlpha: 0.94 },
     /**
      * 홀로그램 빛. stripe* 는 카드를 가로지르는 가는 줄무늬의 빈도(카드 높이당 줄 수)·세기(줄 사이가 투명해지는 정도)·
      * 위로 흐르는 속도(카드 높이/초), iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기,

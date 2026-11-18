@@ -2,9 +2,10 @@
   /* 첫 그림 전 기본값. main.ts 가 tuning.look 으로 덮어쓴다 */
   --bg: #020814;
   --text: #d3f1ff;
-  --text-dim: #5e8aa6;
+  --text-dim: #7ea4bd;
   --accent: #38d4ff;
-  --mono: ui-monospace, "Cascadia Mono", Consolas, "D2Coding", monospace;
+  /* 영문·숫자는 고정폭, 한글은 고정폭 한글 글꼴 대신 산세리프로 받친다 */
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
 }
 
 html,
@@ -34,6 +35,7 @@ body {
   touch-action: none;
 }
 
+/* 자간은 영문·숫자 줄(탭, 시점 표시)에만 준다. 한글 문구는 자간 0 이다 */
 .hud {
   position: fixed;
   left: 0;
@@ -64,6 +66,8 @@ body {
   bottom: calc(env(safe-area-inset-bottom) + 14px);
   color: var(--text-dim);
   text-align: center;
+  letter-spacing: 0;
+  text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg);
 }
 
 /* 탭이 화면 폭을 넘으면 줄을 바꾸지 않고 가로로 민다 */
@@ -104,6 +108,7 @@ body {
   letter-spacing: 0.06em;
   color: var(--text);
   pointer-events: none;
+  text-shadow: 0 0 6px var(--bg), 0 0 2px var(--bg);
 }
 
 .axis-readout::before {
@@ -195,7 +200,7 @@ body {
   border-radius: 999px;
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--text) 32%, transparent);
   background: color-mix(in srgb, var(--bg) 68%, transparent);
@@ -243,7 +248,7 @@ body {
   background: var(--accent);
   padding: 2px 6px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .settings-panel button {
@@ -353,7 +358,7 @@ body {
   color: var(--text);
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
@@ -436,7 +441,7 @@ body.card-view-open .strata-actions {
 .card-list-layer-name {
   font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   color: var(--text);
 }
 
@@ -489,7 +494,7 @@ body.card-view-open .strata-actions {
   color: var(--text-dim);
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
@@ -506,7 +511,7 @@ body.card-view-open .strata-actions {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   color: var(--text-dim);
 }
 
@@ -714,7 +719,7 @@ body.card-view-open .strata-actions {
   color: var(--text);
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1117,7 +1122,7 @@ body.explorer-open .hud-bottom {
   min-width: 0;
   font-family: var(--mono);
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   color: var(--card-tint);
 }
 
@@ -1131,7 +1136,7 @@ body.explorer-open .hud-bottom {
   color: var(--text);
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
@@ -1408,7 +1413,7 @@ body.explorer-open .hud-bottom {
 .note-editor-label {
   font-family: var(--mono);
   font-size: 12px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   color: var(--text-dim);
 }
 

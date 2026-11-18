@@ -46,8 +46,10 @@ export function holoTint(face: Pick<CardFace, 'id' | 'kind' | 'tint'>): string {
 /** 선 색에서 낸 칠 색들 */
 interface Palette {
   line: string;
-  /** 메모·문서 글자색: 카드 색을 흰색 쪽으로 밝혀 색을 깐 바탕 위에서도 읽힌다 */
+  /** 메모·문서 제목 글자색: 카드 색을 흰색 쪽으로 밝혀 색을 깐 바탕 위에서도 읽힌다 */
   ink: string;
+  /** 메모·문서 본문 글자색: 제목보다 더 흰색에 가깝다 */
+  bodyInk: string;
   dim: string;
   faint: string;
   band: string;
@@ -60,11 +62,15 @@ function palette(face: CardFace): Palette {
   const h = tuning.card.holo;
   const c = new Color(holoTint(face));
   const rgba = (a: number) => `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${a})`;
-  const ink = c.clone().lerp(new Color(1, 1, 1), h.inkLift);
+  const lift = (t: number) => {
+    const l = c.clone().lerp(new Color(1, 1, 1), t);
+    return `rgb(${Math.round(l.r * 255)}, ${Math.round(l.g * 255)}, ${Math.round(l.b * 255)})`;
+  };
   const wash = face.kind === 'doc' ? h.docWashAlpha : h.washAlpha;
   return {
     line: rgba(1),
-    ink: `rgb(${Math.round(ink.r * 255)}, ${Math.round(ink.g * 255)}, ${Math.round(ink.b * 255)})`,
+    ink: lift(h.inkLift),
+    bodyInk: lift(h.bodyInkLift),
     dim: rgba(h.dimAlpha),
     faint: rgba(h.faintAlpha),
     band: rgba(h.bandAlpha),
@@ -99,7 +105,7 @@ function toTexture(canvas: HTMLCanvasElement, anisotropy: number): CanvasTexture
   return texture;
 }
 
-/** 선과 글자에 빛 번짐을 켜고 끈다. 사진과 바탕에는 쓰지 않는다. unit 은 레이아웃 기준 폭이다 */
+/** 선과 제목 글자에 빛 번짐을 켜고 끈다. 사진·바탕·본문 글자에는 쓰지 않는다. unit 은 레이아웃 기준 폭이다 */
 function glow(ctx: CanvasRenderingContext2D, color: string | null, unit: number): void {
   if (color === null) {
     ctx.shadowBlur = 0;
@@ -366,16 +372,16 @@ function drawMemo(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLay
     }
     y += m.titleGap;
   }
+  glow(ctx, null, u);
   if (face.body) {
     ctx.font = `${m.bodySize}px ${SANS}`;
-    ctx.fillStyle = p.ink;
+    ctx.fillStyle = p.bodyInk;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / m.bodyLineH));
     for (const l of wrapLines(ctx, face.body, content.width, maxLines)) {
       ctx.fillText(l, content.x, y);
       y += m.bodyLineH;
     }
   }
-  glow(ctx, null, u);
 }
 
 /** 문서: 굵은 제목과 공책 괘선 위의 촘촘한 문단 */
@@ -407,8 +413,7 @@ function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayo
   }
   ctx.stroke();
 
-  glow(ctx, p.line, w);
-  ctx.fillStyle = p.ink;
+  ctx.fillStyle = p.bodyInk;
   if (face.body) {
     ctx.font = `${bodySize}px ${SANS}`;
     const maxLines = Math.max(1, Math.floor((content.y + content.height - y) / lineH));
@@ -417,7 +422,6 @@ function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayo
       y += lineH;
     }
   }
-  glow(ctx, null, w);
 }
 
 /** 상태 줄: 찍은 시각 */
