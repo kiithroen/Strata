@@ -1,5 +1,5 @@
 import { tuning } from '../../config';
-import { decodeText, formatSize } from './explorerModel';
+import { formatSize, TextChunkDecoder } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 
 export interface MediaViewerOptions {
@@ -192,26 +192,55 @@ export class MediaViewer {
     }
   }
 
+  /**
+   * 텍스트를 explorer.textChunkBytes 씩 앞에서부터 읽는다. 첫 조각을 보이고, 끝에서 explorer.preloadPx 안으로 스크롤하면
+   * 다음 조각을 이어 붙인다. 조각 경계에 걸친 글자는 TextChunkDecoder 가 다음 조각과 잇는다
+   */
   private async renderText(file: File): Promise<void> {
     const gen = this.generation;
-    const max = tuning.explorer.textMaxBytes;
-    const truncated = file.size > max;
-    let bytes: Uint8Array;
-    try {
-      bytes = new Uint8Array(await file.slice(0, max).arrayBuffer());
-    } catch {
+    const chunk = tuning.explorer.textChunkBytes;
+    const decoder = new TextChunkDecoder();
+    const pre = document.createElement('pre');
+    pre.className = 'viewer-text';
+    const note = document.createElement('p');
+    note.className = 'viewer-text-note';
+    let offset = 0;
+    let loading = false;
+    const updateNote = () => {
+      const rest = offset < file.size ? ` · ${Math.floor((offset / file.size) * 100)}% 읽음, 내리면 이어 읽는다` : '';
+      note.textContent = `${decoder.encoding.toUpperCase()} · ${formatSize(file.size)}${rest}`;
+    };
+    /** 다음 조각을 읽어 붙인다. 읽지 못하면 false */
+    const readNext = async (): Promise<boolean> => {
+      const end = Math.min(file.size, offset + chunk);
+      let bytes: Uint8Array;
+      try {
+        bytes = new Uint8Array(await file.slice(offset, end).arrayBuffer());
+      } catch {
+        return false;
+      }
+      if (gen !== this.generation) return false;
+      offset = end;
+      pre.append(decoder.push(bytes, offset >= file.size));
+      updateNote();
+      return true;
+    };
+    /** 끝 근처까지 스크롤했거나 글이 화면을 다 채우지 못하면 이어 읽는다 */
+    const fill = async () => {
+      if (loading) return;
+      loading = true;
+      while (offset < file.size && gen === this.generation && pre.scrollHeight - pre.scrollTop - pre.clientHeight < tuning.explorer.preloadPx) {
+        if (!(await readNext())) break;
+      }
+      loading = false;
+    };
+    if (!(await readNext())) {
       if (gen === this.generation) this.message('파일을 읽을 수 없다');
       return;
     }
-    if (gen !== this.generation) return;
-    const { text, encoding } = decodeText(bytes, truncated);
-    const pre = document.createElement('pre');
-    pre.className = 'viewer-text';
-    pre.textContent = text;
-    const note = document.createElement('p');
-    note.className = 'viewer-text-note';
-    note.textContent = `${encoding.toUpperCase()} · ${formatSize(file.size)}${truncated ? ` · 앞 ${formatSize(max)}만 표시` : ''}`;
     this.stage.append(note, pre);
+    pre.addEventListener('scroll', () => void fill(), { passive: true });
+    void fill();
   }
 
   /** 같은 폴더에서 지금 다음에 오는 음악으로 넘긴다. 없으면 멈춘다 */

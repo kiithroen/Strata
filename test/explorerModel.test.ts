@@ -10,6 +10,7 @@ import {
   kindOf,
   parentPath,
   sortEntries,
+  TextChunkDecoder,
   visibleEntries,
 } from '../src/widgets/explorer/explorerModel';
 import type { FileEntry } from '../src/widgets/explorer/fileSource';
@@ -102,6 +103,43 @@ describe('decodeText', () => {
   it('앞부분만 읽어 끝 글자가 잘렸으면 그 글자만 버리고 UTF-8 로 읽는다', () => {
     const cut = utf8.subarray(0, 4); // '안' 3바이트 + '녕' 의 첫 바이트
     expect(decodeText(cut, true)).toEqual({ text: '안', encoding: 'utf-8' });
+  });
+});
+
+describe('TextChunkDecoder', () => {
+  /** bytes 를 size 바이트씩 잘라 이어 읽는다 */
+  const readChunks = (bytes: Uint8Array, size: number) => {
+    const d = new TextChunkDecoder();
+    let text = '';
+    for (let i = 0; i < bytes.length; i += size) text += d.push(bytes.subarray(i, i + size), i + size >= bytes.length);
+    return { text, encoding: d.encoding };
+  };
+  const source = '가나다 abc 한글 줄\n'.repeat(20);
+
+  it('조각 경계에 걸친 UTF-8 글자를 다음 조각과 이어 읽는다', () => {
+    const bytes = new TextEncoder().encode(source);
+    for (const size of [1, 2, 5, 7, 64]) expect(readChunks(bytes, size)).toEqual({ text: source, encoding: 'utf-8' });
+  });
+
+  it('앞 조각이 모두 ASCII 였다가 깨지면 EUC-KR 로 바꿔 읽는다', () => {
+    // 'abc' + '가'(EUC-KR B0A1) + 'd'
+    const bytes = new Uint8Array([0x61, 0x62, 0x63, 0xb0, 0xa1, 0x64]);
+    expect(readChunks(bytes, 3)).toEqual({ text: 'abc가d', encoding: 'euc-kr' });
+    // EUC-KR 두 바이트 글자가 조각 경계에 걸쳐도 잇는다
+    expect(readChunks(bytes, 4)).toEqual({ text: 'abc가d', encoding: 'euc-kr' });
+  });
+
+  it('UTF-8 글자를 읽은 뒤 깨진 바이트는 대체 글자로 두고 UTF-8 로 계속 읽는다', () => {
+    const head = new TextEncoder().encode('한');
+    const bytes = new Uint8Array([...head, 0x61, 0xff, 0x62]);
+    const { text, encoding } = readChunks(bytes, head.length + 1);
+    expect(encoding).toBe('utf-8');
+    expect(text.startsWith('한a') && text.endsWith('b') && text.includes('\ufffd')).toBe(true);
+  });
+
+  it('BOM 은 첫 조각에서만 보고 떼어 낸다', () => {
+    const bytes = new Uint8Array([0xff, 0xfe, 0x48, 0x00, 0x69, 0x00, 0x21, 0x00]);
+    expect(readChunks(bytes, 3)).toEqual({ text: 'Hi!', encoding: 'utf-16le' });
   });
 });
 

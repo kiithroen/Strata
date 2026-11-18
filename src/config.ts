@@ -462,7 +462,7 @@ export const tuning = {
    * decodeConcurrency 는 동시에 디코딩하는 썸네일 수, preloadPx 는 격자가 화면 위아래 얼마까지 칸을 만들고 썸네일을 미리 만들지(CSS px),
    * thumbQuality 는 썸네일 JPEG 품질(0~1), thumbCacheMB 는 페이지가 열려 있는 동안 썸네일을 담아 두는 캐시 상한(MB),
    * videoThumbConcurrency 는 동시에 장면을 뽑는 동영상 썸네일 수,
-   * textMaxBytes 는 텍스트 뷰어가 앞에서부터 읽는 최대 바이트, swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
+   * textChunkBytes 는 텍스트 뷰어가 앞에서부터 한 번에 이어 읽는 바이트(끝 근처까지 내리면 다음 조각을 읽는다), swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
    * kindColors 는 칸 종류 색이다.
    * 은하로 보기: cosmosMaxFiles 는 하위 폴더까지 카드로 만드는 파일 수 상한, readConcurrency 는 동시에 읽는 파일 수,
    * cardTextBytes 는 텍스트 문서 카드에 담는 앞부분 바이트, videoThumbAt 은 동영상 카드·썸네일에 쓰는 장면 자리(길이 대비),
@@ -476,7 +476,7 @@ export const tuning = {
     thumbQuality: 0.8,
     thumbCacheMB: 96,
     videoThumbConcurrency: 2,
-    textMaxBytes: 2_000_000,
+    textChunkBytes: 512 * 1024,
     swipePx: 60,
     cosmosMaxFiles: 600,
     readConcurrency: 8,

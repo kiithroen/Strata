@@ -95,16 +95,50 @@ export function formatSize(bytes: number): string {
 }
 
 /**
- * 텍스트 파일 바이트를 글로 바꾼다. BOM 이 있으면 그 인코딩, 없으면 UTF-8 로 읽고 깨진 바이트가 있으면
- * 한국어 윈도우 기본 인코딩(EUC-KR)으로 다시 읽는다. truncated 면 앞부분만 읽은 것이라 끝에서 잘린 글자는 버린다
+ * 텍스트 파일을 앞에서부터 조각으로 이어 읽는 디코더. 첫 조각에 BOM 이 있으면 그 인코딩, 없으면 UTF-8 로 읽고,
+ * 깨진 바이트가 나왔을 때 그때까지 읽은 바이트가 모두 ASCII 면 한국어 윈도우 기본 인코딩(EUC-KR)으로 바꿔 그 조각부터 다시 읽는다.
+ * 이미 UTF-8 글자를 읽은 뒤 깨지면 UTF-8 로 계속 읽고 깨진 바이트만 대체 글자로 둔다. 조각 경계에 걸친 글자는 다음 조각과 이어 읽는다
+ */
+export class TextChunkDecoder {
+  private decoder: TextDecoder | null = null;
+  private ascii = true;
+  encoding = 'utf-8';
+
+  /** 다음 조각을 글로 바꾼다. last 면 마지막 조각이라 남은 바이트를 마저 내보낸다 */
+  push(bytes: Uint8Array, last: boolean): string {
+    let body = bytes;
+    if (!this.decoder) {
+      const bom: [number[], string][] = [
+        [[0xef, 0xbb, 0xbf], 'utf-8'],
+        [[0xff, 0xfe], 'utf-16le'],
+        [[0xfe, 0xff], 'utf-16be'],
+      ];
+      const hit = bom.find(([mark]) => mark.every((b, i) => bytes[i] === b));
+      if (hit) {
+        this.encoding = hit[1];
+        this.ascii = false;
+        this.decoder = new TextDecoder(hit[1]);
+        body = bytes.subarray(hit[0].length);
+      } else this.decoder = new TextDecoder('utf-8', { fatal: true });
+    }
+    let text: string;
+    try {
+      text = this.decoder.decode(body, { stream: !last });
+    } catch {
+      this.encoding = this.ascii ? 'euc-kr' : 'utf-8';
+      this.decoder = new TextDecoder(this.encoding);
+      text = this.decoder.decode(body, { stream: !last });
+    }
+    if (this.ascii) this.ascii = body.every((b) => b < 0x80);
+    return text;
+  }
+}
+
+/**
+ * 텍스트 파일 바이트를 글로 바꾼다(TextChunkDecoder 의 한 조각). truncated 면 앞부분만 읽은 것이라 끝에서 잘린 글자는 버린다
  */
 export function decodeText(bytes: Uint8Array, truncated = false): { text: string; encoding: string } {
-  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return { text: new TextDecoder('utf-8').decode(bytes.subarray(3)), encoding: 'utf-8' };
-  if (bytes[0] === 0xff && bytes[1] === 0xfe) return { text: new TextDecoder('utf-16le').decode(bytes.subarray(2)), encoding: 'utf-16le' };
-  if (bytes[0] === 0xfe && bytes[1] === 0xff) return { text: new TextDecoder('utf-16be').decode(bytes.subarray(2)), encoding: 'utf-16be' };
-  try {
-    return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes, { stream: truncated }), encoding: 'utf-8' };
-  } catch {
-    return { text: new TextDecoder('euc-kr').decode(bytes), encoding: 'euc-kr' };
-  }
+  const d = new TextChunkDecoder();
+  const text = d.push(bytes, !truncated);
+  return { text, encoding: d.encoding };
 }
