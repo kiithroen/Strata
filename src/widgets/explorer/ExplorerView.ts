@@ -1,4 +1,5 @@
 import { tuning } from '../../config';
+import { formatStamp } from '../../core/format';
 import { TaskQueue } from '../../core/taskQueue';
 import { gridLayout, visibleRows, type GridLayout } from './explorerGrid';
 import { breadcrumbs, extensionOf, formatSize, isViewable, parentPath, sortEntries, visibleEntries, type SortKey } from './explorerModel';
@@ -29,6 +30,44 @@ export function isExplorerState(state: unknown): state is HistoryState {
 
 const SORT_LABEL: Record<SortKey, string> = { name: '이름순', modified: '최근 수정순', size: '큰 파일순' };
 
+/** 칸 모양: 썸네일 격자 또는 이름·크기·수정 시각 열의 목록 */
+export type ViewMode = 'grid' | 'list';
+
+interface Prefs {
+  mode: ViewMode;
+  sort: SortKey;
+}
+
+const PREFS_KEY = 'strata.explorer';
+
+/** 기기에 남긴 보기 방식과 정렬. 저장소를 못 쓰거나 값이 깨져 있으면 기본값이다 */
+function loadPrefs(): Prefs {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>;
+    return {
+      mode: raw.mode === 'list' ? 'list' : 'grid',
+      sort: raw.sort && raw.sort in SORT_LABEL ? raw.sort : 'name',
+    };
+  } catch {
+    return { mode: 'grid', sort: 'name' };
+  }
+}
+
+function savePrefs(prefs: Prefs): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // 저장하지 못하면 이번 실행에만 적용된다
+  }
+}
+
+/** 목록 보기 머리 줄의 열: 누르면 그 열로 정렬한다 */
+const LIST_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: 'name', label: '이름' },
+  { key: 'size', label: '크기' },
+  { key: 'modified', label: '수정 시각' },
+];
+
 /**
  * 로컬 탐색기 화면(2D): 경로 막대, 폴더·파일 썸네일 격자, 상태 줄. 폴더를 누르면 들어가고 파일을 누르면 뷰어로 연다.
  * 폴더를 옮길 때마다 방문 기록을 쌓아 브라우저·안드로이드 뒤로가 위 폴더로 간다. 격자는 화면 근처 줄의 칸만 만들고(가상 스크롤),
@@ -41,6 +80,8 @@ export class ExplorerView {
   private readonly upButton: HTMLButtonElement;
   private readonly cosmosButton: HTMLButtonElement;
   private readonly sortSelect: HTMLSelectElement;
+  private readonly modeButton: HTMLButtonElement;
+  private readonly listHead: HTMLDivElement;
   private readonly body: HTMLDivElement;
   private readonly spacer: HTMLDivElement;
   private readonly grid: HTMLDivElement;
@@ -60,7 +101,8 @@ export class ExplorerView {
   private shown: FileEntry[] = [];
   private layout: GridLayout | null = null;
   private range = { first: -1, last: -1 };
-  private sortKey: SortKey = 'name';
+  private sortKey: SortKey;
+  private mode: ViewMode;
   private generation = 0;
   private viewerPushed = false;
 
@@ -104,14 +146,16 @@ export class ExplorerView {
       o.textContent = SORT_LABEL[key];
       this.sortSelect.append(o);
     }
-    this.sortSelect.addEventListener('change', () => {
-      this.sortKey = this.sortSelect.value as SortKey;
-      this.renderEntries();
-    });
+    const prefs = loadPrefs();
+    this.sortKey = prefs.sort;
+    this.mode = prefs.mode;
+    this.sortSelect.value = this.sortKey;
+    this.sortSelect.addEventListener('change', () => this.setSort(this.sortSelect.value as SortKey));
+    this.modeButton = this.button('', () => this.setMode(this.mode === 'grid' ? 'list' : 'grid'));
     this.cosmosButton = this.button('은하로 보기', () => void this.openCosmos());
     this.cosmosButton.hidden = !options.showInCosmos;
     const openButton = this.button('폴더 열기', () => void this.pick());
-    actions.append(this.sortSelect, this.cosmosButton, openButton);
+    actions.append(this.sortSelect, this.modeButton, this.cosmosButton, openButton);
     head.append(this.upButton, this.path, actions);
 
     this.body = document.createElement('div');
@@ -122,6 +166,18 @@ export class ExplorerView {
     this.grid = document.createElement('div');
     this.grid.className = 'explorer-grid';
     this.spacer.append(this.grid);
+    this.listHead = document.createElement('div');
+    this.listHead.className = 'explorer-list-head';
+    for (const c of LIST_COLUMNS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.key = c.key;
+      b.textContent = c.label;
+      b.addEventListener('click', () => this.setSort(c.key));
+      this.listHead.append(b);
+    }
+    this.listHead.prepend(document.createElement('span'));
+    this.applyMode();
     this.status = document.createElement('footer');
     this.status.className = 'explorer-status';
     this.root.append(head, this.body, this.status);
@@ -153,11 +209,12 @@ export class ExplorerView {
   }
 
   /** 지금 원본·폴더·보이는 항목 수(확인 스크립트용) */
-  state(): { source: string | null; dir: string; entries: number; tiles: number; thumbsPending: number; viewer: FileEntry | null } {
+  state(): { source: string | null; dir: string; entries: number; mode: ViewMode; tiles: number; thumbsPending: number; viewer: FileEntry | null } {
     return {
       source: this.source?.name ?? null,
       dir: this.dir,
       entries: this.entries.length,
+      mode: this.mode,
       tiles: this.rendered.size,
       thumbsPending: this.inflight.size,
       viewer: this.viewer.current,
@@ -210,6 +267,38 @@ export class ExplorerView {
       this.viewerPushed = true;
     }
     this.viewer.show(source, items, index);
+  }
+
+  /** 정렬을 바꾸고 다시 그린다 */
+  setSort(key: SortKey): void {
+    this.sortKey = key;
+    this.sortSelect.value = key;
+    this.savePrefs();
+    this.applyMode();
+    if (this.source) this.renderEntries();
+  }
+
+  /** 격자·목록 보기를 바꾸고 다시 그린다 */
+  setMode(mode: ViewMode): void {
+    this.mode = mode;
+    this.savePrefs();
+    this.applyMode();
+    if (this.source) this.renderEntries();
+  }
+
+  private savePrefs(): void {
+    savePrefs({ mode: this.mode, sort: this.sortKey });
+  }
+
+  /** 보기 방식 단추 글과 목록 머리 줄의 정렬 표시를 지금 상태에 맞춘다 */
+  private applyMode(): void {
+    this.modeButton.textContent = this.mode === 'grid' ? '목록 보기' : '격자 보기';
+    this.grid.classList.toggle('list', this.mode === 'list');
+    for (const b of this.listHead.querySelectorAll<HTMLButtonElement>('button')) {
+      const active = b.dataset.key === this.sortKey;
+      b.classList.toggle('active', active);
+      b.dataset.dir = active ? (this.sortKey === 'name' ? '↑' : '↓') : '';
+    }
   }
 
   dispose(): void {
@@ -301,7 +390,8 @@ export class ExplorerView {
       p.textContent = hidden > 0 ? `열 수 있는 파일이 없다 (숨긴 파일 ${hidden}개)` : '빈 폴더다';
       this.body.replaceChildren(p);
     } else {
-      this.body.replaceChildren(this.spacer);
+      if (this.mode === 'list') this.body.replaceChildren(this.listHead, this.spacer);
+      else this.body.replaceChildren(this.spacer);
       this.relayout();
     }
     const folders = this.shown.filter((e) => e.kind === 'folder').length;
@@ -317,18 +407,20 @@ export class ExplorerView {
     const width = this.spacer.clientWidth;
     if (width === 0) return;
     const gap = parseFloat(getComputedStyle(this.grid).rowGap) || 0;
-    const columns = gridLayout(width, tuning.explorer.tileMinPx, gap, 0, 0).columns;
+    // 목록 보기는 한 줄에 하나다
+    const minTile = this.mode === 'list' ? Infinity : tuning.explorer.tileMinPx;
+    const columns = gridLayout(width, minTile, gap, 0, 0).columns;
     const rowHeight = this.measureTile((width - gap * (columns - 1)) / columns);
-    const layout = gridLayout(width, tuning.explorer.tileMinPx, gap, rowHeight, this.shown.length);
+    const layout = gridLayout(width, minTile, gap, rowHeight, this.shown.length);
     this.layout = layout;
     this.spacer.style.height = `${layout.height}px`;
     this.grid.style.gridTemplateColumns = `repeat(${layout.columns}, minmax(0, 1fr))`;
     this.renderRange(true);
   }
 
-  /** 칸 하나의 높이(px): 보이지 않는 견본 칸을 tileWidth 폭으로 그려 잰다. 칸 높이는 썸네일 비율과 글자 줄로 정해진다 */
+  /** 칸 하나의 높이(px): 보이지 않는 견본 칸을 tileWidth 폭으로 그려 잰다. 격자 칸 높이는 썸네일 비율과 글자 줄로 정해진다 */
   private measureTile(tileWidth: number): number {
-    const probe = this.tile({ name: 'probe', path: '', kind: 'other', size: 0, modified: 0 });
+    const probe = this.item({ name: 'probe', path: '', kind: 'other', size: 0, modified: 0 });
     probe.style.cssText = `position:absolute;visibility:hidden;width:${tileWidth}px`;
     this.spacer.append(probe);
     const h = probe.offsetHeight;
@@ -352,7 +444,7 @@ export class ExplorerView {
     for (let i = start; i < end; i++) {
       const e = this.shown[i];
       const reused = old.get(e.path);
-      const t = reused ?? this.tile(e);
+      const t = reused ?? this.item(e);
       // 썸네일 작업이 칸이 있는지 보므로 먼저 적는다
       this.rendered.set(e.path, t);
       if (!reused && (e.kind === 'image' || e.kind === 'video')) this.attachThumb(t, e);
@@ -362,10 +454,11 @@ export class ExplorerView {
     this.grid.replaceChildren(...tiles);
   }
 
-  private tile(e: FileEntry): HTMLButtonElement {
+  /** 항목 하나의 칸: 격자 보기는 썸네일 칸, 목록 보기는 작은 썸네일과 이름·크기·수정 시각 줄이다 */
+  private item(e: FileEntry): HTMLButtonElement {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'explorer-tile';
+    b.className = this.mode === 'list' ? 'explorer-tile explorer-row' : 'explorer-tile';
     b.dataset.kind = e.kind;
     b.title = e.name;
     const thumb = document.createElement('div');
@@ -377,16 +470,22 @@ export class ExplorerView {
     } else {
       const ext = document.createElement('span');
       ext.className = 'explorer-ext';
-      ext.textContent = (extensionOf(e.name) || e.kind).slice(0, 5).toUpperCase();
+      ext.textContent = (extensionOf(e.name) || e.kind).slice(0, this.mode === 'list' ? 4 : 5).toUpperCase();
       thumb.append(ext);
     }
     const name = document.createElement('span');
     name.className = 'explorer-name';
     name.textContent = e.name;
-    const meta = document.createElement('span');
-    meta.className = 'explorer-meta';
-    meta.textContent = e.kind === 'folder' ? '폴더' : formatSize(e.size);
-    b.append(thumb, name, meta);
+    const size = document.createElement('span');
+    size.className = 'explorer-meta';
+    size.textContent = e.kind === 'folder' ? '폴더' : formatSize(e.size);
+    b.append(thumb, name, size);
+    if (this.mode === 'list') {
+      const date = document.createElement('span');
+      date.className = 'explorer-meta explorer-date';
+      date.textContent = e.modified > 0 ? formatStamp(new Date(e.modified)) : '';
+      b.append(date);
+    }
     b.addEventListener('click', () => {
       if (e.kind === 'folder') void this.navigate(e.path);
       else if (isViewable(e.kind)) this.openFile(e.path);

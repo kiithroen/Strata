@@ -781,6 +781,106 @@ body.card-view-open .strata-actions {
   will-change: transform;
 }
 
+/* 목록 보기: 작은 썸네일 | 이름 | 크기 | 수정 시각 */
+.explorer-grid.list {
+  gap: 2px;
+}
+
+.explorer-tile.explorer-row,
+.explorer-list-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 76px 128px;
+  align-items: center;
+  gap: 12px;
+}
+
+.explorer-tile.explorer-row {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.explorer-tile.explorer-row:hover {
+  border-color: color-mix(in srgb, var(--tint) 45%, transparent);
+}
+
+.explorer-row .explorer-thumb {
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+
+.explorer-row .explorer-ext {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.explorer-row .explorer-folder-icon {
+  width: 60%;
+  border-width: 1.5px;
+}
+
+.explorer-row .explorer-folder-icon::before {
+  top: -5px;
+  height: 4px;
+  border-width: 1.5px;
+}
+
+.explorer-row .explorer-name {
+  font-size: 14px;
+}
+
+.explorer-row .explorer-meta {
+  text-align: right;
+  font-size: 12px;
+}
+
+.explorer-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 -16px 4px;
+  padding: 6px 26px;
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.explorer-list-head button {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.explorer-list-head button:nth-of-type(n + 2) {
+  text-align: right;
+}
+
+.explorer-list-head button.active {
+  color: var(--accent);
+}
+
+.explorer-list-head button.active::after {
+  content: " " attr(data-dir);
+}
+
+/* 좁은 화면의 목록은 수정 시각 열을 줄인다 */
+@media (max-width: 560px) {
+  .explorer-tile.explorer-row,
+  .explorer-list-head {
+    grid-template-columns: 30px minmax(0, 1fr) 60px 110px;
+    gap: 8px;
+  }
+
+  .explorer-row .explorer-date {
+    font-size: 11px;
+  }
+}
+
 .explorer-tile {
   --tint: var(--kind-other);
   display: flex;

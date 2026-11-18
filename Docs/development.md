@@ -116,7 +116,7 @@ npm run build
   - 시간축: 위에 더해 `controller`(`AxisController`), `clusters()`
   - 우주 보기: 시간축에 더해 `hubs()`, `nodes()`(지난 프레임의 행성·허브 노드), `screenOf(월드 위치)`(탭할 화면 좌표, CSS px), `tapNode(노드)`(은하 탭 두 단계를 거친다)·`approachedKey()`(다가간 노드 키), `enterStrata(노드)`(바로 들어간다)·`exitStrata()`, `strataState()`, `pickStrataLayer(x, y)`, `openCardList()`(지층 보기의 카드 보기)·`setCardMode('space' | 'list')`·`cardListState()`
   - 우주 보기(이어서): `noteScreens`(`viewer`, `editor`(`fill({ title, body, checklist, tags, tint })`, `setPhotoFile(File)`, `draft()`), `openNote(번호)`, `compose()`, `edit(id)`), `openSearch(검색어)`(찾은 수), `openNodeCards()`(다가간 노드의 카드 보기)
-  - 로컬 탐색기: `openFiles(File[])`(파일 목록으로 원본을 연다. 폴더 고르기 창은 스크립트로 열 수 없어 확인 스크립트는 `webkitRelativePath`를 붙인 `File`로 폴더 구조를 넘긴다), `view.state()`(원본·폴더·항목 수·DOM 에 만든 칸 수·만드는 중인 썸네일·뷰어 파일), `view.navigate(경로)`, `view.openFile(경로)`, `view.viewer`(`step(±1)`, `close()`)
+  - 로컬 탐색기: `openFiles(File[])`(파일 목록으로 원본을 연다. 폴더 고르기 창은 스크립트로 열 수 없어 확인 스크립트는 `webkitRelativePath`를 붙인 `File`로 폴더 구조를 넘긴다), `view.state()`(원본·폴더·항목 수·보기 방식·DOM 에 만든 칸 수·만드는 중인 썸네일·뷰어 파일), `view.navigate(경로)`, `view.setMode('grid' | 'list')`, `view.setSort('name' | 'modified' | 'size')`, `view.openFile(경로)`, `view.viewer`(`step(±1)`, `close()`)
 - `importFiles(File[])`: 설정 화면의 실데이터 불러오기와 같다. 결과 글을 돌려준다. 확인 스크립트는 `OffscreenCanvas.convertToBlob`으로 만든 JPEG 바이트를 `File`로 감싸 넘긴다
 - `ready`: 메모 앨범 저장소를 열고 첫 화면을 띄우면 끝나는 약속. 확인 스크립트는 이것을 기다린 뒤 `demo`를 쓴다
 - `albumCount()`: 메모 앨범에 저장된 노트 수
