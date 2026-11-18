@@ -196,6 +196,8 @@ export interface NoteRef {
   body?: string;
   /** 지금 글로 만든 AI 요약. 카드가 중간 거리에서 본문 대신 쓴다 */
   summary?: string;
+  /** tags 가운데 AI 가 붙인 태그. 노트 보기가 다른 색으로 보인다 */
+  autoTags?: readonly string[];
   /** 체크리스트 노트의 항목. 노트 보기가 체크 칸으로 그린다 */
   checklist?: readonly ChecklistItem[];
   /** 메모 포스트잇 색 번호(card.holo.memoColors). 없으면 노트 번호로 고른다 */

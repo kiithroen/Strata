@@ -493,11 +493,22 @@ export const tuning = {
     swipePx: 60,
     swipeRatio: 1.5,
     /**
-     * AI 요약: 본문(체크리스트는 항목 글)이 minChars 자 이상인 메모·문서를 Claude API 로 maxChars 자 안팎의 요약으로 만든다.
-     * 앱을 열 때와 노트를 저장한 뒤, 그리고 열려 있는 동안 intervalSec 초마다 요약이 없거나 내용이 바뀐 노트를 최근 것부터 perRun 개씩 요약한다.
-     * model·effort 는 요청에 쓰는 모델과 생각 깊이다
+     * AI 요약: 본문(체크리스트는 항목 글)이 minChars 자 이상인 메모·문서를 Gemini API 로 maxChars 자 안팎의 요약과 maxTags 개까지의 태그로 만든다.
+     * 앱을 열 때, 노트를 저장하고 settleSec 초 뒤, 그리고 열려 있는 동안 intervalSec 초마다 요약이 없거나 글이 바뀐 노트를 최근 것부터 perRun 개씩 요약한다.
+     * 고친 지 settleSec 초가 안 된 노트는 고치는 중으로 보고 미룬다. vocabularySize 는 태그를 고를 때 보여 주는 앨범의 자주 쓴 태그 수다.
+     * model·thinkingLevel 은 요청에 쓰는 모델과 생각 깊이다
      */
-    summary: { minChars: 60, maxChars: 60, intervalSec: 600, perRun: 8, model: 'claude-opus-5-5', effort: 'low' },
+    summary: {
+      minChars: 60,
+      maxChars: 60,
+      maxTags: 3,
+      vocabularySize: 40,
+      settleSec: 120,
+      intervalSec: 600,
+      perRun: 8,
+      model: 'gemini-4-hydrogen',
+      thinkingLevel: 'low',
+    },
   },
 
   dev: {

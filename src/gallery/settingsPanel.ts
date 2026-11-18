@@ -16,17 +16,20 @@ import { type AppSettings, saveSettings } from './settings';
 
 /** 설정 화면이 다루는 AI 요약 동작 */
 export interface SummaryControls {
-  /** 키를 바꾼 뒤 요약을 다시 시작한다(빈 키는 멈춘다) */
+  /** 키를 바꾼 뒤 요약을 다시 시작한다(빈 키면 개발 서버 프록시로, 그것도 없으면 멈춘다) */
   restart(apiKey: string): void;
+  /** 이 키로 요약을 어디로 보내는지 */
+  route(apiKey: string): 'key' | 'dev' | null;
   status(): SummaryStatus | null;
   /** 상태가 바뀔 때 부를 함수를 건다. null 이면 뗀다 */
   listen(listener: ((status: SummaryStatus | null) => void) | null): void;
   runNow(): void;
 }
 
-function summaryStatusText(status: SummaryStatus | null): string {
-  if (!status) return '키를 넣으면 긴 메모·문서를 Claude 로 요약해 카드가 멀 때 본문 대신 보여 준다. 키는 이 기기 브라우저에만 저장한다.';
+function summaryStatusText(status: SummaryStatus | null, route: 'key' | 'dev' | null): string {
+  if (!status) return 'Gemini API 키를 넣으면 긴 메모·문서를 요약하고 태그를 붙인다. 요약은 카드가 멀 때 본문 대신 보인다. 키는 이 기기 브라우저에만 저장한다.';
   const parts = [status.running ? '요약하는 중' : `요약 대기 ${status.pending}`, `이번 실행에 만든 요약 ${status.done}`];
+  if (route === 'dev') parts.unshift('개발 서버의 GEMINI_API_KEY 로 요약한다');
   if (status.error) parts.push(`마지막 오류: ${status.error}`);
   return parts.join(' · ');
 }
@@ -94,7 +97,7 @@ export class SettingsPanel {
     document.body.appendChild(this.panel);
     window.addEventListener('keydown', this.onKey);
     summary.listen((status) => {
-      if (this.summaryNote) this.summaryNote.textContent = summaryStatusText(status);
+      if (this.summaryNote) this.summaryNote.textContent = summaryStatusText(status, this.summary.route(this.settings.geminiKey));
     });
   }
 
@@ -193,9 +196,10 @@ export class SettingsPanel {
     p.append(apply);
   }
 
-  /** AI 요약: 키가 없으면 입력 칸과 저장, 있으면 지금 요약과 키 지우기 */
+  /** AI 요약: 키가 있으면 지금 요약과 키 지우기, 없으면 입력 칸과 저장(개발 서버 프록시가 있으면 지금 요약도) */
   private renderSummary(p: HTMLElement): void {
-    if (this.settings.summaryKey) {
+    const route = this.summary.route(this.settings.geminiKey);
+    if (this.settings.geminiKey) {
       p.append(
         row('AI 요약', [
           choice('지금 요약', false, () => this.summary.runNow()),
@@ -205,7 +209,7 @@ export class SettingsPanel {
     } else {
       const input = el('input', 'settings-input');
       input.type = 'password';
-      input.placeholder = 'Claude API 키';
+      input.placeholder = 'Gemini API 키';
       input.autocomplete = 'off';
       input.spellcheck = false;
       const save = choice('저장', false, () => this.setSummaryKey(input.value.trim()));
@@ -213,15 +217,16 @@ export class SettingsPanel {
         if (e.key === 'Enter') save.click();
         e.stopPropagation();
       });
-      p.append(row('AI 요약', [input, save]));
+      const items = route === 'dev' ? [choice('지금 요약', false, () => this.summary.runNow()), input, save] : [input, save];
+      p.append(row('AI 요약', items));
     }
-    this.summaryNote = el('p', 'settings-note', summaryStatusText(this.summary.status()));
+    this.summaryNote = el('p', 'settings-note', summaryStatusText(this.summary.status(), route));
     p.append(this.summaryNote);
   }
 
   private setSummaryKey(key: string): void {
-    if (this.settings.summaryKey === key) return;
-    this.settings.summaryKey = key;
+    if (this.settings.geminiKey === key) return;
+    this.settings.geminiKey = key;
     saveSettings(this.settings);
     this.summary.restart(key);
     this.render();

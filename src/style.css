@@ -1405,6 +1405,11 @@ body.explorer-open .hud-bottom {
   color: var(--card-tint);
 }
 
+/* AI 가 붙인 태그: 사용자 태그보다 흐리게 */
+.note-viewer-tag.auto {
+  color: var(--text-dim);
+}
+
 .note-editor-body {
   display: flex;
   flex-direction: column;

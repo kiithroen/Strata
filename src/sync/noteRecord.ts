@@ -24,8 +24,11 @@ export interface NoteRecord {
   tint?: number;
   /** 사진 파일 이름과 크기(레이아웃 비율에 미리 쓴다) */
   photo?: { file: string; width: number; height: number };
-  /** AI 요약. source 는 요약할 때 글의 contentKey 이고, 지금 글과 다르면 지난 요약이다 */
-  summary?: { text: string; source: string };
+  /**
+   * AI 요약과 AI 가 붙인 태그. source 는 요약할 때 글의 contentKey 이고, 지금 글과 다르면 지난 요약이다.
+   * 지난 요약의 글은 쓰지 않지만 태그는 새 요약이 올 때까지 그대로 쓴다
+   */
+  summary?: { text: string; tags?: string[]; source: string };
   deleted?: boolean;
 }
 
@@ -70,7 +73,10 @@ export function parseNoteRecord(json: unknown): NoteRecord | null {
     out.photo = { file: p.file, width: p.width, height: p.height };
   }
   const sm = r.summary as Record<string, unknown> | undefined;
-  if (sm && isStr(sm.text) && sm.text.length > 0 && isStr(sm.source)) out.summary = { text: sm.text, source: sm.source };
+  if (sm && isStr(sm.text) && sm.text.length > 0 && isStr(sm.source)) {
+    out.summary = { text: sm.text, source: sm.source };
+    if (Array.isArray(sm.tags)) out.summary.tags = sm.tags.filter(isStr);
+  }
   if (r.deleted === true) out.deleted = true;
   return out;
 }
@@ -80,9 +86,17 @@ export function noteText(record: Pick<NoteRecord, 'body' | 'checklist'>): string
   return record.checklist ? checklistText(record.checklist) : record.body;
 }
 
-/** 제목과 글로 낸 짧은 지문(FNV-1a 32비트, 16진수). 요약이 지금 글로 만든 것인지 가릴 때 쓴다 */
+/** AI 요약에 넘기는 글: 체크리스트 노트는 항목 글만 줄마다 적고(끝냄 표시 없이), 아니면 본문이다 */
+export function summaryText(record: Pick<NoteRecord, 'body' | 'checklist'>): string | undefined {
+  return record.checklist ? record.checklist.map((it) => it.text).join('\n') : record.body;
+}
+
+/**
+ * 제목과 요약할 글로 낸 짧은 지문(FNV-1a 32비트, 16진수). 요약이 지금 글로 만든 것인지 가릴 때 쓴다.
+ * 체크리스트 항목을 끝냄으로 바꾸는 것만으로는 바뀌지 않는다
+ */
 export function contentKey(record: Pick<NoteRecord, 'title' | 'body' | 'checklist'>): string {
-  const text = `${record.title ?? ''}\n${noteText(record) ?? ''}`;
+  const text = `${record.title ?? ''}\n${summaryText(record) ?? ''}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);
@@ -94,6 +108,20 @@ export function contentKey(record: Pick<NoteRecord, 'title' | 'body' | 'checklis
 /** 지금 글로 만든 요약. 없거나 지난 요약이면 undefined */
 export function freshSummary(record: NoteRecord): string | undefined {
   return record.summary && record.summary.source === contentKey(record) ? record.summary.text : undefined;
+}
+
+/** 기록의 태그와 AI 태그를 합친 것(사용자 태그 먼저, 대소문자를 가리지 않고 겹치면 뺀다)과 그중 AI 태그 */
+export function noteTags(record: NoteRecord): { tags: string[]; auto: string[] } {
+  const tags = [...(record.tags ?? [])];
+  const seen = new Set(tags.map((t) => t.toLowerCase()));
+  const auto: string[] = [];
+  for (const t of record.summary?.tags ?? []) {
+    if (seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    tags.push(t);
+    auto.push(t);
+  }
+  return { tags, auto };
 }
 
 /** 키 순서와 상관없이 같은 값이면 같은 글이 되는 JSON(객체 키를 정렬한다) */
@@ -157,16 +185,20 @@ export function albumNotes(records: readonly NoteRecord[]): { notes: NoteRef[]; 
   const live = records.filter((r) => !r.deleted).sort((a, b) => b.time - a.time || (a.id < b.id ? -1 : 1));
   return {
     records: live,
-    notes: live.map((r) => ({
-      id: r.id,
-      time: r.time,
-      kind: r.kind,
-      title: r.title,
-      body: noteText(r),
-      summary: freshSummary(r),
-      checklist: r.checklist,
-      tags: r.tags,
-      tint: r.tint,
-    })),
+    notes: live.map((r) => {
+      const { tags, auto } = noteTags(r);
+      return {
+        id: r.id,
+        time: r.time,
+        kind: r.kind,
+        title: r.title,
+        body: noteText(r),
+        summary: freshSummary(r),
+        checklist: r.checklist,
+        tags: tags.length > 0 ? tags : undefined,
+        autoTags: auto.length > 0 ? auto : undefined,
+        tint: r.tint,
+      };
+    }),
   };
 }

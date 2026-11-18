@@ -7,8 +7,8 @@ export interface AppSettings {
   /** 사진 카드의 사진 칸을 그리는 방식. 기본은 홀로그램 선 */
   photoStyle: PhotoStyle;
   quality: Partial<QualityValues>;
-  /** AI 요약에 쓰는 Claude API 키. 비어 있으면 요약하지 않는다 */
-  summaryKey: string;
+  /** AI 요약에 쓰는 Gemini API 키. 비어 있으면 개발 서버 프록시가 있을 때만 요약한다 */
+  geminiKey: string;
 }
 
 const KEY = 'strata.settings';
@@ -23,7 +23,7 @@ export function loadSettings(): AppSettings {
       perf: parsed.perf === true,
       photoStyle: readPhotoStyle(parsed),
       quality: sanitizeQuality(parsed.quality),
-      summaryKey: typeof parsed.summaryKey === 'string' ? parsed.summaryKey : '',
+      geminiKey: typeof parsed.geminiKey === 'string' ? parsed.geminiKey : '',
     };
   } catch {
     return defaults();
@@ -31,7 +31,7 @@ export function loadSettings(): AppSettings {
 }
 
 function defaults(): AppSettings {
-  return { perf: false, photoStyle: 'lines', quality: {}, summaryKey: '' };
+  return { perf: false, photoStyle: 'lines', quality: {}, geminiKey: '' };
 }
 
 /** 저장된 사진 표현. 예전 켜고 끄기 값(photoFx: false)은 원래 사진으로 읽는다 */

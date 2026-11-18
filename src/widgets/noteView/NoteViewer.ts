@@ -15,6 +15,8 @@ export interface ViewedNote {
   /** 있으면 체크리스트 노트다. 본문 대신 체크 칸 목록을 그린다 */
   checklist?: readonly ChecklistItem[];
   tags: readonly string[];
+  /** tags 가운데 AI 가 붙인 태그 */
+  autoTags?: readonly string[];
   tint?: number;
   photo?: PhotoSource;
 }
@@ -146,7 +148,7 @@ export class NoteViewer {
     time.textContent = formatStamp(new Date(note.time));
     foot.append(time);
     for (const tag of note.tags) {
-      const t = el('span', 'note-viewer-tag');
+      const t = el('span', note.autoTags?.includes(tag) ? 'note-viewer-tag auto' : 'note-viewer-tag');
       t.textContent = `#${tag}`;
       foot.append(t);
     }

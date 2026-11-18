@@ -2,7 +2,7 @@ import { Album } from '../album/album';
 import { draftFromRecord } from '../album/albumModel';
 import { MemoryNoteStore, openNoteStore } from '../album/noteStore';
 import { bakePhotoCopy, readTakenAt } from '../album/photoCopy';
-import { claudeSummarizer } from '../album/claudeSummarizer';
+import { geminiSummarizer } from '../album/geminiSummarizer';
 import { SummaryRunner, type SummaryStatus } from '../album/summaries';
 import { tuning } from '../config';
 import { appHooks } from './appHooks';
@@ -31,21 +31,33 @@ export async function openAlbum(): Promise<void> {
 let mounted: CosmosDemo | null = null;
 let runner: SummaryRunner | null = null;
 let summaryTimer: number | null = null;
+/** 저장한 노트가 settleSec 을 지나면 돌릴 차례 */
+let settleTimer: number | null = null;
 let summaryListener: ((status: SummaryStatus | null) => void) | null = null;
 
+/** 요약을 어디로 보내는지: 설정의 키로 Gemini API 에 바로, 개발 서버 프록시(GEMINI_API_KEY)로, 아니면 끔 */
+export function summaryRoute(apiKey: string): 'key' | 'dev' | null {
+  if (apiKey) return 'key';
+  return __GEMINI_PROXY__ ? 'dev' : null;
+}
+
 /**
- * AI 요약을 시작한다(키가 비면 멈춘다). 바로 한 차례 돌리고, 그 뒤 album.summary.intervalSec 마다 돌린다.
- * 노트를 저장한 뒤에도 한 차례 돌린다. 만든 요약은 저장하고 띄운 카드에 바로 반영한다
+ * AI 요약을 시작한다(키도 개발 서버 프록시도 없으면 멈춘다). 바로 한 차례 돌리고, 그 뒤 album.summary.intervalSec 마다 돌린다.
+ * 노트를 저장하면 settleSec 뒤에 한 차례 돌린다. 만든 요약은 저장하고 띄운 카드에 바로 반영한다
  */
 export function startSummaries(apiKey: string): void {
   if (summaryTimer !== null) window.clearInterval(summaryTimer);
   summaryTimer = null;
   runner = null;
-  if (apiKey) {
+  const route = summaryRoute(apiKey);
+  if (route) {
     runner = new SummaryRunner(
       album,
-      claudeSummarizer(apiKey),
-      (id, text) => mounted?.cards.find((card) => card.id === id)?.setSummary(text),
+      geminiSummarizer(route === 'key' ? apiKey : null),
+      (id) => {
+        const note = album.data()?.notes.find((n) => n.id === id);
+        if (note) mounted?.refreshSummary(note);
+      },
       (status) => summaryListener?.(status),
     );
     void runner.runOnce();
@@ -69,6 +81,16 @@ export function runSummariesNow(): void {
   void runner?.runOnce();
 }
 
+/** 노트를 저장한 뒤: 더 고치지 않고 settleSec 이 지나면 한 차례 돌린다. 이어서 저장하면 다시 기다린다 */
+function summarizeAfterSettle(): void {
+  if (!runner) return;
+  if (settleTimer !== null) window.clearTimeout(settleTimer);
+  settleTimer = window.setTimeout(() => {
+    settleTimer = null;
+    runSummariesNow();
+  }, (tuning.album.summary.settleSec + 1) * 1000);
+}
+
 /** 저장된 노트 수(확인 스크립트용) */
 export function albumCount(): number {
   return album.count;
@@ -90,7 +112,7 @@ const actions: AlbumActions = {
       next = { ...draft, photo: { width: baked.width, height: baked.height } };
     } else if (photo === null) blob = null;
     const saved = await album.save(next, blob, id);
-    runSummariesNow();
+    summarizeAfterSettle();
     return saved.id;
   },
   remove: (id) => album.remove(id),

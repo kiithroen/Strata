@@ -47,6 +47,7 @@ import {
   levelLogScale,
   type AxisState,
   type Cluster,
+  type NoteRef,
 } from '../widgets/timeAxis/axisModel';
 import { createTimeReadout } from './timeReadout';
 import { createTimeScrubber } from './timeScrubber';
@@ -96,6 +97,8 @@ export interface CosmosDemo extends WidgetDemo {
   nodes(): readonly CosmosNode[];
   focus(card: NoteCard | null): void;
   focusedId(): string | null;
+  /** 띄운 노트의 AI 요약·태그를 새 노트 데이터로 바꾼다. 카드·검색·목록·노트 보기가 바로 쓴다(워드 클라우드는 다시 띄울 때 바뀐다) */
+  refreshSummary(note: NoteRef): void;
   /** 월드 위치의 화면 좌표(CSS px). 브라우저 확인 스크립트가 탭할 자리를 구할 때 쓴다 */
   screenOf(position: Vector3): { x: number; y: number };
   /** 은하에서 노드를 탭한 것처럼 처리한다: 처음이면 다가가고, 다가간 노드면 지층 보기로 들어간다 */
@@ -882,6 +885,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     nodes: () => nodes,
     focus: (card) => focus.set(card),
     focusedId: () => focus.focused?.id ?? null,
+    refreshSummary(note) {
+      const i = noteIndex.get(note.id);
+      if (i === undefined) return;
+      Object.assign(notes[i], { summary: note.summary, tags: note.tags, autoTags: note.autoTags });
+      cards.find((card) => card.id === note.id)?.setSummary(note.summary);
+    },
     screenOf,
     tapNode,
     approachedKey: () => approach.approached,

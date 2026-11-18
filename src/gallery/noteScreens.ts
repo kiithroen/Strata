@@ -146,6 +146,7 @@ export class NoteScreens {
         body: note.body,
         checklist: note.checklist,
         tags: note.tags ?? [],
+        autoTags: note.autoTags,
         tint: note.tint,
         photo: this.photos[index],
       },

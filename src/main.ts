@@ -4,7 +4,7 @@ import { applyQuality, readQuality } from './core/quality';
 import { importLocalNotes, photoQueue } from './dev/localNotes';
 import type { NoteData } from './dev/noteData';
 import { appHooks, type ExplorerResume } from './gallery/appHooks';
-import { albumCount, mountAlbumDemo, onSummaryStatus, openAlbum, runSummariesNow, startSummaries, summaryStatus } from './gallery/albumDemo';
+import { albumCount, mountAlbumDemo, onSummaryStatus, openAlbum, runSummariesNow, startSummaries, summaryRoute, summaryStatus } from './gallery/albumDemo';
 import { mountCosmosDemo, type CosmosAxis } from './gallery/cosmosDemo';
 import { mountExplorerDemo } from './gallery/explorerDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
@@ -75,7 +75,7 @@ const idleDemo: WidgetDemo = { title: '', hint: '', update: () => undefined, dis
 let demo: WidgetDemo = idleDemo;
 // 첫 화면은 저장소를 연 뒤에 띄운다(그동안 뒤로·앞으로로 다른 화면이 떴으면 그대로 둔다)
 const ready = openAlbum().then(() => {
-  startSummaries(settings.summaryKey);
+  startSummaries(settings.geminiKey);
   if (demo !== idleDemo) return;
   demo = picked.factory(stage);
   hintEl.textContent = demo.hint;
@@ -179,7 +179,7 @@ new SettingsPanel(
   },
   setPhotoStyle,
   importFiles,
-  { restart: startSummaries, status: summaryStatus, listen: onSummaryStatus, runNow: runSummariesNow },
+  { restart: startSummaries, route: summaryRoute, status: summaryStatus, listen: onSummaryStatus, runNow: runSummariesNow },
 );
 
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다
