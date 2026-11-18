@@ -16,6 +16,8 @@ export interface CardLook {
   uColorRange: { value: Vector2 };
   /** 읽는 크기 범위. 이 범위에서 글자를 가리는 홀로그램 효과가 걷히고 사진 선이 원래 사진으로 돌아온다 */
   uReadRange: { value: Vector2 };
+  /** 요약 텍스처가 본문 텍스처로 바뀌는 크기 범위 */
+  uBodyRange: { value: Vector2 };
   uFarAlpha: { value: number };
   uFocusAlpha: { value: number };
   /** 가로 줄무늬: 빈도, 세기, 흐르는 속도 */
@@ -69,6 +71,7 @@ export function createCardLook(): CardLook {
     uDetailRange: { value: new Vector2(...lod.detail) },
     uColorRange: { value: new Vector2(...lod.color) },
     uReadRange: { value: new Vector2(...lod.read) },
+    uBodyRange: { value: new Vector2(...lod.body) },
     uFarAlpha: { value: lod.farAlpha },
     uFocusAlpha: { value: lod.focusAlpha },
     uStripe: { value: new Vector3(h.stripeFreq, h.stripeStrength, h.stripeSpeed) },
@@ -92,7 +95,7 @@ export function createCardLook(): CardLook {
 
 /**
  * 카드는 평평한 유리판이다. 카드 높이가 화면 높이에서 차지하는 비율로 단순한 모양 ↔ 제대로 된 모양(vDetail), 흑백 ↔ 제 색(vColor),
- * 훑는 크기 ↔ 읽는 크기(vRead)를 정한다. 카드 중심 하나로 재서 한 장 안에서는 같다.
+ * 훑는 크기 ↔ 읽는 크기(vRead), 요약 ↔ 본문(vBody)을 정한다. 카드 중심 하나로 재서 한 장 안에서는 같다.
  */
 const vertexShader = /* glsl */ `
 uniform float uFocus;
@@ -100,6 +103,7 @@ uniform vec2 uCardSize;
 uniform vec2 uDetailRange;
 uniform vec2 uColorRange;
 uniform vec2 uReadRange;
+uniform vec2 uBodyRange;
 varying vec2 vUv;
 varying float vDepth;
 varying vec3 vNormalV;
@@ -107,6 +111,7 @@ varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
 varying float vRead;
+varying float vBody;
 void main() {
   vUv = uv;
   vec4 center = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
@@ -115,6 +120,7 @@ void main() {
   vDetail = max(smoothstep(uDetailRange.x, uDetailRange.y, screen), uFocus);
   vColor = max(smoothstep(uColorRange.x, uColorRange.y, screen), uFocus);
   vRead = max(smoothstep(uReadRange.x, uReadRange.y, screen), uFocus);
+  vBody = max(smoothstep(uBodyRange.x, uBodyRange.y, screen), uFocus);
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vDepth = -mv.z;
   vViewPos = mv.xyz;
@@ -126,6 +132,8 @@ void main() {
 const fragmentShader = /* glsl */ `
 uniform sampler2D map;
 uniform sampler2D mapSimple;
+/** 중간 거리의 요약 텍스처. 요약이 없는 카드는 map 과 같은 텍스처다 */
+uniform sampler2D mapSummary;
 uniform float uTime;
 uniform float uEdgeWidth;
 uniform float uDimFloor;
@@ -166,6 +174,15 @@ varying vec3 vViewPos;
 varying float vDetail;
 varying float vColor;
 varying float vRead;
+varying float vBody;
+
+// 빨강·파랑을 옆으로 split 만큼 갈라 읽는다
+vec4 splitSample(sampler2D tex, vec2 uv, vec2 split) {
+  vec4 c = texture2D(tex, uv);
+  c.r = texture2D(tex, uv + split).r;
+  c.b = texture2D(tex, uv - split).b;
+  return c;
+}
 
 // 감마 밝기(사람 눈에 고르게). bias 는 밉맵 단계를 더 흐리게 고른다
 float gammaLum(vec2 p, float bias) {
@@ -195,11 +212,10 @@ void main() {
 
   // 양면 홀로그램: 뒤에서 봐도 글자가 바로 읽히게 가로를 뒤집는다
   vec2 uv = vec2(gl_FrontFacing ? vUv.x : 1.0 - vUv.x, vUv.y);
-  // 선의 빨강·파랑이 옆으로 살짝 갈라진다(비스듬할수록 더). 읽는 크기의 카드는 글이 또렷하게 갈라지지 않는다
-  vec4 detail = texture2D(map, uv);
+  // 선의 빨강·파랑이 옆으로 살짝 갈라진다(비스듬할수록 더). 읽는 크기의 카드는 글이 또렷하게 갈라지지 않는다.
+  // 멀면 단순한 모양, 중간 거리는 요약, 가까우면 본문이다
   vec2 split = vec2(uChroma * (0.4 + graze) * veil, 0.0);
-  detail.r = texture2D(map, uv + split).r;
-  detail.b = texture2D(map, uv - split).b;
+  vec4 detail = mix(splitSample(mapSummary, uv, split), splitSample(map, uv, split), vBody);
   vec4 color = mix(texture2D(mapSimple, uv), detail, vDetail);
   // 겉모양 밖(메모의 깎은 모서리, 문서 탭 옆)은 비어 있다. 아래 효과들도 그 자리는 건드리지 않는다
   float body = smoothstep(0.0, 0.25, color.a);
@@ -319,6 +335,8 @@ export interface CardMaterialOptions {
   map: Texture;
   /** 멀리서 쓰는 단순한 텍스처 */
   mapSimple: Texture;
+  /** 중간 거리의 요약 텍스처. 없으면 map 을 쓴다 */
+  mapSummary?: Texture | null;
   look: CardLook;
   width: number;
   height: number;
@@ -340,6 +358,7 @@ export function createCardMaterial(o: CardMaterialOptions): ShaderMaterial {
       ...o.look,
       map: { value: o.map },
       mapSimple: { value: o.mapSimple },
+      mapSummary: { value: o.mapSummary ?? o.map },
       uHoloTint: { value: new Color(o.tint) },
       uAspect: { value: o.width / o.height },
       uCardSize: { value: new Vector2(o.width, o.height) },

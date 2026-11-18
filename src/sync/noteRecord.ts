@@ -24,6 +24,8 @@ export interface NoteRecord {
   tint?: number;
   /** 사진 파일 이름과 크기(레이아웃 비율에 미리 쓴다) */
   photo?: { file: string; width: number; height: number };
+  /** AI 요약. source 는 요약할 때 글의 contentKey 이고, 지금 글과 다르면 지난 요약이다 */
+  summary?: { text: string; source: string };
   deleted?: boolean;
 }
 
@@ -67,8 +69,31 @@ export function parseNoteRecord(json: unknown): NoteRecord | null {
   if (p && isStr(p.file) && isNum(p.width) && isNum(p.height) && p.width > 0 && p.height > 0) {
     out.photo = { file: p.file, width: p.width, height: p.height };
   }
+  const sm = r.summary as Record<string, unknown> | undefined;
+  if (sm && isStr(sm.text) && sm.text.length > 0 && isStr(sm.source)) out.summary = { text: sm.text, source: sm.source };
   if (r.deleted === true) out.deleted = true;
   return out;
+}
+
+/** 카드·목록·검색에 쓰는 노트 글: 체크리스트 노트는 항목을 줄마다 적은 글, 아니면 본문이다 */
+export function noteText(record: Pick<NoteRecord, 'body' | 'checklist'>): string | undefined {
+  return record.checklist ? checklistText(record.checklist) : record.body;
+}
+
+/** 제목과 글로 낸 짧은 지문(FNV-1a 32비트, 16진수). 요약이 지금 글로 만든 것인지 가릴 때 쓴다 */
+export function contentKey(record: Pick<NoteRecord, 'title' | 'body' | 'checklist'>): string {
+  const text = `${record.title ?? ''}\n${noteText(record) ?? ''}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+/** 지금 글로 만든 요약. 없거나 지난 요약이면 undefined */
+export function freshSummary(record: NoteRecord): string | undefined {
+  return record.summary && record.summary.source === contentKey(record) ? record.summary.text : undefined;
 }
 
 /** 키 순서와 상관없이 같은 값이면 같은 글이 되는 JSON(객체 키를 정렬한다) */
@@ -137,7 +162,8 @@ export function albumNotes(records: readonly NoteRecord[]): { notes: NoteRef[]; 
       time: r.time,
       kind: r.kind,
       title: r.title,
-      body: r.checklist ? checklistText(r.checklist) : r.body,
+      body: noteText(r),
+      summary: freshSummary(r),
       checklist: r.checklist,
       tags: r.tags,
       tint: r.tint,

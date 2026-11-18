@@ -10,8 +10,26 @@ import {
   qualityPresets,
   sameQuality,
 } from '../core/quality';
+import type { SummaryStatus } from '../album/summaries';
 import type { PhotoStyle } from '../widgets/noteCard/cardMaterial';
 import { type AppSettings, saveSettings } from './settings';
+
+/** 설정 화면이 다루는 AI 요약 동작 */
+export interface SummaryControls {
+  /** 키를 바꾼 뒤 요약을 다시 시작한다(빈 키는 멈춘다) */
+  restart(apiKey: string): void;
+  status(): SummaryStatus | null;
+  /** 상태가 바뀔 때 부를 함수를 건다. null 이면 뗀다 */
+  listen(listener: ((status: SummaryStatus | null) => void) | null): void;
+  runNow(): void;
+}
+
+function summaryStatusText(status: SummaryStatus | null): string {
+  if (!status) return '키를 넣으면 긴 메모·문서를 Claude 로 요약해 카드가 멀 때 본문 대신 보여 준다. 키는 이 기기 브라우저에만 저장한다.';
+  const parts = [status.running ? '요약하는 중' : `요약 대기 ${status.pending}`, `이번 실행에 만든 요약 ${status.done}`];
+  if (status.error) parts.push(`마지막 오류: ${status.error}`);
+  return parts.join(' · ');
+}
 
 const KEY_LABEL: Record<QualityKey, string> = {
   pr: '해상도 배율',
@@ -46,6 +64,8 @@ export class SettingsPanel {
   /** 실데이터 불러오기 상태 글. 다시 그려도 남는다 */
   private importStatus = '';
   private importing = false;
+  /** 요약 상태 글. 상태가 바뀔 때 이 글만 고친다(입력 칸이 다시 그려지지 않게) */
+  private summaryNote: HTMLParagraphElement | null = null;
   private readonly onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') this.close();
   };
@@ -58,6 +78,7 @@ export class SettingsPanel {
     /** 사진 표현을 바꿀 때 바로 부른다 */
     private readonly onPhotoStyleChange: (style: PhotoStyle) => void,
     private readonly onImport: (files: File[], progress: (text: string) => void) => Promise<string>,
+    private readonly summary: SummaryControls,
   ) {
     this.draft = { ...current };
     this.button = document.createElement('button');
@@ -72,6 +93,9 @@ export class SettingsPanel {
     this.panel.hidden = true;
     document.body.appendChild(this.panel);
     window.addEventListener('keydown', this.onKey);
+    summary.listen((status) => {
+      if (this.summaryNote) this.summaryNote.textContent = summaryStatusText(status);
+    });
   }
 
   open(): void {
@@ -87,6 +111,7 @@ export class SettingsPanel {
   }
 
   dispose(): void {
+    this.summary.listen(null);
     window.removeEventListener('keydown', this.onKey);
     this.button.remove();
     this.panel.remove();
@@ -118,6 +143,8 @@ export class SettingsPanel {
         ),
       ),
     );
+
+    this.renderSummary(p);
 
     const pickFiles = choice('파일', false, () => this.pick(false));
     const pickFolder = choice('폴더', false, () => this.pick(true));
@@ -164,6 +191,40 @@ export class SettingsPanel {
     apply.className = 'settings-apply';
     apply.disabled = !changed;
     p.append(apply);
+  }
+
+  /** AI 요약: 키가 없으면 입력 칸과 저장, 있으면 지금 요약과 키 지우기 */
+  private renderSummary(p: HTMLElement): void {
+    if (this.settings.summaryKey) {
+      p.append(
+        row('AI 요약', [
+          choice('지금 요약', false, () => this.summary.runNow()),
+          choice('키 지우기', false, () => this.setSummaryKey('')),
+        ]),
+      );
+    } else {
+      const input = el('input', 'settings-input');
+      input.type = 'password';
+      input.placeholder = 'Claude API 키';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      const save = choice('저장', false, () => this.setSummaryKey(input.value.trim()));
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') save.click();
+        e.stopPropagation();
+      });
+      p.append(row('AI 요약', [input, save]));
+    }
+    this.summaryNote = el('p', 'settings-note', summaryStatusText(this.summary.status()));
+    p.append(this.summaryNote);
+  }
+
+  private setSummaryKey(key: string): void {
+    if (this.settings.summaryKey === key) return;
+    this.settings.summaryKey = key;
+    saveSettings(this.settings);
+    this.summary.restart(key);
+    this.render();
   }
 
   private pick(folder: boolean): void {

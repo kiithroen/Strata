@@ -19,14 +19,15 @@
 노트 하나를 나타내는 양면 홀로그램 카드다. 반투명 남색 바탕(`card.holo.fill`)에 카드 색(사진·문서는 `card.holo.kinds`, 메모는 `card.holo.memoColors` 가운데 하나)의 가는 테두리와 글자로 위에서부터 제목 줄, 내용 칸, 상태 줄을 그려 텍스처로 쓴다(`cardTexture.ts`). 흐린 선·옅은 선은 종류 색에 `card.holo`의 불투명도를 곱한 색이다. 선과 제목 글자에만 빛 번짐(`card.holo.glowRatio`)을 주고 본문 글자에는 주지 않는다. 사진만 제 색이다.
 - 세 종류 모두 같은 둥근 사각형이고(`card.window.cornerRatio`, `cardLayout.ts`의 `cornerRadius`) 색과 내용, 주제에 맞는 작은 요소로 구분된다. 제목 줄 왼쪽에 종류 아이콘(사진은 조리개, 메모는 접착 메모지, 문서는 귀퉁이 접힌 페이지)과 작은 이름표(고정폭 글꼴, 흐린 색), 상태 줄 왼쪽에 찍은 시각을 적는다. 멀리서 보는 단순한 텍스처는 아이콘 대신 점이다. 본문 글꼴은 산세리프다.
 - **사진 (`photo`)**: 사진 비율 그대로 내용 칸을 채우고 모서리를 둥글게 자른다(`card.window.innerCornerRatio`). 이름표는 캡션, 없으면 `IMG_번호`다.
-- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색 파스텔 유리 그라데이션을 깔고(`card.holo.washAlpha`의 위·아래 불투명도) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다. 메모·문서 글자는 카드 색을 흰색 쪽으로 밝힌 색(제목 `card.holo.inkLift`, 본문 `card.holo.bodyInkLift`)이라 색을 깐 바탕 위에서도 읽힌다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
+- **짧은 노트 (`memo`)**: 이름표는 `MEMO`다. 바탕에 메모 색 파스텔 유리 그라데이션을 깔고(`card.holo.washAlpha`의 위·아래 불투명도) 오른쪽 아래에 접힌 귀퉁이(`card.window.foldRatio`)가 있다. 굵은 제목(두 줄까지)과 큼직한 본문이다(`card.memo.titleRatio`, `bodyRatio`). 본문이 칸을 넘으면 마지막 줄 끝을 말줄임표로 자른다. 메모·문서 글자는 카드 색을 흰색 쪽으로 밝힌 색(제목 `card.holo.inkLift`, 본문 `card.holo.bodyInkLift`)이라 색을 깐 바탕 위에서도 읽힌다. 색은 노트의 `tint`(포스트잇 색 번호)로 고르고, 없으면 노트 번호로 정한다.
 - 메모 크기는 글 양에 맞춘다(`cardLayout.ts`의 `memoFit`). 글 폭을 캔버스 없이 어림해(`textWrap.ts`의 `estimateTextWidth`: 넓은 글자 1, 나머지 0.6) 길수록 넓게(`card.memo.widthScales`, `card.memo.fullText`), 어림한 줄 수만큼 높게 하되 폭 대비 `card.memo.aspect` 범위로 자른다. 비율은 기본 해상도(`qualityDefaults.tex`)에서 한 번 정해 품질 설정을 바꾸거나 단순·상세 텍스처를 써도 같은 모양이다.
-- **긴 문서 (`doc`)**: `1 : √2` 카드. 이름표는 `TXT_번호`이고, 푸른 유리 그라데이션 바탕(`card.holo.docWashAlpha`) 위에 굵은 제목과 공책처럼 본문 줄마다 옅은 괘선(`card.holo.ruleAlpha`)을 긋고 촘촘한 문단을 쓴다.
+- **긴 문서 (`doc`)**: `1 : √2` 카드. 이름표는 `TXT_번호`이고, 푸른 유리 그라데이션 바탕(`card.holo.docWashAlpha`) 위에 굵은 제목과 공책처럼 본문 줄마다 옅은 괘선(`card.holo.ruleAlpha`)을 긋고 문단을 쓴다(글자 크기·줄 간격 `card.doc`, `cardLayout.ts`의 `docMetrics`). 넘치는 본문은 말줄임표로 자른다.
+- **요약 텍스처** (`createSummaryTexture`): 지금 글로 만든 AI 요약이 있는 메모·문서는 본문 텍스처와 같은 크기·겉모양·제목에 본문 대신 요약을 큰 글자(`card.summary`)로 쓴 텍스처를 하나 더 가진다. 이름표는 `SUMMARY`다. 요약이 오면 `NoteCard.setSummary`가 텍스처를 바꾼다. 요약이 없는 카드는 중간 거리에서도 본문 텍스처를 쓴다.
 - 둥근 모서리 밖은 텍스처가 비어 있고, 셰이더의 펼침 불투명도·테두리 빛·반짝임도 그 자리는 건드리지 않는다.
 
 **멀고 가까움** (`cardMaterial.ts`, `createSimpleTexture`)
-- 카드마다 텍스처가 둘이다. 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`)다. 단순한 텍스처는 글자 없이 같은 겉모양에 사진은 둥글게 자른 굵은 모자이크(`card.simple.photoBlocks`), 메모는 굵은 막대 몇 줄, 문서는 가는 막대 여러 줄(`card.simple`)로만 그린다.
-- 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(그 카드 종류 색으로 물든 밝기)을 제 색으로 섞는다. `card.lod.read` 범위(읽는 크기)에서는 글자·사진 위에 얹히는 효과(색 갈라짐, 무지개빛, 줄무늬, 유리 광택, 사진 홀로그램·선화)를 걷어내고 테두리 빛과 도는 빛만 남긴다. 멀리서 훑을 때는 홀로그램이고 다가가 읽을 때는 글이 또렷하다. 한 장 안에서는 같은 값이다. 펼치는 카드는 셋 다 1이다.
+- 카드마다 텍스처가 둘이다(요약이 있으면 셋). 가까이서 보는 텍스처(`card.textureWidth`)와 멀리서 보는 단순한 텍스처(`card.simpleTextureWidth`), 중간 거리의 요약 텍스처다. 단순한 텍스처는 글자 없이 같은 겉모양에 사진은 둥글게 자른 굵은 모자이크(`card.simple.photoBlocks`), 메모는 굵은 막대 몇 줄, 문서는 가는 막대 여러 줄(`card.simple`)로만 그린다.
+- 정점 셰이더가 카드 중심에서 카드 높이가 화면 높이에서 차지하는 비율을 재고, `card.lod.detail` 범위에서 단순한 모양을 제대로 된 모양으로, `card.lod.color` 범위에서 흑백(그 카드 종류 색으로 물든 밝기)을 제 색으로 섞는다. `card.lod.body` 범위에서 요약 텍스처를 본문 텍스처로 바꾼다(멀면 단순한 모양, 중간은 요약, 가까우면 본문). `card.lod.read` 범위(읽는 크기)에서는 글자·사진 위에 얹히는 효과(색 갈라짐, 무지개빛, 줄무늬, 유리 광택, 사진 홀로그램·선화)를 걷어내고 테두리 빛과 도는 빛만 남긴다. 멀리서 훑을 때는 홀로그램이고 다가가 읽을 때는 글이 또렷하다. 한 장 안에서는 같은 값이다. 펼치는 카드는 모두 1이다.
 - 단순한 모양일수록 옅어진다(`card.lod.farAlpha`). 펼친 카드는 바탕 불투명도를 `card.lod.focusAlpha` 이상으로 올려 뒤 카드가 글을 가리지 않게 한다.
 
 **그래프 연결 자리** (`cardEdge.ts`)

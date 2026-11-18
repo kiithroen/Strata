@@ -93,9 +93,10 @@ export const tuning = {
      * 멀고 가까움에 따른 모습. 값은 카드 높이가 화면 높이에서 차지하는 비율이다.
      * detail 범위에서 단순한 모양이 제대로 된 모양으로, color 범위에서 흑백이 제 색으로 바뀐다.
      * read 범위에서 글자·사진 위에 얹힌 홀로그램 효과(색 갈라짐·무지개빛·줄무늬·광택·사진 선)가 걷힌다. 테두리 빛은 남는다.
+     * body 범위에서 요약 텍스처가 본문 텍스처로 바뀐다(요약이 있는 메모·문서만).
      * farAlpha 는 단순한 모양일 때의 불투명도 배율, focusAlpha 는 펼친 카드 바탕의 최소 불투명도(뒤가 비쳐 글이 흐려지지 않게)다
      */
-    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], read: [0.14, 0.3], farAlpha: 0.78, focusAlpha: 0.94 },
+    lod: { detail: [0.045, 0.11], color: [0.04, 0.11], read: [0.14, 0.3], body: [0.17, 0.21], farAlpha: 0.78, focusAlpha: 0.94 },
     /**
      * 홀로그램 빛. stripe* 는 카드를 가로지르는 가는 줄무늬의 빈도(카드 높이당 줄 수)·세기(줄 사이가 투명해지는 정도)·
      * 위로 흐르는 속도(카드 높이/초), iridescence 는 비스듬히 볼수록 도는 무지개빛 막의 세기,
@@ -149,9 +150,14 @@ export const tuning = {
      * 짧은 노트(메모): 글 양에 맞춰 크기가 바뀐다. 폭은 기준 폭 대비 widthScales 범위에서 글 폭(어림, 글자 크기 단위)이 fullText 에 가까울수록 넓고,
      * 높이는 제목·본문 줄 수에 맞추되 폭 대비 aspect 범위로 자른다. 글자 크기는 텍스처 기준 폭 대비 titleRatio·bodyRatio, 줄 간격 배율 lineHeight
      */
-    memo: { widthScales: [0.6, 0.92], fullText: 40, aspect: [0.5, 1.3], titleRatio: 0.07, bodyRatio: 0.058, lineHeight: 1.45 },
-    /** 긴 문서는 1:√2 세로 비율이다. 기준 폭 대비 배율 */
-    doc: { widthScale: 1.05 },
+    memo: { widthScales: [0.6, 0.92], fullText: 40, aspect: [0.5, 1.3], titleRatio: 0.085, bodyRatio: 0.072, lineHeight: 1.4 },
+    /** 긴 문서는 1:√2 세로 비율이다. widthScale 은 기준 폭 대비 배율, titleRatio·bodyRatio 는 텍스처 기준 폭 대비 글자 크기, lineHeight 는 본문 줄 간격 배율 */
+    doc: { widthScale: 1.05, titleRatio: 0.075, bodyRatio: 0.062, lineHeight: 1.5 },
+    /**
+     * 요약 텍스처: 본문 대신 요약을 쓴 메모·문서 카드. textRatio 는 텍스처 기준 폭 대비 요약 글자 크기, lineHeight 는 줄 간격 배율이다.
+     * 요약이 없는 노트는 본문 텍스처를 그대로 쓴다
+     */
+    summary: { textRatio: 0.08, lineHeight: 1.4 },
   },
 
   float: {
@@ -486,6 +492,12 @@ export const tuning = {
     /** 노트 보기의 가로 끌기: 이 거리(CSS px) 이상, 가로가 세로의 swipeRatio 배 이상 움직이면 이전·다음 노트로 넘긴다 */
     swipePx: 60,
     swipeRatio: 1.5,
+    /**
+     * AI 요약: 본문(체크리스트는 항목 글)이 minChars 자 이상인 메모·문서를 Claude API 로 maxChars 자 안팎의 요약으로 만든다.
+     * 앱을 열 때와 노트를 저장한 뒤, 그리고 열려 있는 동안 intervalSec 초마다 요약이 없거나 내용이 바뀐 노트를 최근 것부터 perRun 개씩 요약한다.
+     * model·effort 는 요청에 쓰는 모델과 생각 깊이다
+     */
+    summary: { minChars: 60, maxChars: 60, intervalSec: 600, perRun: 8, model: 'claude-opus-5-5', effort: 'low' },
   },
 
   dev: {

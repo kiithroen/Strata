@@ -7,6 +7,8 @@ import { createCardMaterial, type CardLook } from './cardMaterial';
 import {
   createCardTexture,
   createSimpleTexture,
+  createSummaryTexture,
+  hasSummaryFace,
   holoTint,
   redrawCardTexture,
   redrawSimpleTexture,
@@ -30,7 +32,8 @@ const OPEN_ORDER = 1000;
 
 /**
  * 노트 카드 위젯: 양면 홀로그램 창. 배치가 넘기는 자리에 떠 있다가 펼치면 카메라 앞으로 나와 화면에 맞게 커진다.
- * 멀리서는 단순한 텍스처, 가까이서는 작은 텍스처, 펼치는 동안에는 선명한 텍스처를 쓴다. 둘 사이 전환은 셰이더가 한다.
+ * 멀리서는 단순한 텍스처, 중간 거리에서는 요약 텍스처(요약이 있는 메모·문서), 가까이서는 작은 텍스처, 펼치는 동안에는 선명한 텍스처를 쓴다.
+ * 사이 전환은 셰이더가 한다.
  * 사진을 디코딩해야 하면 사진 칸을 비워 두고 그렸다가 사진이 오면 다시 그린다. 선명한 텍스처는 사진이 온 뒤에 바꾼다.
  */
 export class NoteCard {
@@ -45,6 +48,7 @@ export class NoteCard {
 
   private readonly baseTexture: CanvasTexture;
   private readonly simpleTexture: CanvasTexture;
+  private summaryTexture: CanvasTexture | null = null;
   private detailTexture: CanvasTexture | null = null;
   private readonly anisotropy: number;
   private readonly labels: LabelCache;
@@ -67,6 +71,7 @@ export class NoteCard {
     const ready = photo instanceof Promise ? null : photo;
     this.baseTexture = createCardTexture(opts.face, this.layout, opts.anisotropy, ready);
     this.simpleTexture = createSimpleTexture(opts.face, simpleLayout, opts.anisotropy, ready);
+    if (hasSummaryFace(opts.face)) this.summaryTexture = createSummaryTexture(opts.face, this.layout, opts.anisotropy);
     if (ready) releasePhoto(ready);
     if (photo instanceof Promise) {
       photo.then(
@@ -85,6 +90,7 @@ export class NoteCard {
     const material = createCardMaterial({
       map: this.baseTexture,
       mapSimple: this.simpleTexture,
+      mapSummary: this.summaryTexture,
       look: opts.look,
       width: this.layout.worldWidth,
       height: this.layout.worldHeight,
@@ -165,11 +171,24 @@ export class NoteCard {
     this.badge.visible = true;
   }
 
+  /**
+   * 요약을 바꾼다(새로 만든 AI 요약이 왔을 때). 메모·문서만 요약 텍스처를 쓰고, undefined 면 요약 텍스처를 버려 중간 거리에서도 본문을 쓴다.
+   * 카드 크기는 본문으로 정했으므로 바뀌지 않는다
+   */
+  setSummary(text: string | undefined): void {
+    if (this.disposed || this.face.summary === text) return;
+    this.face.summary = text;
+    this.summaryTexture?.dispose();
+    this.summaryTexture = hasSummaryFace(this.face) ? createSummaryTexture(this.face, this.layout, this.anisotropy) : null;
+    this.mesh.material.uniforms.mapSummary.value = this.summaryTexture ?? this.baseTexture;
+  }
+
   dispose(): void {
     this.disposed = true;
     this.mesh.geometry.dispose();
     this.baseTexture.dispose();
     this.simpleTexture.dispose();
+    this.summaryTexture?.dispose();
     this.detailTexture?.dispose();
     this.mesh.material.dispose();
     if (this.badge) {

@@ -71,6 +71,13 @@ export function memoMetrics(unit: number): { titleSize: number; bodySize: number
   return { titleSize, bodySize, titleLineH: titleSize * 1.3, bodyLineH: bodySize * m.lineHeight, titleGap: bodySize * 0.4 };
 }
 
+/** 문서 글자 크기와 본문 줄 간격(px). 레이아웃과 그리기가 함께 쓴다 */
+export function docMetrics(unit: number): { titleSize: number; bodySize: number; lineH: number } {
+  const d = tuning.card.doc;
+  const bodySize = Math.max(8, Math.round(unit * d.bodyRatio));
+  return { titleSize: Math.max(9, Math.round(unit * d.titleRatio)), bodySize, lineH: bodySize * d.lineHeight };
+}
+
 /** 메모 제목은 두 줄까지 */
 export const MEMO_TITLE_LINES = 2;
 

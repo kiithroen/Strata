@@ -2,6 +2,9 @@ import { Album } from '../album/album';
 import { draftFromRecord } from '../album/albumModel';
 import { MemoryNoteStore, openNoteStore } from '../album/noteStore';
 import { bakePhotoCopy, readTakenAt } from '../album/photoCopy';
+import { claudeSummarizer } from '../album/claudeSummarizer';
+import { SummaryRunner, type SummaryStatus } from '../album/summaries';
+import { tuning } from '../config';
 import { appHooks } from './appHooks';
 import { mountCosmosDemo, type CosmosDemo } from './cosmosDemo';
 import type { AlbumActions, AlbumReload } from './noteScreens';
@@ -24,6 +27,48 @@ export async function openAlbum(): Promise<void> {
   }
 }
 
+/** 지금 띄운 메모 앨범 우주 보기. 새 요약이 오면 그 카드를 바꾼다 */
+let mounted: CosmosDemo | null = null;
+let runner: SummaryRunner | null = null;
+let summaryTimer: number | null = null;
+let summaryListener: ((status: SummaryStatus | null) => void) | null = null;
+
+/**
+ * AI 요약을 시작한다(키가 비면 멈춘다). 바로 한 차례 돌리고, 그 뒤 album.summary.intervalSec 마다 돌린다.
+ * 노트를 저장한 뒤에도 한 차례 돌린다. 만든 요약은 저장하고 띄운 카드에 바로 반영한다
+ */
+export function startSummaries(apiKey: string): void {
+  if (summaryTimer !== null) window.clearInterval(summaryTimer);
+  summaryTimer = null;
+  runner = null;
+  if (apiKey) {
+    runner = new SummaryRunner(
+      album,
+      claudeSummarizer(apiKey),
+      (id, text) => mounted?.cards.find((card) => card.id === id)?.setSummary(text),
+      (status) => summaryListener?.(status),
+    );
+    void runner.runOnce();
+    summaryTimer = window.setInterval(() => void runner?.runOnce(), tuning.album.summary.intervalSec * 1000);
+  }
+  summaryListener?.(summaryStatus());
+}
+
+/** 요약 상태. 요약을 켜지 않았으면 null */
+export function summaryStatus(): SummaryStatus | null {
+  return runner?.status() ?? null;
+}
+
+/** 요약 상태가 바뀔 때 부를 함수(설정 화면). null 이면 뗀다 */
+export function onSummaryStatus(listener: ((status: SummaryStatus | null) => void) | null): void {
+  summaryListener = listener;
+}
+
+/** 요약 차례를 바로 한 번 돌린다 */
+export function runSummariesNow(): void {
+  void runner?.runOnce();
+}
+
 /** 저장된 노트 수(확인 스크립트용) */
 export function albumCount(): number {
   return album.count;
@@ -44,7 +89,9 @@ const actions: AlbumActions = {
       blob = baked.blob;
       next = { ...draft, photo: { width: baked.width, height: baked.height } };
     } else if (photo === null) blob = null;
-    return (await album.save(next, blob, id)).id;
+    const saved = await album.save(next, blob, id);
+    runSummariesNow();
+    return saved.id;
   },
   remove: (id) => album.remove(id),
   check: async (id, index, done) => {
@@ -59,5 +106,12 @@ const actions: AlbumActions = {
  * `+ 노트`로 노트를 쓰고, 저장된 노트는 보기 화면에서 고치고 지운다. reload 는 저장·삭제 뒤 보여 줄 것이다
  */
 export function mountAlbumDemo(stage: Stage, reload: AlbumReload = {}): CosmosDemo {
-  return mountCosmosDemo(stage, album.data() ?? undefined, { album: actions, focusNote: reload.focusNote, restore: reload.view, openNote: reload.openNote });
+  const demo = mountCosmosDemo(stage, album.data() ?? undefined, { album: actions, focusNote: reload.focusNote, restore: reload.view, openNote: reload.openNote });
+  mounted = demo;
+  const dispose = demo.dispose.bind(demo);
+  demo.dispose = () => {
+    if (mounted === demo) mounted = null;
+    dispose();
+  };
+  return demo;
 }

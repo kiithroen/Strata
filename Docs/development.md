@@ -27,6 +27,7 @@ npm run dev
   - CPU 시간: 위젯 갱신과 그리기 명령 각각의 평균(최대). GPU가 실제로 그리는 시간은 프레임 간격에만 드러난다
   - 그리기 호출·삼각형·점·선 수, 텍스처·형상 수, 사진 디코딩 큐(돌고 있는 수와 기다리는 수), 화면 CSS 크기, 캔버스 크기와 적용된 픽셀 비율, MSAA, 지금 품질 값, GPU 이름
 - **사진 표현**: 사진 카드의 사진 칸을 원본·홀로그램 선(`card.photoFx`)·선화(`card.photoSketch`) 가운데 하나로 바로 바꾼다. 기본은 홀로그램이다.
+- **AI 요약**: Claude API 키를 넣으면 메모 앨범의 긴 메모·문서를 요약한다(아래 "AI 요약"). 키는 설정(`strata.settings`의 `summaryKey`)에 둔다. `지금 요약`은 한 차례를 바로 돌리고, `키 지우기`는 요약을 멈춘다. 아래 글에 기다리는 수·만든 수·마지막 오류가 보인다.
 - **실데이터**: `파일`·`폴더`로 고른 파일을 노트로 읽어 우주 보기를 그 노트로 다시 띄운다(`src/dev/localNotes.ts`). 메모리에만 두는 임시 주입이라 다시 불러오면 가짜 노트로 돌아간다.
   - 사진(JPEG·PNG 등): 파일 앞부분(`dev.headerBytes`)에서 크기·EXIF 방향·촬영 시각을 읽는다(`src/dev/imageHeader.ts`). 원본 촬영 시각, 없으면 EXIF 파일 시각, 그것도 없으면 파일 수정 시각에 놓는다. 앞부분으로 크기를 모르는 형식은 한 번 디코딩해서 잰다. 제목은 파일 이름이다.
   - 구글 킵 테이크아웃 JSON: 제목·본문·체크리스트(항목과 체크 상태, 빈 항목은 뺀다)·라벨(태그)·만든 시각을 읽고, 본문(체크리스트는 항목 글)이 `album.docMinChars`자 이상이면 긴 문서, 아니면 메모다(`src/dev/keepNote.ts`). 휴지통 노트는 버린다.
@@ -52,6 +53,13 @@ npm run dev
 - 앨범을 비우려면 브라우저 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다.
 - 앱 시작은 저장소를 연 뒤 첫 화면을 띄운다(`main.ts`의 `ready`).
 
+## AI 요약
+
+- `src/album/summaries.ts`의 `SummaryRunner`가 요약할 노트(지우지 않은 메모·문서, 글이 `album.summary.minChars`자 이상, 지금 글의 요약 없음)를 최근 것부터 한 차례에 `album.summary.perRun`개씩 요약해 앨범에 적고 띄운 카드를 바로 바꾼다. 앱을 열 때, 노트를 저장한 뒤, 열려 있는 동안 `album.summary.intervalSec`마다 돈다(`albumDemo.ts`의 `startSummaries`).
+- 요청은 `src/album/claudeSummarizer.ts`가 Anthropic TypeScript SDK로 브라우저에서 바로 보낸다(`dangerouslyAllowBrowser`). SDK는 처음 요약할 때 불러와 따로 묶인다. 모델·생각 깊이는 `album.summary.model`·`effort`이고, 거절되면 서버 쪽 대체 모델(`fallbacks: "default"`)이 이어받는다. 노트 글은 `<note>` 안의 자료로 넘긴다.
+- 거절·빈 답은 그 노트만 이번 실행 동안 건너뛰고, 키 오류·요청 한도·연결 실패는 그 차례를 멈추고 다음 차례에 다시 해 본다.
+- 키는 그 기기 브라우저의 `localStorage`에 평문으로 남는다. 개인 기기에서만 넣는다. 앱으로 감쌀 때 기기 보안 저장소로 옮긴다.
+
 ## 배포
 
 `main`에 푸시하면 `.github/workflows/pages.yml`이 `npm ci`, `npm test`, `npm run build`를 돌리고 `dist`를 GitHub Pages에 올린다. 주소는 <https://kiithroen.github.io/Strata/>다. 테스트나 빌드가 실패하면 올라가지 않는다.
@@ -69,7 +77,7 @@ npm run dev
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
 | `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 블룸 후처리(`bloom.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
-| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`) |
+| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`), AI 요약 차례(`summaries.ts`)와 Claude API 요청(`claudeSummarizer.ts`) |
 | `src/dev/` | 개발용 가짜 데이터(`noteData.ts`)와 실데이터 임시 불러오기(`localNotes.ts`, `imageHeader.ts`, `keepNote.ts`) |
 | `test/` | vitest 단위 테스트(노드 환경) |
 

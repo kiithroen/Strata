@@ -3,7 +3,7 @@ import { tuning } from '../../config';
 import { MONO, SANS } from '../common/fonts';
 import { formatStamp } from '../../core/format';
 import { createRng } from '../../core/random';
-import { cornerRadius, memoMetrics, MEMO_TITLE_LINES, type CardLayout, type NoteKind, type Rect } from './cardLayout';
+import { cornerRadius, docMetrics, memoMetrics, MEMO_TITLE_LINES, type CardLayout, type NoteKind, type Rect } from './cardLayout';
 import { wrapLines } from './textWrap';
 
 /**
@@ -28,6 +28,8 @@ export interface CardFace {
   photo?: PhotoSource;
   title?: string;
   body?: string;
+  /** AI 요약. 있으면 메모·문서 카드가 중간 거리에서 본문 대신 쓴다(createSummaryTexture) */
+  summary?: string;
   /** 메모 색 번호(card.holo.memoColors). 없으면 노트 번호로 고른다 */
   tint?: number;
 }
@@ -136,6 +138,61 @@ export function createCardTexture(face: CardFace, layout: CardLayout, anisotropy
   const { canvas, ctx } = newCanvas(layout);
   drawCard(ctx, face, layout, photo);
   return toTexture(canvas, anisotropy);
+}
+
+/** 요약 텍스처를 쓰는 카드인지: 요약이 있는 메모·문서 */
+export function hasSummaryFace(face: CardFace): boolean {
+  return (face.kind === 'memo' || face.kind === 'doc') && !!face.summary;
+}
+
+/**
+ * 중간 거리의 요약 카드. 본문 카드와 같은 겉모양·제목에 본문 대신 요약을 큰 글자(card.summary)로 쓴다.
+ * 이름표는 SUMMARY 다. hasSummaryFace 인 카드만 만든다
+ */
+export function createSummaryTexture(face: CardFace, layout: CardLayout, anisotropy: number): CanvasTexture {
+  const { canvas, ctx } = newCanvas(layout);
+  drawSummaryCard(ctx, face, layout);
+  return toTexture(canvas, anisotropy);
+}
+
+export function redrawSummaryTexture(texture: CanvasTexture, face: CardFace, layout: CardLayout): void {
+  drawSummaryCard(canvasContext(texture), face, layout);
+  texture.needsUpdate = true;
+}
+
+function drawSummaryCard(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayout): void {
+  const p = palette(face);
+  const { content, padding } = layout;
+  const u = layout.unit;
+  drawBody(ctx, layout, p, false);
+  drawLabel(ctx, layout, p, 'SUMMARY', layout.textureWidth - padding);
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  let y = content.y + padding * 0.3;
+  const bottom = content.y + content.height;
+  if (face.title) {
+    const titleSize = layout.kind === 'memo' ? memoMetrics(u).titleSize : docMetrics(u).titleSize;
+    glow(ctx, p.line, u);
+    ctx.font = `700 ${titleSize}px ${SANS}`;
+    ctx.fillStyle = p.ink;
+    for (const l of wrapLines(ctx, face.title, content.width, MEMO_TITLE_LINES)) {
+      ctx.fillText(l, content.x, y);
+      y += titleSize * 1.3;
+    }
+    y += titleSize * 0.35;
+    glow(ctx, null, u);
+  }
+  const s = tuning.card.summary;
+  const size = Math.max(9, Math.round(u * s.textRatio));
+  const lineH = size * s.lineHeight;
+  ctx.font = `${size}px ${SANS}`;
+  ctx.fillStyle = p.bodyInk;
+  const maxLines = Math.max(1, Math.floor((bottom - y) / lineH));
+  for (const l of wrapLines(ctx, face.summary ?? '', content.width, maxLines)) {
+    ctx.fillText(l, content.x, y);
+    y += lineH;
+  }
+  drawFooter(ctx, face, layout, p);
 }
 
 /** 사진이 늦게 오면 같은 캔버스에 다시 그리고 올린다 */
@@ -389,9 +446,7 @@ function drawDoc(ctx: CanvasRenderingContext2D, face: CardFace, layout: CardLayo
   const { content, padding } = layout;
   const w = layout.unit;
   drawLabel(ctx, layout, p, `TXT_${face.id}`, layout.textureWidth - padding);
-  const titleSize = Math.max(9, Math.round(w * 0.056));
-  const bodySize = Math.max(8, Math.round(w * 0.042));
-  const lineH = bodySize * 1.55;
+  const { titleSize, bodySize, lineH } = docMetrics(w);
 
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';

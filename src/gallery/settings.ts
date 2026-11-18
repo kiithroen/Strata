@@ -7,6 +7,8 @@ export interface AppSettings {
   /** 사진 카드의 사진 칸을 그리는 방식. 기본은 홀로그램 선 */
   photoStyle: PhotoStyle;
   quality: Partial<QualityValues>;
+  /** AI 요약에 쓰는 Claude API 키. 비어 있으면 요약하지 않는다 */
+  summaryKey: string;
 }
 
 const KEY = 'strata.settings';
@@ -15,12 +17,21 @@ const KEY = 'strata.settings';
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { perf: false, photoStyle: 'lines', quality: {} };
+    if (!raw) return defaults();
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return { perf: parsed.perf === true, photoStyle: readPhotoStyle(parsed), quality: sanitizeQuality(parsed.quality) };
+    return {
+      perf: parsed.perf === true,
+      photoStyle: readPhotoStyle(parsed),
+      quality: sanitizeQuality(parsed.quality),
+      summaryKey: typeof parsed.summaryKey === 'string' ? parsed.summaryKey : '',
+    };
   } catch {
-    return { perf: false, photoStyle: 'lines', quality: {} };
+    return defaults();
   }
+}
+
+function defaults(): AppSettings {
+  return { perf: false, photoStyle: 'lines', quality: {}, summaryKey: '' };
 }
 
 /** 저장된 사진 표현. 예전 켜고 끄기 값(photoFx: false)은 원래 사진으로 읽는다 */

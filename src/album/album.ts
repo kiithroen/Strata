@@ -1,6 +1,6 @@
 import { photoQueue } from '../dev/localNotes';
 import type { NoteData } from '../dev/noteData';
-import { albumNotes, type NoteRecord } from '../sync/noteRecord';
+import { albumNotes, contentKey, type NoteRecord } from '../sync/noteRecord';
 import type { PhotoSource } from '../widgets/noteCard/cardTexture';
 import { deletedRecord, recordFromDraft, newNoteId, type NoteDraft } from './albumModel';
 import type { NoteStore } from './noteStore';
@@ -40,6 +40,25 @@ export class Album {
     return r && !r.deleted ? r : undefined;
   }
 
+  /** 지우지 않은 노트의 기록 모두 */
+  liveRecords(): NoteRecord[] {
+    return [...this.records.values()].filter((r) => !r.deleted);
+  }
+
+  /**
+   * AI 요약을 노트에 적는다. source 는 요약할 때 글의 contentKey 이고, 그 사이 글이 바뀌었거나 지웠으면 적지 않고 undefined 를 돌려준다.
+   * 수정 시각은 그 판보다 1ms 만 늦춘다. 요약은 그 판에서 나온 것이라 다른 기기의 같은 판은 이기고, 그 뒤에 고친 글에는 진다
+   */
+  async setSummary(id: string, text: string, source: string): Promise<NoteRecord | undefined> {
+    const r = this.record(id);
+    if (!r || contentKey(r) !== source) return undefined;
+    const record: NoteRecord = { ...r, summary: { text, source }, modified: r.modified + 1 };
+    await this.store.put(record);
+    this.records.set(id, record);
+    this.cached = null;
+    return record;
+  }
+
   /** 은하에 띄울 노트(최근 것부터)와 사진. 지우지 않은 노트가 없으면 null 이다 */
   data(): NoteData | null {
     if (this.cached) return this.cached;
@@ -57,6 +76,9 @@ export class Album {
     const now = this.now();
     const noteId = id ?? this.freshId(now);
     const record = recordFromDraft(noteId, draft, now);
+    // 태그·색만 바꿨으면 글이 그대로라 요약도 그대로 쓴다
+    const before = id ? this.records.get(id)?.summary : undefined;
+    if (before && before.source === contentKey(record)) record.summary = before;
     await this.store.put(record, photo);
     this.records.set(noteId, record);
     if (photo !== undefined) this.photoBlobs.delete(noteId);
