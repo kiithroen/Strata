@@ -57,7 +57,7 @@ export function mountExplorerDemo(_stage: Stage): ExplorerDemo {
   if (resume) void view.setSource(resume.source, resume.dir);
   return {
     title: 'EXPLORER',
-    hint: '폴더: 들어가기 · 파일: 열기 · 백스페이스: 위로 · 방향키: 다음·이전',
+    hint: '폴더: 들어가기 · 파일: 열기 · 방향키: 칸 옮기기 · 엔터: 열기 · 백스페이스: 위로',
     view,
     openFiles: (files) => view.setSource(new ListSource(files)),
     update() {},

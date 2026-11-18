@@ -3,8 +3,8 @@ import { decodeText, formatSize } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 
 export interface MediaViewerOptions {
-  /** 닫기 단추·Esc·뒤로로 닫혔을 때 */
-  onClose?: () => void;
+  /** 닫기 단추·Esc·뒤로로 닫혔을 때. last 는 닫을 때 보던 파일이다 */
+  onClose?: (last: FileEntry | null) => void;
 }
 
 /**
@@ -100,10 +100,11 @@ export class MediaViewer {
 
   close(): void {
     if (!this.open) return;
+    const last = this.current;
     this.clear();
     this.root.hidden = true;
     document.body.classList.remove('viewer-open');
-    this.options.onClose?.();
+    this.options.onClose?.(last);
   }
 
   /** 다음(+1)·이전(−1) 파일로 넘긴다. 끝에서는 멈춘다 */

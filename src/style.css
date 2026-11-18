@@ -759,6 +759,8 @@ body.card-view-open .strata-actions {
 }
 
 .explorer-body {
+  /* 가상 스크롤이 칸 위치를 이 상자 기준으로 잰다(offsetTop) */
+  position: relative;
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -900,6 +902,13 @@ body.card-view-open .strata-actions {
 .explorer-tile:hover {
   border-color: color-mix(in srgb, var(--tint) 75%, transparent);
   background: color-mix(in srgb, var(--tint) 14%, var(--bg));
+}
+
+/* 키보드 커서 칸 */
+.explorer-tile.cursor,
+.explorer-tile.explorer-row.cursor {
+  border-color: var(--tint);
+  box-shadow: 0 0 0 1px var(--tint), 0 0 14px color-mix(in srgb, var(--tint) 35%, transparent);
 }
 
 .explorer-tile[data-kind="folder"] { --tint: var(--kind-folder); }

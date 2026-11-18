@@ -1,7 +1,7 @@
 import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import { TaskQueue } from '../../core/taskQueue';
-import { gridLayout, visibleRows, type GridLayout } from './explorerGrid';
+import { gridLayout, moveCursor, scrollToShow, visibleRows, type GridKey, type GridLayout } from './explorerGrid';
 import { breadcrumbs, extensionOf, formatSize, isViewable, parentPath, sortEntries, visibleEntries, type SortKey } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 import { MediaViewer } from './MediaViewer';
@@ -39,6 +39,8 @@ interface Prefs {
 }
 
 const PREFS_KEY = 'strata.explorer';
+
+const GRID_KEYS = new Set<string>(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
 
 /** 기기에 남긴 보기 방식과 정렬. 저장소를 못 쓰거나 값이 깨져 있으면 기본값이다 */
 function loadPrefs(): Prefs {
@@ -101,6 +103,8 @@ export class ExplorerView {
   private shown: FileEntry[] = [];
   private layout: GridLayout | null = null;
   private range = { first: -1, last: -1 };
+  /** 키보드 커서가 있는 항목 번호(shown 기준). 없으면 -1 */
+  private cursor = -1;
   private sortKey: SortKey;
   private mode: ViewMode;
   private generation = 0;
@@ -112,8 +116,8 @@ export class ExplorerView {
       this.viewer.close();
       return;
     }
-    // 뷰어를 닫으며 되돌린 기록은 지금 폴더라 다시 읽지 않는다
-    if (isExplorerState(e.state) && this.source && e.state.path !== this.dir) void this.navigate(e.state.path, false);
+    // 뷰어를 닫으며 되돌린 기록은 지금 폴더라 다시 읽지 않는다. 위 폴더로 돌아오면 지나온 폴더에 커서를 둔다
+    if (isExplorerState(e.state) && this.source && e.state.path !== this.dir) void this.navigate(e.state.path, false, this.dir);
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
@@ -123,6 +127,21 @@ export class ExplorerView {
     if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowUp')) {
       e.preventDefault();
       this.up();
+      return;
+    }
+    if (e.altKey || e.ctrlKey || e.metaKey || this.shown.length === 0 || !this.layout) return;
+    if (GRID_KEYS.has(e.key)) {
+      e.preventDefault();
+      const layout = this.layout;
+      // 커서가 없으면 화면 맨 위 칸에서 시작한다
+      const start = this.cursor >= 0 ? this.cursor : -1;
+      const pageRows = Math.max(1, Math.floor(this.viewportHeight() / layout.stride));
+      const next = start < 0 ? Math.min(this.shown.length - 1, this.firstVisible()) : moveCursor(start, e.key as GridKey, layout.columns, this.shown.length, pageRows);
+      this.setCursor(next, true);
+    } else if (e.key === 'Enter' && this.cursor >= 0 && (!target || target.tagName !== 'BUTTON' || target.classList.contains('explorer-tile'))) {
+      // 칸 단추에 초점이 있어도 단추의 클릭 대신 커서 칸을 연다
+      e.preventDefault();
+      this.activate(this.shown[this.cursor]);
     }
   };
 
@@ -185,7 +204,9 @@ export class ExplorerView {
     document.body.classList.add('explorer-open');
 
     this.viewer = new MediaViewer({
-      onClose: () => {
+      onClose: (last) => {
+        // 보던 파일에 커서를 둔다
+        if (last) this.setCursor(this.shown.findIndex((x) => x.path === last.path), true);
         if (this.viewerPushed) {
           this.viewerPushed = false;
           history.back();
@@ -229,8 +250,8 @@ export class ExplorerView {
     await this.navigate(dir, false);
   }
 
-  /** 폴더로 간다. push 면 방문 기록을 쌓는다 */
-  async navigate(path: string, push = true): Promise<void> {
+  /** 폴더로 간다. push 면 방문 기록을 쌓는다. focus 경로의 항목이 있으면 그 칸에 커서를 두고 보이게 스크롤한다 */
+  async navigate(path: string, push = true, focus?: string): Promise<void> {
     const source = this.source;
     if (!source) return;
     const gen = ++this.generation;
@@ -247,12 +268,14 @@ export class ExplorerView {
     if (push) history.pushState({ explorer: true, path } satisfies HistoryState, '');
     this.renderPath();
     this.body.scrollTop = 0;
+    this.cursor = -1;
     this.renderEntries();
+    if (focus !== undefined) this.setCursor(this.shown.findIndex((x) => x.path === focus), true);
   }
 
   up(): void {
     const parent = parentPath(this.dir);
-    if (parent !== null) void this.navigate(parent);
+    if (parent !== null) void this.navigate(parent, true, this.dir);
   }
 
   /** 지금 폴더의 path 파일을 뷰어로 연다. 같은 폴더의 뷰어로 여는 파일을 지금 정렬 순서로 넘긴다 */
@@ -275,7 +298,7 @@ export class ExplorerView {
     this.sortSelect.value = key;
     this.savePrefs();
     this.applyMode();
-    if (this.source) this.renderEntries();
+    this.rerender();
   }
 
   /** 격자·목록 보기를 바꾸고 다시 그린다 */
@@ -283,7 +306,55 @@ export class ExplorerView {
     this.mode = mode;
     this.savePrefs();
     this.applyMode();
-    if (this.source) this.renderEntries();
+    this.rerender();
+  }
+
+  /** 정렬·보기 방식이 바뀌어 다시 그린다. 커서는 같은 항목에 남긴다 */
+  private rerender(): void {
+    if (!this.source) return;
+    const focused = this.shown[this.cursor]?.path;
+    this.renderEntries();
+    this.cursor = -1;
+    if (focused !== undefined) this.setCursor(this.shown.findIndex((x) => x.path === focused), true);
+  }
+
+  /** 커서를 index 칸에 둔다(-1 이면 없앤다). show 면 그 칸이 보이게 스크롤한다 */
+  private setCursor(index: number, show: boolean): void {
+    this.cursor = index;
+    const layout = this.layout;
+    if (index >= 0 && show && layout) {
+      const headH = this.stickyHeight();
+      const top = this.body.scrollTop - this.spacer.offsetTop + headH;
+      const next = scrollToShow(layout, index, top, this.viewportHeight());
+      // 첫 줄이면 위 여백까지 보이게 맨 위로 간다
+      if (next !== top) this.body.scrollTop = next === 0 ? 0 : next + this.spacer.offsetTop - headH;
+    }
+    this.renderRange(true);
+  }
+
+  /** 목록 보기의 머리 줄처럼 스크롤해도 위에 남아 칸을 가리는 높이 */
+  private stickyHeight(): number {
+    return this.mode === 'list' && this.listHead.isConnected ? this.listHead.offsetHeight : 0;
+  }
+
+  /** 칸이 실제로 보이는 높이: 머리 줄과 아래 여백을 뺀다 */
+  private viewportHeight(): number {
+    const pad = parseFloat(getComputedStyle(this.body).paddingBottom) || 0;
+    return Math.max(1, this.body.clientHeight - this.stickyHeight() - pad);
+  }
+
+  /** 화면에 처음 보이는 칸 번호 */
+  private firstVisible(): number {
+    const layout = this.layout;
+    if (!layout) return 0;
+    const top = this.body.scrollTop - this.spacer.offsetTop + this.stickyHeight();
+    return Math.max(0, Math.ceil(top / layout.stride)) * layout.columns;
+  }
+
+  /** 폴더는 들어가고 뷰어로 여는 파일은 연다 */
+  private activate(e: FileEntry): void {
+    if (e.kind === 'folder') void this.navigate(e.path);
+    else if (isViewable(e.kind)) this.openFile(e.path);
   }
 
   private savePrefs(): void {
@@ -448,6 +519,7 @@ export class ExplorerView {
       // 썸네일 작업이 칸이 있는지 보므로 먼저 적는다
       this.rendered.set(e.path, t);
       if (!reused && (e.kind === 'image' || e.kind === 'video')) this.attachThumb(t, e);
+      t.classList.toggle('cursor', i === this.cursor);
       tiles.push(t);
     }
     this.grid.style.transform = `translateY(${range.first * layout.stride}px)`;
@@ -486,9 +558,11 @@ export class ExplorerView {
       date.textContent = e.modified > 0 ? formatStamp(new Date(e.modified)) : '';
       b.append(date);
     }
+    // 키보드는 커서로 다루므로 탭 순서에서 뺀다
+    b.tabIndex = -1;
     b.addEventListener('click', () => {
-      if (e.kind === 'folder') void this.navigate(e.path);
-      else if (isViewable(e.kind)) this.openFile(e.path);
+      this.cursor = this.shown.indexOf(e);
+      this.activate(e);
     });
     return b;
   }
