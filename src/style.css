@@ -839,6 +839,21 @@ body.card-view-open .strata-actions {
   display: none;
 }
 
+/* 동영상 썸네일은 재생 표시를 얹어 사진과 가린다 */
+.explorer-tile[data-kind="video"] .explorer-thumb.loaded::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: translate(-35%, -50%);
+  border-style: solid;
+  border-width: 13px 0 13px 22px;
+  border-color: transparent transparent transparent color-mix(in srgb, white 88%, transparent);
+  filter: drop-shadow(0 0 6px rgb(0 0 0 / 0.6));
+}
+
 .explorer-ext {
   font-family: var(--mono);
   font-size: 15px;

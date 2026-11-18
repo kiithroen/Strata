@@ -291,7 +291,7 @@
 
 ## 로컬 탐색기
 
-파일: `src/widgets/explorer/` (원본 인터페이스 `fileSource.ts`, 브라우저 원본 `browserSources.ts`, 모델 `explorerModel.ts`, 격자 배치 `explorerGrid.ts`, 썸네일 `thumbnails.ts`, 화면 `ExplorerView.ts`, 뷰어 `MediaViewer.ts`), 데모 `src/gallery/explorerDemo.ts`(`?w=explorer`)
+파일: `src/widgets/explorer/` (원본 인터페이스 `fileSource.ts`, 브라우저 원본 `browserSources.ts`, 모델 `explorerModel.ts`, 격자 배치 `explorerGrid.ts`, 썸네일 `thumbnails.ts`, 동영상 장면 `videoFrames.ts`, 화면 `ExplorerView.ts`, 뷰어 `MediaViewer.ts`), 데모 `src/gallery/explorerDemo.ts`(`?w=explorer`)
 
 기기의 폴더를 2D로 훑고 사진·동영상·음악·텍스트를 여는 탐색기 모드다. 파일은 `FileSource`(이름, `list(경로)`, `file(경로)`)로만 읽는다. 경로는 원본 폴더 기준 `/`로 이은 문자열이고 원본 폴더는 `''`이다.
 
@@ -308,7 +308,7 @@
 - HUD 아래를 채운다. 머리 줄에 `↑ 위로`, 경로 막대(누르면 그 폴더로), 정렬, `은하로 보기`, `폴더 열기`가 있고, 아래 상태 줄이 보이는 폴더·파일 수와 크기, 숨긴 파일 수를 보인다. 좁은 화면에서는 경로 막대가 단추 아래 줄로 내려가고, 넘치면 지금 폴더(끝)가 보이게 스크롤한다.
 - 칸은 썸네일 격자(`explorer.tileMinPx`)다. 칸 색은 종류 색(`explorer.kindColors`)이고, 폴더는 폴더 그림, 파일은 확장자 글자다.
 - 격자는 가상 스크롤이다(`explorerGrid.ts`). 열 수는 폭에서 칸 최소 폭과 간격으로 정하고, 칸 높이는 보이지 않는 견본 칸을 그려 잰다. 전체 높이만 잡는 판 위에 화면 위아래 `explorer.preloadPx` 안의 줄만 칸을 만들어 옮겨 놓고, 스크롤하면 그 범위의 칸으로 바꾼다(범위 안에 남은 칸은 다시 쓴다). 폭이 바뀌면 다시 잰다.
-- 사진은 만들어진 칸만 디코딩 큐(`explorer.decodeConcurrency`)로 `explorer.thumbPx` 폭(기기 픽셀 비율, 최대 2배)의 JPEG 썸네일(`explorer.thumbQuality`)을 만든다. 차례가 왔을 때 칸이 이미 화면 밖으로 나갔으면 만들지 않는다. 폴더를 옮기면 기다리던 썸네일은 버린다.
+- 사진·동영상은 만들어진 칸만 `explorer.thumbPx` 폭(기기 픽셀 비율, 최대 2배)의 JPEG 썸네일(`explorer.thumbQuality`)을 만든다. 사진은 디코딩 큐(`explorer.decodeConcurrency`)로, 동영상은 따로 적게 도는 큐(`explorer.videoThumbConcurrency`)로 은하의 동영상 카드와 같은 장면(`videoFrames.ts`, 길이의 `explorer.videoThumbAt` 비율 자리)을 뽑고, 동영상 썸네일에는 재생 표시를 얹는다. 열 수 없는 파일은 확장자 글자로 둔다. 차례가 왔을 때 칸이 이미 화면 밖으로 나갔으면 만들지 않는다. 폴더를 옮기면 기다리던 썸네일은 버린다.
 - 썸네일은 캐시(`thumbCache`, 바이트 상한 LRU `core/lruCache.ts`, `explorer.thumbCacheMB`)에 원본·경로·크기·수정 시각을 키로 둔다. 페이지가 열려 있는 동안 남아, 스크롤을 되돌리거나 폴더·은하를 오가도 다시 디코딩하지 않는다. 버릴 때 객체 URL 을 돌려준다.
 - 폴더를 옮길 때마다 방문 기록을 쌓아 브라우저·안드로이드 뒤로가 지난 폴더로 간다. `Backspace`·`Alt+↑`는 위 폴더로 간다.
 - `은하로 보기`는 지금 폴더와 하위 폴더의 열 수 있는 파일을 폴더 축 은하로 띄운다(`explorerNotes.ts`의 `folderNotes`, 우주 보기의 "묶는 축"). 가까운 폴더부터 너비 우선으로 훑어 `explorer.cosmosMaxFiles` 개에서 멈추고, 파일 앞부분은 `explorer.readConcurrency` 개씩 겹쳐 읽는다. 사진은 사진 카드(EXIF 촬영 시각, 없으면 수정 시각), 동영상은 길이의 `explorer.videoThumbAt` 비율 자리 장면을 그리는 사진 카드(크기·장면을 읽을 때마다 숨은 video 요소와 객체 URL 을 만들고 끝나면 바로 비운다. `explorer.videoTimeoutMs` 안에 끝나지 않으면 실패로 친다), 음악은 메모 카드, 텍스트는 앞 `explorer.cardTextBytes` 바이트를 담은 문서 카드다. 읽는 동안 상태 줄에 진행을 적는다.

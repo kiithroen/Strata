@@ -4,7 +4,7 @@ import { gridLayout, visibleRows, type GridLayout } from './explorerGrid';
 import { breadcrumbs, extensionOf, formatSize, isViewable, parentPath, sortEntries, visibleEntries, type SortKey } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 import { MediaViewer } from './MediaViewer';
-import { imageThumb, thumbCache, thumbKey, thumbWidth, type Thumb } from './thumbnails';
+import { imageThumb, thumbCache, thumbKey, thumbWidth, videoThumb, type Thumb } from './thumbnails';
 
 export interface ExplorerViewOptions {
   /** 폴더 열기 단추. 원본을 골라 넘기거나 취소하면 null 을 낸다 */
@@ -32,7 +32,7 @@ const SORT_LABEL: Record<SortKey, string> = { name: '이름순', modified: '최�
 /**
  * 로컬 탐색기 화면(2D): 경로 막대, 폴더·파일 썸네일 격자, 상태 줄. 폴더를 누르면 들어가고 파일을 누르면 뷰어로 연다.
  * 폴더를 옮길 때마다 방문 기록을 쌓아 브라우저·안드로이드 뒤로가 위 폴더로 간다. 격자는 화면 근처 줄의 칸만 만들고(가상 스크롤),
- * 사진 썸네일은 그 칸만 디코딩 큐로 만들어 썸네일 캐시에 둔다.
+ * 사진·동영상 썸네일은 그 칸만 디코딩 큐로 만들어 썸네일 캐시에 둔다.
  */
 export class ExplorerView {
   readonly root: HTMLDivElement;
@@ -46,6 +46,8 @@ export class ExplorerView {
   private readonly grid: HTMLDivElement;
   private readonly status: HTMLElement;
   private readonly queue = new TaskQueue(tuning.explorer.decodeConcurrency);
+  /** 동영상 장면은 미디어 디코더를 쥐므로 따로 적게 돌린다 */
+  private readonly videoQueue = new TaskQueue(tuning.explorer.videoThumbConcurrency);
   /** 만드는 중인 썸네일(캐시 키 → 약속). 같은 칸이 다시 나타나도 한 번만 만든다 */
   private readonly inflight = new Map<string, Promise<Thumb>>();
   /** 지금 DOM 에 있는 칸(경로 → 칸) */
@@ -240,6 +242,7 @@ export class ExplorerView {
   private reset(): void {
     this.generation++;
     this.queue.clear();
+    this.videoQueue.clear();
     this.inflight.clear();
     this.rendered.clear();
     this.grid.replaceChildren();
@@ -352,7 +355,7 @@ export class ExplorerView {
       const t = reused ?? this.tile(e);
       // 썸네일 작업이 칸이 있는지 보므로 먼저 적는다
       this.rendered.set(e.path, t);
-      if (!reused && e.kind === 'image') this.attachThumb(t, e);
+      if (!reused && (e.kind === 'image' || e.kind === 'video')) this.attachThumb(t, e);
       tiles.push(t);
     }
     this.grid.style.transform = `translateY(${range.first * layout.stride}px)`;
@@ -404,12 +407,14 @@ export class ExplorerView {
     let job = this.inflight.get(key);
     if (!job) {
       const gen = this.generation;
-      const created = this.queue.run(async () => {
+      const video = entry.kind === 'video';
+      const created = (video ? this.videoQueue : this.queue).run(async () => {
         // 기다리는 사이 화면 밖으로 나간 칸은 만들지 않는다
         if (gen !== this.generation || !this.rendered.has(entry.path)) throw new Error('stale');
         const cached = thumbCache.get(key);
         if (cached) return cached;
-        const thumb = await imageThumb(await source.file(entry.path), thumbWidth());
+        const file = await source.file(entry.path);
+        const thumb = await (video ? videoThumb(file, thumbWidth()) : imageThumb(file, thumbWidth()));
         thumbCache.set(key, thumb, thumb.bytes);
         return thumb;
       });
@@ -425,7 +430,7 @@ export class ExplorerView {
         if (this.rendered.get(entry.path) === tile) this.showThumb(tile, thumb, true);
       },
       () => {
-        // 디코딩할 수 없는 사진(SVG·손상 등)이나 버린 작업은 확장자 글자만 둔다
+        // 디코딩할 수 없는 사진(SVG·손상 등)·동영상이나 버린 작업은 확장자 글자만 둔다
       },
     );
   }

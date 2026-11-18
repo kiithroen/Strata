@@ -437,6 +437,7 @@ export const tuning = {
     preloadPx: 480,
     thumbQuality: 0.8,
     thumbCacheMB: 96,
+    videoThumbConcurrency: 2,
   },
 
   /**
@@ -460,10 +461,11 @@ export const tuning = {
    * 로컬 탐색기. tileMinPx 는 썸네일 격자 칸의 최소 폭(CSS px), thumbPx 는 썸네일을 디코딩하는 폭(CSS px, 기기 픽셀 비율을 곱해 쓴다),
    * decodeConcurrency 는 동시에 디코딩하는 썸네일 수, preloadPx 는 격자가 화면 위아래 얼마까지 칸을 만들고 썸네일을 미리 만들지(CSS px),
    * thumbQuality 는 썸네일 JPEG 품질(0~1), thumbCacheMB 는 페이지가 열려 있는 동안 썸네일을 담아 두는 캐시 상한(MB),
+   * videoThumbConcurrency 는 동시에 장면을 뽑는 동영상 썸네일 수,
    * textMaxBytes 는 텍스트 뷰어가 앞에서부터 읽는 최대 바이트, swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
    * kindColors 는 칸 종류 색이다.
    * 은하로 보기: cosmosMaxFiles 는 하위 폴더까지 카드로 만드는 파일 수 상한, readConcurrency 는 동시에 읽는 파일 수,
-   * cardTextBytes 는 텍스트 문서 카드에 담는 앞부분 바이트, videoThumbAt 은 동영상 카드에 쓰는 장면 자리(길이 대비),
+   * cardTextBytes 는 텍스트 문서 카드에 담는 앞부분 바이트, videoThumbAt 은 동영상 카드·썸네일에 쓰는 장면 자리(길이 대비),
    * videoTimeoutMs 는 동영상 크기·장면 읽기를 포기하는 시간(ms, 파일 읽기라 벽시계)이다
    */
   explorer: {
@@ -473,6 +475,7 @@ export const tuning = {
     preloadPx: 480,
     thumbQuality: 0.8,
     thumbCacheMB: 96,
+    videoThumbConcurrency: 2,
     textMaxBytes: 2_000_000,
     swipePx: 60,
     cosmosMaxFiles: 600,

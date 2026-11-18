@@ -1,6 +1,7 @@
 import { tuning } from '../../config';
 import { LruCache } from '../../core/lruCache';
 import type { FileEntry, FileSource } from './fileSource';
+import { videoFrame } from './videoFrames';
 
 /** 만들어 둔 썸네일: 줄인 JPEG 의 객체 URL */
 export interface Thumb {
@@ -48,4 +49,9 @@ export async function imageThumb(file: Blob, width: number): Promise<Thumb> {
   } finally {
     bitmap.close();
   }
+}
+
+/** 동영상 파일의 한 장면(길이의 explorer.videoThumbAt 비율 자리)으로 썸네일을 만든다. 열 수 없으면 거부한다 */
+export async function videoThumb(file: File, width: number): Promise<Thumb> {
+  return encode(await videoFrame(file, width));
 }
