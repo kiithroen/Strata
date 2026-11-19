@@ -34,10 +34,17 @@ export function isViewable(kind: FileKind): boolean {
   return kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'text';
 }
 
-/** 탐색기에 보이는 항목: 폴더와 뷰어로 여는 파일. 나머지는 숨기고 그 수를 낸다 */
-export function visibleEntries(entries: readonly FileEntry[]): { shown: FileEntry[]; hidden: number } {
-  const shown = entries.filter((e) => e.kind === 'folder' || isViewable(e.kind));
-  return { shown, hidden: entries.length - shown.length };
+/**
+ * 탐색기에 보이는 항목과 미지원 파일 수. 기본은 폴더와 뷰어로 여는 파일만 내고,
+ * showHidden 이 true 면 미지원(other) 파일도 함께 낸다. hidden 은 showHidden 과 상관없이 미지원 파일 수다
+ */
+export function visibleEntries(entries: readonly FileEntry[], showHidden = false): { shown: FileEntry[]; hidden: number } {
+  let hidden = 0;
+  for (const e of entries) {
+    if (e.kind !== 'folder' && !isViewable(e.kind)) hidden++;
+  }
+  const shown = showHidden ? [...entries] : entries.filter((e) => e.kind === 'folder' || isViewable(e.kind));
+  return { shown, hidden };
 }
 
 export function joinPath(dir: string, name: string): string {
@@ -49,6 +56,24 @@ export function parentPath(path: string): string | null {
   if (path === '') return null;
   const slash = path.lastIndexOf('/');
   return slash < 0 ? '' : path.slice(0, slash);
+}
+
+/**
+ * descendant 가 ancestor 아래의 하위 경로일 때, ancestor 바로 아래의 자식 경로를 낸다.
+ * ancestor 가 descendant 의 상위 폴더가 아니면 undefined 다
+ */
+export function childOnPath(ancestor: string, descendant: string): string | undefined {
+  if (descendant === '' || descendant === ancestor) return undefined;
+  if (ancestor === '') {
+    const slash = descendant.indexOf('/');
+    return slash < 0 ? descendant : descendant.slice(0, slash);
+  }
+  const prefix = `${ancestor}/`;
+  if (!descendant.startsWith(prefix)) return undefined;
+  const rest = descendant.slice(prefix.length);
+  if (rest === '') return undefined;
+  const slash = rest.indexOf('/');
+  return slash < 0 ? descendant : descendant.slice(0, prefix.length + slash);
 }
 
 /** 경로 막대 조각: 원본 폴더부터 지금 폴더까지 이름과 경로 */

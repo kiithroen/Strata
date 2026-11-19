@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ListSource } from '../src/widgets/explorer/browserSources';
 import {
   breadcrumbs,
+  childOnPath,
   decodeText,
   defaultSortDir,
   extensionOf,
@@ -53,6 +54,19 @@ describe('경로', () => {
       { name: '11', path: '2026/11' },
     ]);
   });
+
+  it('상위 폴더에서 하위 경로로 향하는 직전 자식 경로를 찾는다', () => {
+    expect(childOnPath('', '2026')).toBe('2026');
+    expect(childOnPath('', '2026/11/seoul')).toBe('2026');
+    expect(childOnPath('2026', '2026/11')).toBe('2026/11');
+    expect(childOnPath('2026', '2026/11/seoul')).toBe('2026/11');
+    expect(childOnPath('2026/11', '2026/11/seoul')).toBe('2026/11/seoul');
+    expect(childOnPath('', '')).toBeUndefined();
+    expect(childOnPath('2026', '2026')).toBeUndefined();
+    expect(childOnPath('2026', '20260/11')).toBeUndefined();
+    expect(childOnPath('2026/11', '2026')).toBeUndefined();
+    expect(childOnPath('a', 'b/c')).toBeUndefined();
+  });
 });
 
 describe('sortEntries', () => {
@@ -103,6 +117,21 @@ describe('visibleEntries', () => {
     expect(shown.map((e) => e.name)).toEqual(['a', 'b.jpg', 'd.mp3']);
     expect(hidden).toBe(2);
     expect(kindOf('old.avi')).toBe('other');
+  });
+
+  it('showHidden 이 true 면 미지원 파일도 shown 에 포함하고 hidden 은 미지원 파일 수를 그대로 낸다', () => {
+    const list = [entry('a', 'folder'), entry('b.jpg', 'image'), entry('c.zip', 'other'), entry('d.mp3', 'audio'), entry('e.exe', 'other')];
+    const all = visibleEntries(list, true);
+    expect(all.shown.map((e) => e.name)).toEqual(['a', 'b.jpg', 'c.zip', 'd.mp3', 'e.exe']);
+    expect(all.shown).not.toBe(list);
+    expect(all.hidden).toBe(2);
+
+    const onlyUnsupported = [entry('a.zip', 'other'), entry('b.bin', 'other')];
+    expect(visibleEntries(onlyUnsupported, false)).toEqual({ shown: [], hidden: 2 });
+    expect(visibleEntries(onlyUnsupported, true)).toEqual({ shown: onlyUnsupported, hidden: 2 });
+
+    const noUnsupported = [entry('a', 'folder'), entry('b.jpg', 'image')];
+    expect(visibleEntries(noUnsupported, true)).toEqual({ shown: noUnsupported, hidden: 0 });
   });
 });
 
