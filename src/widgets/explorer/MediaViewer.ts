@@ -1,12 +1,6 @@
 import { tuning } from '../../config';
-import {
-  ImageZoom,
-  isDoubleTap,
-  zoomTransformCss,
-  type Point2D,
-  type TapRecord,
-  type ZoomBounds,
-} from '../common/imageZoom';
+import { zoomTransformCss, type Point2D, type TapRecord, type ZoomBounds } from '../common/imageZoom';
+import { gesturePoint as pointOf, ZoomGesture, type GestureStep } from '../common/zoomGesture';
 import { lockSwipeAxis, swipeStep, type SwipeAxis } from '../noteView/noteNav';
 import { formatSize } from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
@@ -25,13 +19,14 @@ export interface MediaViewerOptions {
   onClose?: (last: FileEntry | null) => void;
 }
 
-/** 한 번에 모든 일치를 `<mark>` 노드로 감쌀 최대 매치 수. 넘으면 현재 일치만 감싼다 */
-const MAX_HIGHLIGHT_MARKS = 2000;
+/** 동영상 탭 뒤 이 이벤트가 오면 그 탭은 기본 재생기 컨트롤 조작이다 */
+const VIDEO_CONTROL_EVENTS = ['play', 'pause', 'seeking', 'volumechange', 'ratechange', 'fullscreenchange', 'enterpictureinpicture'];
 
 /**
  * 전체 화면 2D 뷰어: 사진·동영상·음악·텍스트를 열고, 같은 폴더의 다음·이전 파일로 넘긴다(방향키, 사진은 터치 가로 끌기).
- * 사진은 핀치·더블탭·마우스 휠로 확대하고 확대 중에는 팬으로 동작한다. 사진·동영상은 미디어 영역을 단순 탭하면
- * 상단 헤더와 좌우 오버레이 UI 를 숨기거나 다시 보인다. 텍스트는 줄바꿈 전환·수동 인코딩 재해독·파일 내 찾기를 지원한다.
+ * 사진은 핀치·더블탭·마우스 휠로 확대하고 확대 중에는 팬으로 동작한다(`ZoomGesture`). 사진·동영상은 미디어 영역을 단순 탭하면
+ * 상단 헤더와 좌우 오버레이 UI 를 숨기거나 다시 보인다. 동영상 탭이 재생·탐색·음량 같은 재생기 상태를 바꿨으면 컨트롤 조작으로 보고
+ * 토글하지 않는다. 텍스트는 줄바꿈 전환·수동 인코딩 재해독·파일 내 찾기를 지원한다.
  * 음악이 끝나면 같은 폴더의 다음 음악을 이어 튼다. 파일은 열 때마다 원본에서 읽고, 닫거나 넘기면 객체 URL 을 돌려준다.
  */
 export class MediaViewer {
@@ -54,17 +49,15 @@ export class MediaViewer {
   private textWrap = true;
   private uiHidden = false;
 
-  /** 사진 줌·팬·스와이프·탭 상태 */
-  private readonly zoom = new ImageZoom();
+  /** 사진 줌·팬·탭(동영상은 탭만) 판정과 사진 가로 끌기 */
+  private readonly gesture = new ZoomGesture({
+    bounds: () => this.imageBounds(),
+    focal: (x, y) => this.imageFocal(x, y),
+  });
   private currentImage: HTMLImageElement | null = null;
-  private readonly pointers = new Map<number, { x: number; y: number }>();
-  private pinch: { ids: [number, number]; midX: number; midY: number; dist: number } | null = null;
-  private panState: { id: number; lastX: number; lastY: number } | null = null;
   private swipe: { id: number; x: number; y: number; axis: SwipeAxis } | null = null;
-  private tapCandidate: { id: number; x: number; y: number; t: number; moved: boolean } | null = null;
-  private lastImageTap: TapRecord | null = null;
   private singleTapTimer: number | null = null;
-  private wasMultiTouch = false;
+  private readonly onVideoControl = () => this.gesture.forgetTap();
 
   private readonly onKey = (e: KeyboardEvent) => {
     if (!this.open) return;
@@ -92,33 +85,20 @@ export class MediaViewer {
   };
 
   private readonly onResize = () => {
-    if (!this.open || this.current?.kind !== 'image' || !this.zoom.zoomed) return;
-    this.zoom.clamp(this.imageBounds());
-    this.applyImageZoom(false);
+    if (!this.open || this.current?.kind !== 'image') return;
+    this.applyStep(this.gesture.fit());
   };
 
   /** stage 밖에서 끝난 포인터(동영상·합성 이벤트 등)가 남지 않게 정리한다 */
   private readonly onWindowPointerEnd = (e: PointerEvent) => {
-    if (this.pointers.has(e.pointerId) || (this.tapCandidate && this.tapCandidate.id === e.pointerId)) {
-      this.onStageEnd(e, true);
-    }
+    if (this.gesture.tracks(e.pointerId)) this.onStageEnd(e, true);
   };
 
   private readonly onWindowBlur = () => {
-    if (this.pointers.size === 0 && !this.tapCandidate) return;
-    this.pointers.clear();
-    this.pinch = null;
-    this.panState = null;
-    this.tapCandidate = null;
-    this.lastImageTap = null;
-    this.wasMultiTouch = false;
+    if (this.gesture.pointerCount === 0) return;
     this.clearSingleTapTimer();
     this.cancelSwipe();
-    this.currentImage?.classList.remove('panning');
-    if (this.currentImage) {
-      this.zoom.settle(this.imageBounds());
-      this.applyImageZoom(false);
-    }
+    this.applyStep(this.gesture.blur());
   };
 
   constructor(private readonly options: MediaViewerOptions = {}) {
@@ -232,14 +212,9 @@ export class MediaViewer {
   }
 
   private resetGestureState(): void {
-    this.zoom.reset();
-    this.pointers.clear();
-    this.pinch = null;
-    this.panState = null;
+    this.gesture.reset();
+    this.gesture.zoomable = false;
     this.swipe = null;
-    this.tapCandidate = null;
-    this.lastImageTap = null;
-    this.wasMultiTouch = false;
     this.clearSingleTapTimer();
   }
 
@@ -300,13 +275,11 @@ export class MediaViewer {
       img.draggable = false;
       img.src = this.url;
       img.addEventListener('load', () => {
-        if (img === this.currentImage && this.zoom.zoomed) {
-          this.zoom.clamp(this.imageBounds());
-          this.applyImageZoom(false);
-        }
+        if (img === this.currentImage) this.applyStep(this.gesture.fit());
       });
       img.addEventListener('error', fail('이 사진 형식은 열 수 없다'));
       this.currentImage = img;
+      this.gesture.zoomable = true;
       this.stage.append(img);
     } else if (entry.kind === 'video') {
       const video = document.createElement('video');
@@ -316,6 +289,7 @@ export class MediaViewer {
       video.playsInline = true;
       video.src = this.url;
       video.addEventListener('error', fail('이 동영상 형식은 브라우저에서 열 수 없다'));
+      for (const type of VIDEO_CONTROL_EVENTS) video.addEventListener(type, this.onVideoControl);
       this.stage.append(video);
     } else if (entry.kind === 'audio') {
       const box = document.createElement('div');
@@ -360,16 +334,23 @@ export class MediaViewer {
   private applyImageZoom(animate: boolean): void {
     const img = this.currentImage;
     if (!img) return;
+    const zoom = this.gesture.zoom;
     img.classList.toggle('animating', animate);
     img.classList.remove('dragging');
-    img.style.transform = zoomTransformCss(this.zoom.state);
-    img.classList.toggle('zoomed', this.zoom.zoomed);
-    if (!this.zoom.zoomed) img.classList.remove('panning');
+    img.style.transform = zoomTransformCss(zoom.state);
+    img.classList.toggle('zoomed', zoom.zoomed);
+    img.classList.toggle('panning', this.gesture.panning);
+  }
+
+  /** 제스처 결과를 화면에 옮긴다 */
+  private applyStep(step: GestureStep): void {
+    if (step.redraw) this.applyImageZoom(step.animate);
+    else if (step.consumed) this.currentImage?.classList.toggle('panning', this.gesture.panning);
   }
 
   private settleSwipe(): void {
     const img = this.currentImage;
-    if (!img || this.zoom.zoomed) return;
+    if (!img || this.gesture.zoom.zoomed) return;
     img.classList.remove('dragging');
     if (img.style.transform !== '') {
       img.classList.add('animating');
@@ -383,118 +364,41 @@ export class MediaViewer {
     this.settleSwipe();
   }
 
-  private beginPinch(): void {
-    const it = this.pointers.entries();
-    const first = it.next();
-    const second = it.next();
-    if (first.done || second.done) return;
-    const [idA, a] = first.value;
-    const [idB, b] = second.value;
-    this.pinch = {
-      ids: [idA, idB],
-      midX: (a.x + b.x) / 2,
-      midY: (a.y + b.y) / 2,
-      dist: Math.hypot(b.x - a.x, b.y - a.y),
-    };
-  }
-
   private readonly onStageDown = (e: PointerEvent) => {
     const kind = this.current?.kind;
     if (kind !== 'image' && kind !== 'video') return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const step = this.gesture.down(pointOf(e));
+    // 동영상은 기본 재생기 컨트롤을 방해하지 않게 포인터를 잡지 않고 탭만 판정한다
+    if (kind === 'video') return;
 
-    // 동영상은 기본 재생기 컨트롤을 방해하지 않게 포인터 캡처 없이 단순 탭만 추적한다
-    if (kind === 'video') {
-      if (this.tapCandidate && e.timeStamp - this.tapCandidate.t <= tuning.input.tapMaxSeconds * 1000) {
-        this.tapCandidate.moved = true;
-        return;
-      }
-      this.tapCandidate = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, moved: false };
-      return;
-    }
-
-    this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try {
       this.stage.setPointerCapture(e.pointerId);
     } catch {
       // 합성 이벤트 등 활성 포인터가 없을 때는 캡처를 건너뛴다
     }
     this.currentImage?.classList.remove('animating');
-
-    if (this.pointers.size === 1) {
-      this.wasMultiTouch = false;
-      this.tapCandidate = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, moved: false };
-      if (this.currentImage && this.zoom.zoomed) {
-        this.panState = { id: e.pointerId, lastX: e.clientX, lastY: e.clientY };
-        this.currentImage.classList.add('panning');
-      } else if (this.currentImage && e.pointerType !== 'mouse') {
+    if (this.gesture.pointerCount === 1) {
+      if (this.currentImage && !step.consumed && e.pointerType !== 'mouse') {
         this.swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, axis: 'none' };
       }
-      return;
+    } else {
+      this.cancelSwipe();
     }
-
-    this.wasMultiTouch = true;
-    this.tapCandidate = null;
-    this.lastImageTap = null;
-    this.clearSingleTapTimer();
-    this.panState = null;
-    this.currentImage?.classList.remove('panning');
-    this.cancelSwipe();
-    if (this.currentImage && !this.pinch) this.beginPinch();
+    this.applyStep(step);
   };
 
   private readonly onStageMove = (e: PointerEvent) => {
     const kind = this.current?.kind;
-    if (kind === 'video') {
-      if (this.tapCandidate && this.tapCandidate.id === e.pointerId) {
-        if (Math.hypot(e.clientX - this.tapCandidate.x, e.clientY - this.tapCandidate.y) > tuning.input.tapSlop) {
-          this.tapCandidate.moved = true;
-        }
-      }
-      return;
-    }
-    if (kind !== 'image') return;
-
-    const active = this.pointers.get(e.pointerId);
-    if (!active) return;
-    active.x = e.clientX;
-    active.y = e.clientY;
-
-    if (this.tapCandidate && this.tapCandidate.id === e.pointerId) {
-      if (Math.hypot(e.clientX - this.tapCandidate.x, e.clientY - this.tapCandidate.y) > tuning.input.tapSlop) {
-        this.tapCandidate.moved = true;
-        this.lastImageTap = null;
-        this.clearSingleTapTimer();
-      }
-    }
-
-    if (this.pinch && this.currentImage) {
-      const a = this.pointers.get(this.pinch.ids[0]);
-      const b = this.pointers.get(this.pinch.ids[1]);
-      if (!a || !b) return;
-      const midX = (a.x + b.x) / 2;
-      const midY = (a.y + b.y) / 2;
-      const dist = Math.hypot(b.x - a.x, b.y - a.y);
-      const panDelta = { x: midX - this.pinch.midX, y: midY - this.pinch.midY };
-      this.zoom.pinch(this.pinch.dist, dist, this.imageFocal(midX, midY), this.imageBounds(), panDelta);
-      this.pinch.midX = midX;
-      this.pinch.midY = midY;
-      this.pinch.dist = dist;
-      this.applyImageZoom(false);
+    if (kind !== 'image' && kind !== 'video') return;
+    const step = this.gesture.move(pointOf(e));
+    if (kind === 'video') return;
+    if (step.consumed) {
+      this.applyStep(step);
       return;
     }
 
-    if (this.panState && this.panState.id === e.pointerId && this.currentImage) {
-      const dx = e.clientX - this.panState.lastX;
-      const dy = e.clientY - this.panState.lastY;
-      this.panState.lastX = e.clientX;
-      this.panState.lastY = e.clientY;
-      this.zoom.pan(dx, dy, this.imageBounds());
-      this.applyImageZoom(false);
-      return;
-    }
-
-    if (this.swipe && this.swipe.id === e.pointerId && this.currentImage && !this.zoom.zoomed) {
+    if (this.swipe && this.swipe.id === e.pointerId && this.currentImage && !this.gesture.zoom.zoomed) {
       const dx = e.clientX - this.swipe.x;
       const dy = e.clientY - this.swipe.y;
       this.swipe.axis = lockSwipeAxis(this.swipe.axis, dx, dy);
@@ -508,124 +412,51 @@ export class MediaViewer {
 
   private onStageEnd(e: PointerEvent, cancelled: boolean): void {
     const kind = this.current?.kind;
-    if (kind === 'video') {
-      if (!this.tapCandidate || this.tapCandidate.id !== e.pointerId) return;
-      const cand = this.tapCandidate;
-      this.tapCandidate = null;
-      if (!cancelled && !cand.moved) {
-        const dt = e.timeStamp - cand.t;
-        const dist = Math.hypot(e.clientX - cand.x, e.clientY - cand.y);
-        if (dt <= tuning.input.tapMaxSeconds * 1000 && dist <= tuning.input.tapSlop) this.toggleUi();
-      }
-      return;
-    }
-    if (kind !== 'image' || !this.pointers.has(e.pointerId)) return;
-    this.pointers.delete(e.pointerId);
+    if (kind !== 'image' && kind !== 'video') return;
+    const step = this.gesture.end(pointOf(e), cancelled);
 
-    if (this.pinch && (e.pointerId === this.pinch.ids[0] || e.pointerId === this.pinch.ids[1])) {
-      this.pinch = null;
-      if (this.pointers.size >= 2) {
-        this.beginPinch();
-      } else if (this.pointers.size === 1 && this.zoom.zoomed) {
-        const first = this.pointers.entries().next();
-        if (!first.done) {
-          const [remId, rem] = first.value;
-          this.panState = { id: remId, lastX: rem.x, lastY: rem.y };
-          this.currentImage?.classList.add('panning');
+    if (kind === 'image') {
+      if (this.swipe && this.swipe.id === e.pointerId) {
+        const swipe = this.swipe;
+        this.swipe = null;
+        if (!cancelled && swipe.axis === 'x' && !this.gesture.zoom.zoomed) {
+          const dir = swipeStep(e.clientX - swipe.x, e.clientY - swipe.y, tuning.explorer.swipePx);
+          const canStep = dir !== 0 && this.index + dir >= 0 && this.index + dir < this.items.length;
+          if (canStep) {
+            this.step(dir);
+            return;
+          }
         }
-      } else if (this.pointers.size === 0) {
-        this.zoom.settle(this.imageBounds());
-        this.applyImageZoom(false);
-        this.wasMultiTouch = false;
+        this.settleSwipe();
       }
-      return;
+      this.applyStep(step);
     }
-
-    if (this.panState && this.panState.id === e.pointerId) {
-      this.panState = null;
-      this.currentImage?.classList.remove('panning');
-      if (this.pointers.size === 0) {
-        this.zoom.settle(this.imageBounds());
-        this.applyImageZoom(false);
-      }
-    }
-
-    if (this.swipe && this.swipe.id === e.pointerId) {
-      const swipe = this.swipe;
-      this.swipe = null;
-      if (!cancelled && swipe.axis === 'x' && !this.zoom.zoomed) {
-        const dir = swipeStep(e.clientX - swipe.x, e.clientY - swipe.y, tuning.explorer.swipePx);
-        const canStep = dir !== 0 && this.index + dir >= 0 && this.index + dir < this.items.length;
-        if (canStep) {
-          this.step(dir);
-          return;
-        }
-      }
-      this.settleSwipe();
-    }
-
-    if (!cancelled && this.pointers.size === 0 && !this.wasMultiTouch && this.tapCandidate && this.tapCandidate.id === e.pointerId) {
-      const cand = this.tapCandidate;
-      this.tapCandidate = null;
-      const dt = e.timeStamp - cand.t;
-      const dist = Math.hypot(e.clientX - cand.x, e.clientY - cand.y);
-      if (!cand.moved && dt <= tuning.input.tapMaxSeconds * 1000 && dist <= tuning.input.tapSlop) {
-        this.handleImageTap({ x: e.clientX, y: e.clientY, t: e.timeStamp });
-      }
-    }
-
-    if (this.pointers.size === 0) {
-      this.wasMultiTouch = false;
-      this.tapCandidate = null;
-      if (cancelled) {
-        this.lastImageTap = null;
-        this.clearSingleTapTimer();
-      }
-    }
+    if (step.tap) this.scheduleUiToggle(step.tap);
   }
 
   private readonly onStageUp = (e: PointerEvent) => this.onStageEnd(e, false);
   private readonly onStageCancel = (e: PointerEvent) => this.onStageEnd(e, true);
 
   /**
-   * 사진 영역의 단일 탭(오버레이 UI 토글)과 더블탭(배율 토글)을 충돌 없이 나눈다.
-   * 첫 탭은 zoom.doubleTapSeconds 동안 두 번째 탭을 기다리고, 그 안에 더블탭이 오면 UI 토글을 취소하고 줌만 수행한다
+   * 사진·동영상 영역의 단일 탭은 zoom.doubleTapSeconds 동안 더블탭을 기다린 뒤 오버레이 UI 를 토글한다.
+   * 그사이 더블탭·끌기·새 누름·재생기 조작이 있었으면 제스처가 그 탭을 지워 토글하지 않는다
    */
-  private handleImageTap(tap: TapRecord): void {
-    if (this.currentImage && isDoubleTap(this.lastImageTap, tap)) {
-      this.clearSingleTapTimer();
-      this.lastImageTap = null;
-      this.zoom.doubleTap(this.imageFocal(tap.x, tap.y), this.imageBounds());
-      this.applyImageZoom(true);
-      return;
-    }
+  private scheduleUiToggle(tap: TapRecord): void {
     this.clearSingleTapTimer();
-    this.lastImageTap = this.currentImage ? tap : null;
-    if (!this.currentImage) {
-      this.toggleUi();
-      return;
-    }
     const gen = this.generation;
     this.singleTapTimer = window.setTimeout(() => {
       this.singleTapTimer = null;
-      this.lastImageTap = null;
-      if (gen === this.generation && this.open && this.current?.kind === 'image' && this.pointers.size === 0) {
-        this.toggleUi();
-      }
+      if (gen === this.generation && this.open && this.gesture.confirmTap(tap)) this.toggleUi();
     }, tuning.zoom.doubleTapSeconds * 1000);
   }
 
   private readonly onStageWheel = (e: WheelEvent) => {
-    if (this.current?.kind !== 'image' || !this.currentImage) return;
+    if (this.current?.kind !== 'image') return;
+    const step = this.gesture.wheel({ deltaY: e.deltaY, deltaMode: e.deltaMode, ctrlKey: e.ctrlKey, x: e.clientX, y: e.clientY });
+    if (!step) return;
     e.preventDefault();
-    this.clearSingleTapTimer();
-    this.lastImageTap = null;
     this.cancelSwipe();
-    const unit = (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1) * (e.ctrlKey ? 4 : 1);
-    const bounds = this.imageBounds();
-    this.zoom.wheel(e.deltaY * unit, this.imageFocal(e.clientX, e.clientY), bounds);
-    if (e.deltaY > 0) this.zoom.settle(bounds);
-    this.applyImageZoom(false);
+    this.applyStep(step);
   };
 
   /**
@@ -717,7 +548,7 @@ export class MediaViewer {
 
     const scrollActiveMark = () => {
       const active =
-        matches.length <= MAX_HIGHLIGHT_MARKS ? markEls[activeMatch] : pre.querySelector<HTMLElement>('.viewer-mark.active');
+        matches.length <= tuning.explorer.maxHighlightMarks ? markEls[activeMatch] : pre.querySelector<HTMLElement>('.viewer-mark.active');
       active?.scrollIntoView({ block: 'center', inline: 'nearest' });
     };
 
@@ -737,7 +568,7 @@ export class MediaViewer {
       const frag = document.createDocumentFragment();
       markEls = [];
 
-      if (matches.length <= MAX_HIGHLIGHT_MARKS) {
+      if (matches.length <= tuning.explorer.maxHighlightMarks) {
         let cursor = 0;
         for (let i = 0; i < matches.length; i++) {
           const m = matches[i];
@@ -781,7 +612,7 @@ export class MediaViewer {
       if (matches.length === 0) return;
       const prev = activeMatch;
       activeMatch = stepMatchIndex(activeMatch, matches.length, dir);
-      if (matches.length <= MAX_HIGHLIGHT_MARKS && markEls.length === matches.length) {
+      if (matches.length <= tuning.explorer.maxHighlightMarks && markEls.length === matches.length) {
         markEls[prev]?.classList.remove('active');
         markEls[activeMatch]?.classList.add('active');
         updateFindUi();

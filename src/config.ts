@@ -466,7 +466,8 @@ export const tuning = {
    * decodeConcurrency 는 동시에 디코딩하는 썸네일 수, preloadPx 는 격자가 화면 위아래 얼마까지 칸을 만들고 썸네일을 미리 만들지(CSS px),
    * thumbQuality 는 썸네일 JPEG 품질(0~1), thumbCacheMB 는 페이지가 열려 있는 동안 썸네일을 담아 두는 캐시 상한(MB),
    * videoThumbConcurrency 는 동시에 장면을 뽑는 동영상 썸네일 수,
-   * textChunkBytes 는 텍스트 뷰어가 앞에서부터 한 번에 이어 읽는 바이트(끝 근처까지 내리면 다음 조각을 읽는다), swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
+   * textChunkBytes 는 텍스트 뷰어가 앞에서부터 한 번에 이어 읽는 바이트(끝 근처까지 내리면 다음 조각을 읽는다),
+   * maxHighlightMarks 는 파일 내 찾기가 모든 일치를 강조하는 최대 수(넘으면 지금 일치만 강조한다), swipePx 는 뷰어에서 다음·이전으로 넘기는 가로 끌기 거리(CSS px),
    * kindColors 는 칸 종류 색이다.
    * 은하로 보기: cosmosMaxFiles 는 하위 폴더까지 카드로 만드는 파일 수 상한, readConcurrency 는 동시에 읽는 파일 수,
    * cardTextBytes 는 텍스트 문서 카드에 담는 앞부분 바이트, videoThumbAt 은 동영상 카드·썸네일에 쓰는 장면 자리(길이 대비),
@@ -481,6 +482,7 @@ export const tuning = {
     thumbCacheMB: 96,
     videoThumbConcurrency: 2,
     textChunkBytes: 512 * 1024,
+    maxHighlightMarks: 2000,
     swipePx: 60,
     cosmosMaxFiles: 600,
     readConcurrency: 8,
@@ -553,7 +555,8 @@ export const tuning = {
    * 사진 뷰어(노트 보기·탐색기 미디어 뷰어)의 확대·이동.
    * minScale·maxScale 은 배율 범위, doubleTapScale 은 더블탭 확대 배율(확대 중 더블탭은 minScale 로 복귀),
    * doubleTapSeconds·doubleTapSlop 은 더블탭으로 묶는 최대 간격(초)과 두 탭 사이 최대 거리(CSS px),
-   * wheelSpeed 는 휠 한 눈금(100px)당 로그 배율 변화량, snapEpsilon 은 조작이 끝났을 때 minScale 로 붙이는 여유다
+   * wheelSpeed 는 휠 한 눈금(100px)당 로그 배율 변화량, snapEpsilon 은 조작이 끝났을 때 minScale 로 붙이는 여유다.
+   * 휠 deltaY 는 줄 단위면 wheelLinePx, 쪽 단위면 wheelPagePx 를 곱해 px 로 바꾸고, Ctrl(트랙패드 핀치)이면 wheelCtrlBoost 를 더 곱한다
    */
   zoom: {
     minScale: 1,
@@ -563,6 +566,9 @@ export const tuning = {
     doubleTapSlop: 28,
     wheelSpeed: 0.25,
     snapEpsilon: 0.02,
+    wheelLinePx: 16,
+    wheelPagePx: 400,
+    wheelCtrlBoost: 4,
   },
 
   gesture: {
