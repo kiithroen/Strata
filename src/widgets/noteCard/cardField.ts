@@ -22,6 +22,8 @@ export class CardField {
   /** 지금 앞으로 들어간 거리 */
   offset = 0;
   private goal = 0;
+  /** 세로 끌기 관성 속도(깊이 단위/초) */
+  private velocity = 0;
   /** 가장 가까운 자리가 놓일 수 있는 깊이(세로 화면 배율 포함). 앞뒤 이동의 기준이다 */
   private readonly near: number;
 
@@ -55,8 +57,75 @@ export class CardField {
     this.goal = Math.min(this.maxOffset, Math.max(0, this.goal + delta));
   }
 
+  /** 세로 끌기 끝 속도로 관성을 시작한다(깊이 단위/초). 정지 기준 미만이거나 경계 밖으로 미는 속도는 무시한다 */
+  flick(velocity: number): void {
+    if (!Number.isFinite(velocity) || Math.abs(velocity) < tuning.cardField.inertiaStopSpeed) {
+      this.velocity = 0;
+      return;
+    }
+    if ((this.goal <= 0 && velocity < 0) || (this.goal >= this.maxOffset && velocity > 0)) {
+      this.velocity = 0;
+      return;
+    }
+    this.velocity = velocity;
+  }
+
+  /** 진행 중인 관성을 멈춘다 */
+  cancelInertia(): void {
+    this.velocity = 0;
+  }
+
   step(dt: number): void {
-    this.offset = damp(this.offset, this.goal, tuning.cardField.dollyRate, dt);
+    if (dt <= 0) return;
+    const c = tuning.cardField;
+    const k = c.dollyRate;
+    const r = c.inertiaDecay;
+    const stop = c.inertiaStopSpeed;
+
+    if (this.velocity !== 0) {
+      const v0 = this.velocity;
+      if (Math.abs(v0) < stop) {
+        this.velocity = 0;
+      } else {
+        const bound = v0 > 0 ? this.maxOffset : 0;
+        const distToBound = bound - this.goal;
+        if (distToBound === 0) {
+          this.velocity = 0;
+        } else {
+          // 지수 감쇠 관성(dg/dt = v, dv/dt = -r*v)과 지수 추종(dx/dt = k*(g - x))의 해석해로 주사율 무관성을 지킨다
+          const tStop = Math.log(Math.abs(v0) / stop) / r;
+          const ratio = (r * distToBound) / v0;
+          const tBound = ratio < 1 ? -Math.log(1 - ratio) / r : Infinity;
+          const tActive = Math.min(dt, tStop, tBound);
+
+          const decayR = Math.exp(-r * tActive);
+          const decayK = Math.exp(-k * tActive);
+          const g0 = this.goal;
+          const gInf = g0 + v0 / r;
+          const lag =
+            Math.abs(k - r) < 1e-6 ? v0 * tActive * decayK : ((k * v0) / (r * (k - r))) * (decayR - decayK);
+          this.offset = this.offset * decayK + gInf * (1 - decayK) - lag;
+
+          if (tBound <= dt && tBound <= tStop) {
+            this.goal = bound;
+            this.velocity = 0;
+          } else if (tStop <= dt) {
+            this.goal = Math.min(this.maxOffset, Math.max(0, g0 + (v0 * (1 - decayR)) / r));
+            this.velocity = 0;
+          } else {
+            this.goal = Math.min(this.maxOffset, Math.max(0, g0 + (v0 * (1 - decayR)) / r));
+            this.velocity = v0 * decayR;
+            if (Math.abs(this.velocity) < stop) this.velocity = 0;
+          }
+
+          const rest = dt - tActive;
+          if (rest > 0) this.offset = damp(this.offset, this.goal, k, rest);
+          return;
+        }
+      }
+    }
+
+    this.offset = damp(this.offset, this.goal, k, dt);
   }
 
   /** i 번째 자리의 카메라 공간 자세 */

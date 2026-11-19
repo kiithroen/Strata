@@ -37,7 +37,7 @@ export interface AlbumActions {
  * 보던 화면을 되살린다(고쳤으면 그 노트의 보기 화면도 다시 연다).
  * 보기 화면은 연 자리의 노트 묶음(카드 목록의 묶음, 검색 결과의 묶음, 은하의 행성) 안에서 이전·다음으로 넘긴다.
  * 넘겨도 방문 기록은 쌓지 않아 뒤로 한 번에 보기 화면을 닫는다.
- * 보기 화면에서 체크리스트 항목을 체크하면 바로 저장하고, 보기 화면을 닫을 때 앨범을 다시 띄워 카드에도 반영한다(보던 화면은 되살린다).
+ * 보기 화면에서 체크리스트 항목을 체크하면 바로 저장하고, 보기 화면을 닫을 때 바뀐 노트의 카드·목록 본문만 부분 갱신한다.
  */
 export class NoteScreens {
   readonly viewer: NoteViewer;
@@ -47,18 +47,16 @@ export class NoteScreens {
   private editing: string | undefined;
   /** 보기 화면이 넘길 차례 */
   private sequence: NoteSequence | null = null;
-  /** 보기 화면에서 체크를 바꿨는지. 닫을 때 앨범을 다시 띄운다 */
-  private checked = false;
-  /** 저장·삭제·체크 반영으로 화면을 모두 닫는 중인지 */
+  /** 보기 화면에서 체크를 바꾼 노트들. 닫힐 때 본문만 부분 갱신한다 */
+  private readonly checkedNotes = new Set<NoteRef>();
+  private readonly onNoteChange?: (note: NoteRef) => void;
+  /** 저장·삭제·정리로 화면을 모두 닫는 중인지 */
   private leaving = false;
-  /** 방문 기록에 쌓는 보기 화면. 닫힐 때 체크를 바꿨으면 앨범을 다시 띄운다 */
+  /** 방문 기록에 쌓는 보기 화면. 닫힐 때 체크를 바꾼 노트들의 본문을 부분 갱신한다 */
   private readonly viewerLayer: OverlayLayer = {
     hide: () => {
       this.viewer.hide();
-      if (this.checked && !this.leaving) {
-        this.checked = false;
-        void this.refresh().catch((err) => console.error(err));
-      }
+      this.flushChecked();
     },
   };
   /** 방향키는 보기 화면이 맨 위에 있을 때만 넘긴다(입력 화면의 글 칸에서는 커서를 옮긴다) */
@@ -79,8 +77,13 @@ export class NoteScreens {
     private readonly dismissBelow: () => number,
     /** 연 쪽이 넘길 차례를 주지 않았을 때 노트가 속한 묶음의 노트 번호들(최근 것부터) */
     private readonly groupOf: (index: number) => readonly number[] = (index) => [index],
-    extras?: { onTagClick?: (tag: string) => void; suggestedTags?: () => readonly string[] },
+    extras?: {
+      onTagClick?: (tag: string) => void;
+      suggestedTags?: () => readonly string[];
+      onNoteChange?: (note: NoteRef) => void;
+    },
   ) {
+    this.onNoteChange = extras?.onNoteChange;
     const editable = album !== undefined;
     this.viewer = new NoteViewer({
       onClose: () => void this.back(),
@@ -113,23 +116,12 @@ export class NoteScreens {
       this.editor.requestCancel();
       return true;
     }
-    // 체크를 바꾼 보기 화면은 그 기록까지 한꺼번에 되돌리고 앨범을 다시 띄운다
-    if (this.stack.top === this.viewerLayer && this.checked) {
-      this.checked = false;
-      void this.refresh().catch((err) => console.error(err));
-    } else this.stack.back();
+    this.stack.back();
     return true;
   }
 
   /** 태그 검색을 위해 열린 보기·입력 화면을 닫고 기록을 되돌린 뒤 openSearch 를 부른다 */
   async closeForTag(tag: string, openSearch: (query: string) => void): Promise<void> {
-    if (this.checked) {
-      this.checked = false;
-      const view = { ...this.snapshot(), search: `#${tag}` };
-      await this.leave();
-      this.album?.reload({ view });
-      return;
-    }
     const count = this.stack.hideAll();
     await this.stack.rewind(count);
     openSearch(`#${tag}`);
@@ -197,6 +189,8 @@ export class NoteScreens {
   }
 
   dispose(): void {
+    this.leaving = true;
+    this.checkedNotes.clear();
     window.removeEventListener('keydown', this.onKey);
     this.stack.dispose();
     this.viewer.dispose();
@@ -225,25 +219,24 @@ export class NoteScreens {
       if (this.viewer.current === id && this.sequence) this.showSequence(this.sequence);
       return;
     }
+    if (this.leaving) return;
     const note = this.notes.find((n) => n.id === id);
     const items = note?.checklist;
     if (!note || !items?.[index]) return;
     const next = items.map((item, i) => (i === index ? { text: item.text, done } : item));
     note.checklist = next;
     note.body = checklistText(next);
-    this.checked = true;
+    if (this.viewer.open) this.checkedNotes.add(note);
+    else this.onNoteChange?.(note);
   }
 
-  /**
-   * 체크를 바꾼 보기 화면을 닫는다(이미 뒤로 닫혔으면 그 아래부터): 열린 화면과 아래 화면을 닫고 기록을 되돌린 뒤
-   * 보던 화면으로 앨범을 다시 띄운다
-   */
-  private async refresh(): Promise<void> {
-    const album = this.album;
-    if (!album) return;
-    const view = this.snapshot();
-    await this.leave();
-    album.reload({ view });
+  /** 보기 화면에서 체크를 바꾼 노트들의 본문을 즉시 부분 갱신한다 */
+  private flushChecked(): void {
+    if (this.checkedNotes.size === 0) return;
+    const notes = [...this.checkedNotes];
+    this.checkedNotes.clear();
+    if (this.leaving) return;
+    for (const note of notes) this.onNoteChange?.(note);
   }
 
   private async remove(id: string): Promise<void> {

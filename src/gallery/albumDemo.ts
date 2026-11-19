@@ -128,7 +128,14 @@ const actions: AlbumActions = {
  * `+ 노트`로 노트를 쓰고, 저장된 노트는 보기 화면에서 고치고 지운다. reload 는 저장·삭제 뒤 보여 줄 것이다
  */
 export function mountAlbumDemo(stage: Stage, reload: AlbumReload = {}): CosmosDemo {
-  const demo = mountCosmosDemo(stage, album.data() ?? undefined, { album: actions, focusNote: reload.focusNote, restore: reload.view, openNote: reload.openNote });
+  const data = album.data() ?? undefined;
+  const demo = mountCosmosDemo(stage, data, {
+    album: actions,
+    preview: data === undefined,
+    focusNote: reload.focusNote,
+    restore: reload.view,
+    openNote: reload.openNote,
+  });
   mounted = demo;
   const dispose = demo.dispose.bind(demo);
   demo.dispose = () => {

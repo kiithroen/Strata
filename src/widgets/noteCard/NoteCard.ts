@@ -50,6 +50,7 @@ export class NoteCard {
   private readonly simpleTexture: CanvasTexture;
   private summaryTexture: CanvasTexture | null = null;
   private detailTexture: CanvasTexture | null = null;
+  private detailLayout: CardLayout | null = null;
   private readonly anisotropy: number;
   private readonly labels: LabelCache;
   private badge: Mesh<PlaneGeometry, MeshBasicMaterial> | null = null;
@@ -183,6 +184,21 @@ export class NoteCard {
     this.mesh.material.uniforms.mapSummary.value = this.summaryTexture ?? this.baseTexture;
   }
 
+  /**
+   * 본문이 바뀐 메모·문서 카드(예: 체크리스트 항목 체크)의 본문 텍스처만 다시 굽는다.
+   * 카드 크기와 사진·요약·단순 텍스처는 그대로이므로 기존 캔버스에 바로 다시 그려 올린다.
+   * 펼쳐져 선명한 텍스처를 쓰고 있으면 함께 다시 굽는다.
+   */
+  refreshFace(body: string | undefined): void {
+    if (this.disposed || this.face.body === body) return;
+    this.face.body = body;
+    if (this.layout.kind === 'photo') return;
+    redrawCardTexture(this.baseTexture, this.face, this.layout, null);
+    if (this.detailTexture && this.detailLayout) {
+      redrawCardTexture(this.detailTexture, this.face, this.detailLayout, null);
+    }
+  }
+
   dispose(): void {
     this.disposed = true;
     this.mesh.geometry.dispose();
@@ -190,6 +206,8 @@ export class NoteCard {
     this.simpleTexture.dispose();
     this.summaryTexture?.dispose();
     this.detailTexture?.dispose();
+    this.detailTexture = null;
+    this.detailLayout = null;
     this.mesh.material.dispose();
     if (this.badge) {
       this.badge.geometry.dispose();
@@ -225,10 +243,13 @@ export class NoteCard {
       this.mesh.material.uniforms.map.value = this.baseTexture;
       this.detailTexture?.dispose();
       this.detailTexture = null;
+      this.detailLayout = null;
     }
   }
 
   private showDetail(layout: CardLayout, photo: CanvasImageSource | null): void {
+    this.detailTexture?.dispose();
+    this.detailLayout = layout;
     this.detailTexture = createCardTexture(this.face, layout, this.anisotropy, photo);
     if (photo) releasePhoto(photo);
     this.mesh.material.uniforms.map.value = this.detailTexture;

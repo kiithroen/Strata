@@ -73,6 +73,16 @@ export class CardListMode {
     this.view.setLayer(info);
   }
 
+  /** 공간 모드 깊이 진행 막대(0~1). null 이면 감춘다 */
+  setProgress(ratio: number | null): void {
+    this.view.setProgress(ratio);
+  }
+
+  /** 띄운 노트 하나의 본문 DOM 만 즉시 갱신한다 */
+  updateBody(id: string, body: string | undefined): void {
+    this.view.updateBody(id, body);
+  }
+
   stats(): { cards: number; waitingPhotos: number } {
     return this.view.stats();
   }

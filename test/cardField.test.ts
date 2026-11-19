@@ -86,6 +86,86 @@ describe('CardField', () => {
     expect(field.frontSlot()).toBe(field.slots.length - 1);
     expect(new CardField(0, 5, fovDeg).frontSlot()).toBe(-1);
   });
+
+  it('관성 이동은 같은 게임 시간이면 주사율과 무관하게 같은 위치에 닿는다', () => {
+    const c = tuning.cardField;
+    // 경계에 닿지 않을 만큼 긴 통로에서 관성 중간과 정지 뒤 모두 비교한다
+    const count = Math.ceil(c.minSpan * c.cardsPerDepth * 10);
+    const speed = c.inertiaDecay * 4;
+    const run = (hz: number, seconds: number) => {
+      const field = new CardField(count, 8, fovDeg);
+      field.flick(speed);
+      const dt = 1 / hz;
+      for (let i = 0; i < Math.round(seconds * hz); i++) field.step(dt);
+      return { goal: field.goalOffset, offset: field.offset };
+    };
+    const midRef = run(60, 0.5);
+    expect(midRef.goal).toBeGreaterThan(0);
+    expect(midRef.offset).toBeGreaterThan(0);
+    for (const hz of [30, 120, 144]) {
+      const other = run(hz, 0.5);
+      expect(other.goal).toBeCloseTo(midRef.goal, 9);
+      expect(other.offset).toBeCloseTo(midRef.offset, 9);
+    }
+    const endRef = run(60, 3);
+    for (const hz of [30, 120, 144]) {
+      const other = run(hz, 3);
+      expect(other.goal).toBeCloseTo(endRef.goal, 6);
+      expect(other.offset).toBeCloseTo(endRef.offset, 6);
+    }
+  });
+
+  it('관성은 0·maxOffset 경계에 닿으면 속도가 0이 되고, 주사율과 무관하게 수렴한다', () => {
+    const c = tuning.cardField;
+    const runHit = (hz: number) => {
+      const field = new CardField(f.count, 9, fovDeg);
+      field.flick(field.maxOffset * c.inertiaDecay * 4);
+      for (let i = 0; i < 0.5 * hz; i++) field.step(1 / hz);
+      return { goal: field.goalOffset, offset: field.offset, max: field.maxOffset };
+    };
+    const hitRef = runHit(60);
+    expect(hitRef.goal).toBe(hitRef.max);
+    for (const hz of [30, 120, 144]) {
+      const other = runHit(hz);
+      expect(other.goal).toBe(hitRef.max);
+      expect(other.offset).toBeCloseTo(hitRef.offset, 9);
+    }
+
+    // maxOffset 경계에 부딪힌 뒤 뒤로 옮겨도 남은 관성이 밀고 올라가지 않는다
+    const field = new CardField(f.count, 9, fovDeg);
+    field.flick(field.maxOffset * c.inertiaDecay * 5);
+    for (let i = 0; i < 60; i++) field.step(1 / 60);
+    expect(field.goalOffset).toBe(field.maxOffset);
+    const back = field.maxOffset / 2;
+    field.dolly(-back);
+    for (let i = 0; i < 30; i++) field.step(1 / 60);
+    expect(field.goalOffset).toBeCloseTo(field.maxOffset - back, 9);
+
+    // 0 경계도 마찬가지로 속도가 0이 된다
+    field.flick(-field.maxOffset * c.inertiaDecay * 5);
+    for (let i = 0; i < 60; i++) field.step(1 / 60);
+    expect(field.goalOffset).toBe(0);
+    field.dolly(back);
+    for (let i = 0; i < 30; i++) field.step(1 / 60);
+    expect(field.goalOffset).toBeCloseTo(back, 9);
+  });
+
+  it('cancelInertia 와 정지 기준 미만 속도는 관성을 멈춘다', () => {
+    const c = tuning.cardField;
+    const field = new CardField(f.count * 3, 10, fovDeg);
+    field.flick(c.inertiaStopSpeed * 0.5);
+    field.step(0.5);
+    expect(field.goalOffset).toBe(0);
+
+    field.flick(c.inertiaDecay * 5);
+    field.step(0.1);
+    const stoppedGoal = field.goalOffset;
+    expect(stoppedGoal).toBeGreaterThan(0);
+    field.cancelInertia();
+    for (let i = 0; i < 60; i++) field.step(1 / 60);
+    expect(field.goalOffset).toBe(stoppedGoal);
+    expect(field.offset).toBeCloseTo(stoppedGoal, 3);
+  });
 });
 
 describe('CardField 화면 비율', () => {

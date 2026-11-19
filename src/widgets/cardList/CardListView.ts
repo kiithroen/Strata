@@ -39,10 +39,14 @@ export class CardListView {
   private readonly title: HTMLSpanElement;
   private readonly closeButton: HTMLButtonElement;
   private readonly searchInput: HTMLInputElement | null = null;
+  private readonly progress: HTMLDivElement;
+  private readonly progressFill: HTMLDivElement;
+  private lastProgress: number | null = null;
   private readonly layer: HTMLDivElement;
   private readonly body: HTMLDivElement;
   private readonly observer: IntersectionObserver;
   private readonly pending = new Map<Element, PhotoSource>();
+  private readonly items = new Map<string, HTMLElement>();
   /** 보여 줄 때마다 늘린다. 닫힌 뒤 도착한 사진을 가려낸다 */
   private generation = 0;
   private count = 0;
@@ -96,10 +100,14 @@ export class CardListView {
       this.current = 'space';
     }
     this.applyMode();
+    this.progress = el('div', 'card-list-progress');
+    this.progress.hidden = true;
+    this.progressFill = el('div', 'card-list-progress-fill');
+    this.progress.append(this.progressFill);
     this.layer = el('div', 'card-list-layer');
     this.layer.hidden = true;
     this.body = el('div', 'card-list-body');
-    this.root.append(head, this.layer, this.body);
+    this.root.append(head, this.progress, this.layer, this.body);
     document.body.appendChild(this.root);
     this.observer = new IntersectionObserver((entries) => this.onIntersect(entries), {
       root: this.body,
@@ -160,6 +168,45 @@ export class CardListView {
   /** 지금 목록에 있는 카드 수와 사진을 아직 받지 않은 칸 수 */
   stats(): { cards: number; waitingPhotos: number } {
     return { cards: this.body.querySelectorAll('.card-item').length, waitingPhotos: this.pending.size };
+  }
+
+  /** 공간 모드 깊이 진행 막대(0~1). null 이면 감춘다 */
+  setProgress(ratio: number | null): void {
+    const next = ratio !== null && Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : null;
+    if (next === null) {
+      if (this.lastProgress !== null || !this.progress.hidden) {
+        this.lastProgress = null;
+        this.progress.hidden = true;
+      }
+      return;
+    }
+    if (
+      this.lastProgress !== null &&
+      (next === this.lastProgress || (Math.abs(next - this.lastProgress) < 1e-4 && next > 0 && next < 1))
+    ) {
+      return;
+    }
+    this.lastProgress = next;
+    if (this.progress.hidden) this.progress.hidden = false;
+    this.progressFill.style.transform = `scaleX(${next})`;
+  }
+
+  /** 띄운 노트 하나의 본문 DOM 만 즉시 갱신한다(체크리스트 항목 체크 등) */
+  updateBody(id: string, body: string | undefined): void {
+    const card = this.items.get(id);
+    if (!card) return;
+    const existing = card.querySelector<HTMLParagraphElement>('.card-item-body');
+    if (body) {
+      if (existing) {
+        existing.textContent = body;
+      } else {
+        const b = el('p', 'card-item-body');
+        b.textContent = body;
+        card.insertBefore(b, card.querySelector('.card-item-foot'));
+      }
+    } else {
+      existing?.remove();
+    }
   }
 
   /**
@@ -244,6 +291,8 @@ export class CardListView {
     this.focusSection = null;
     this.observer.disconnect();
     this.pending.clear();
+    this.items.clear();
+    this.setProgress(null);
     this.body.replaceChildren();
   }
 
@@ -252,6 +301,7 @@ export class CardListView {
     const card = el('article', `card-item card-${item.kind}`);
     card.style.setProperty('--card-tint', holoTint(item));
     card.dataset.id = item.id;
+    this.items.set(item.id, card);
     const onOpen = this.options.onOpen;
     if (onOpen) {
       card.classList.add('openable');
