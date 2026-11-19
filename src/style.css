@@ -796,20 +796,16 @@ button.note-viewer-tag:hover {
   padding: 6px 10px;
 }
 
-/* 좁은 화면에서는 경로 막대를 단추 아래 한 줄로 내린다 */
+/* 좁은 화면에서는 단추·필터 줄을 경로 막대 아래로 내린다 */
 @media (max-width: 720px) {
-  .explorer-path {
+  .explorer-actions {
     order: 3;
     flex-basis: 100%;
-  }
-
-  .explorer-actions {
-    flex: 1 1 100%;
     margin-left: 0;
   }
 
   .explorer-filter {
-    flex: 1 1 120px;
+    flex: 1 1 130px;
     width: auto;
   }
 }
