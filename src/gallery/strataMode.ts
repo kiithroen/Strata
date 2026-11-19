@@ -32,6 +32,9 @@ interface Saved {
 export interface StrataModeHooks {
   /** Esc 를 눌렀을 때 지층을 나가기 전에 먼저 닫을 것(펼친 카드 등)이 있으면 true 를 낸다 */
   onEscape?: () => boolean;
+  /** 위·아래 방향키 층 이동을 막을지(카드 펼침·카드 보기·검색·노트 보기/입력 중) */
+  isBlocked?: () => boolean;
+  onFocusChange?: () => void;
   onLeave?: () => void;
   /** 있으면 `카드로 보기` 단추를 띄우고, 누르면 부른다 */
   onCards?: () => void;
@@ -72,6 +75,8 @@ export class StrataMode {
   private pushed = false;
   private readonly view: StrataView;
   private readonly actions: HTMLDivElement;
+  private readonly upButton: HTMLButtonElement;
+  private readonly downButton: HTMLButtonElement;
   private readonly pose = createPose();
   private readonly raycaster = new Raycaster();
   private readonly ndc = new Vector2();
@@ -88,9 +93,17 @@ export class StrataMode {
     this.leave();
   };
   private readonly onKey = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape' || !this.active) return;
-    if (this.hooks?.onEscape?.()) return;
-    this.exit();
+    if (!this.active) return;
+    if (e.key === 'Escape') {
+      if (this.hooks?.onEscape?.()) return;
+      this.exit();
+      return;
+    }
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.ctrlKey && !e.metaKey && !this.hooks?.isBlocked?.()) {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      if (this.stepLayer(e.key === 'ArrowUp' ? -1 : 1)) e.preventDefault();
+    }
   };
 
   constructor(
@@ -104,14 +117,19 @@ export class StrataMode {
     this.actions = document.createElement('div');
     this.actions.className = 'strata-actions';
     this.actions.hidden = true;
-    const button = (text: string, onClick: () => void) => {
+    const button = (text: string, onClick: () => void, className?: string, ariaLabel?: string) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = text;
+      if (className) b.className = className;
+      if (ariaLabel) b.setAttribute('aria-label', ariaLabel);
       b.addEventListener('click', onClick);
       this.actions.appendChild(b);
+      return b;
     };
     button('← 은하로', () => this.exit());
+    this.upButton = button('▲', () => this.stepLayer(-1), 'strata-step', '위층으로');
+    this.downButton = button('▼', () => this.stepLayer(1), 'strata-step', '아래층으로');
     const onCards = hooks?.onCards;
     if (onCards) button('카드 보기', onCards);
     for (const b of hooks?.buttons ?? []) button(b.label, b.onClick);
@@ -127,6 +145,13 @@ export class StrataMode {
   private fitDistance(): number {
     const layer = this.layers[this.focus];
     return layer ? strataDistance([layer], this.stage.camera.fov, this.stage.camera.aspect) : tuning.strata.distance;
+  }
+
+  private syncStepButtons(): void {
+    const multi = this.layers.length > 1;
+    this.upButton.hidden = this.downButton.hidden = !multi;
+    this.upButton.disabled = this.focus <= 0;
+    this.downButton.disabled = this.focus >= this.layers.length - 1;
   }
 
   /** layers 는 최근 것부터, focusIndex 는 고른 층, origin 은 고른 층 판의 중심(고른 노드 자리)이다 */
@@ -146,6 +171,7 @@ export class StrataMode {
       for (const tile of layer.tiles) this.placed.set(tile.index, { layer, layerIndex, tile });
     });
     this.focus = focusIndex;
+    this.syncStepButtons();
     this.view.build(this.layers, this.frame);
     this.rig.focusPoint(strataPoint(this.frame, 0, strataFocusHeight(this.layers, focusIndex), 0, this.hit));
     this.rig.setGoalDistance(this.fitDistance());
@@ -224,13 +250,36 @@ export class StrataMode {
     return this.focus;
   }
 
+  layerTimes(): number[] {
+    return this.layers.map((l) => l.anchorTime);
+  }
+
+  focusInfo(): { label: string; index: number; total: number } | null {
+    const layer = this.layers[this.focus];
+    return this.active && layer ? { label: layer.label, index: this.focus, total: this.layers.length } : null;
+  }
+
+  nearestLayerLabel(time: number): string {
+    return this.layers.length > 0 ? (this.layers[nearestLayer(this.layers, time)]?.label ?? '') : '';
+  }
+
+  stepLayer(delta: -1 | 1): boolean {
+    if (!this.active || this.layers.length <= 1) return false;
+    const next = Math.max(0, Math.min(this.layers.length - 1, this.focus + delta));
+    if (next === this.focus) return false;
+    this.focusLayer(next);
+    return true;
+  }
+
   /** 층 하나를 바라본다: 그 층 판 중심으로 피벗을 옮긴다 */
   focusLayer(index: number): void {
     const layer = this.layers[index];
     if (!layer) return;
     this.focus = index;
+    this.syncStepButtons();
     this.rig.focusPoint(strataPoint(this.frame, 0, strataFocusHeight(this.layers, index), 0, this.hit));
     this.rig.setGoalDistance(this.fitDistance());
+    this.hooks?.onFocusChange?.();
   }
 
   /** 시간 띠로 고른 시각에 가장 가까운 층을 바라본다 */

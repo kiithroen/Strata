@@ -515,9 +515,14 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       }
       return false;
     },
+    isBlocked: () => focus.focused !== null || cardList.open || searchList.open || screens.open,
+    onFocusChange: () => {
+      pinnedTime = strata.focusTime;
+    },
     onLeave: () => {
       cardList.dismiss();
       focus.set(null);
+      syncScrubberRange();
     },
     onCards: () => openCardList(),
     // 지층 보기에서도 노트를 쓰고 찾는다. 검색은 지층 위에 열고 닫으면 지층으로 돌아온다
@@ -544,6 +549,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   if (options.album) actionButton('+ 노트', () => screens.compose());
   actionButton('검색', () => void openSearch());
   // 다가간 노드가 있을 때만 보인다
+  actionButton('지층 보기', () => {
+    const n = nodeByKey(approach.approached);
+    if (n) enterStrata(n);
+  });
+  const nodeStrataButton = actions.lastElementChild as HTMLButtonElement;
+  nodeStrataButton.hidden = true;
   actionButton('카드 보기', () => openNodeCards());
   const nodeCardsButton = actions.lastElementChild as HTMLButtonElement;
   nodeCardsButton.hidden = true;
@@ -582,6 +593,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     const origin = node.kind === 'hub' ? planets[children[focusIndex]].node.position : node.position;
     strata.enter(layers, focusIndex, origin);
     pinnedTime = strata.focusTime;
+    syncScrubberRange();
   };
 
   /** 노트가 속한 행성 번호와 카드 번호 */
@@ -737,12 +749,13 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     },
   });
 
-  const readout = createTimeReadout(controller);
+  const readout = createTimeReadout(controller, { showLevel: false });
+  const noteTimes = notes.map((n) => n.time);
   const scrubber = createTimeScrubber({
     controller,
     minTime: oldest,
     maxTime: newest,
-    noteTimes: notes.map((n) => n.time),
+    noteTimes,
     onScrub: (t) => {
       if (strata.active) {
         strata.focusNearestTime(t);
@@ -760,6 +773,22 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       scrubbing = t;
     },
   });
+  const syncScrubberRange = () => {
+    if (strata.active) {
+      const times = strata.layerTimes();
+      const min = Math.min(...times);
+      const max = Math.max(...times);
+      scrubber.setRange({
+        minTime: min,
+        maxTime: max,
+        noteTimes: times,
+        formatLabel: (t) => strata.nearestLayerLabel(t),
+        hidden: times.length <= 1 || max <= min,
+      });
+      return;
+    }
+    scrubber.setRange({ minTime: oldest, maxTime: newest, noteTimes, hidden: false });
+  };
 
   /** 노드 자리를 지금 공전 시계로 구한다(첫 프레임 전에 다가가거나 되살릴 때) */
   const placeNodes = () => {
@@ -875,7 +904,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
 
   return {
     title: 'COSMOS',
-    hint: '끌기: 회전 · 핀치/휠: 줌 · 우클릭/두손가락: 이동 · 탭: 노드/카드',
+    get hint() {
+      if (focus.focused !== null) return '카드 다시 탭: 노트 보기 · 바깥 탭/Esc: 닫기';
+      if (strata.active) return '카드 탭: 펼치기 · 층 탭/▲▼: 층 이동 · 바깥 탭: 은하로';
+      if (approach.approached !== null) return '한 번 더 탭: 지층 보기 · 끌기: 회전 · 우클릭/두손가락: 이동';
+      return '끌기: 회전 · 핀치/휠: 줌 · 우클릭/두손가락: 이동 · 탭: 노드/카드';
+    },
     controller,
     cameraRig,
     cards,
@@ -918,8 +952,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     strataState: () => ({ active: strata.active, mix: strata.mix, layers: strata.layerCount, focus: strata.focusIndex }),
     update(dt, time) {
       // 은하 단추는 지층 보기 동안 지층 단추에 자리를 내준다
-      const hideNodeCards = approach.approached === null;
-      if (nodeCardsButton.hidden !== hideNodeCards) nodeCardsButton.hidden = hideNodeCards;
+      const hideApproached = approach.approached === null;
+      if (nodeStrataButton.hidden !== hideApproached) nodeStrataButton.hidden = hideApproached;
+      if (nodeCardsButton.hidden !== hideApproached) nodeCardsButton.hidden = hideApproached;
       if (actions.hidden !== strata.active) actions.hidden = strata.active;
       look.uTime.value = time;
       // 지층 원판은 손가락이 닿아 있거나 카드를 펼쳤거나 카드 보기를 열면 멈춘다
@@ -1150,6 +1185,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       stage.bloomScale = 1 - opened;
       graph.end();
       screenLabels.end(stage.camera, dt);
+      if (strata.active) {
+        const info = strata.focusInfo();
+        readout.setOverride(info ? (info.total > 1 ? `${info.label} · ${info.index + 1}/${info.total}층` : info.label) : null);
+      } else {
+        readout.setOverride(null);
+      }
       readout.update();
       scrubber.update();
     },

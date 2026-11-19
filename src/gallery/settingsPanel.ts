@@ -70,7 +70,17 @@ export class SettingsPanel {
   /** 요약 상태 글. 상태가 바뀔 때 이 글만 고친다(입력 칸이 다시 그려지지 않게) */
   private summaryNote: HTMLParagraphElement | null = null;
   private readonly onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') this.close();
+    if (e.key !== 'Escape' || !this.isVisible()) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    this.close();
+  };
+  private readonly onOutsideDown = (e: PointerEvent) => {
+    if (!this.isVisible()) return;
+    if (e.target instanceof Node && !this.panel.contains(e.target) && !this.button.contains(e.target)) {
+      e.stopPropagation();
+      this.close();
+    }
   };
 
   constructor(
@@ -95,10 +105,16 @@ export class SettingsPanel {
     this.panel.className = 'settings-panel';
     this.panel.hidden = true;
     document.body.appendChild(this.panel);
-    window.addEventListener('keydown', this.onKey);
+    window.addEventListener('keydown', this.onKey, true);
+    window.addEventListener('pointerdown', this.onOutsideDown, true);
     summary.listen((status) => {
       if (this.summaryNote) this.summaryNote.textContent = summaryStatusText(status, this.summary.route(this.settings.geminiKey));
     });
+  }
+
+  private isVisible(): boolean {
+    const c = document.body.classList;
+    return !this.panel.hidden && !c.contains('card-view-open') && !c.contains('note-viewer-open') && !c.contains('note-editor-open') && !c.contains('viewer-open');
   }
 
   open(): void {
@@ -115,7 +131,8 @@ export class SettingsPanel {
 
   dispose(): void {
     this.summary.listen(null);
-    window.removeEventListener('keydown', this.onKey);
+    window.removeEventListener('keydown', this.onKey, true);
+    window.removeEventListener('pointerdown', this.onOutsideDown, true);
     this.button.remove();
     this.panel.remove();
   }

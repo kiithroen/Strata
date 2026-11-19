@@ -167,6 +167,31 @@ body {
   width: 18px;
 }
 
+.time-scrubber[hidden] {
+  display: none;
+}
+
+.time-scrubber-tip {
+  position: absolute;
+  right: 22px;
+  transform: translateY(-50%);
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--bg) 90%, black);
+  color: var(--text);
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.time-scrubber.active .time-scrubber-tip {
+  opacity: 1;
+}
+
 /* 실기기 성능 표시(설정 화면에서 켠다) */
 .perf {
   position: fixed;
@@ -355,6 +380,8 @@ body {
   bottom: calc(env(safe-area-inset-bottom) + 48px);
   z-index: 20;
   display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
   gap: 8px;
 }
 
@@ -377,6 +404,19 @@ body {
   font-size: 12px;
   letter-spacing: 0;
   cursor: pointer;
+}
+
+.strata-actions button.strata-step {
+  padding: 8px 10px;
+}
+
+.strata-actions button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.strata-actions button[hidden] {
+  display: none;
 }
 
 /* 카드 보기 동안에는 우주 보기의 HUD·시간 띠·지층 단추를 숨긴다 */

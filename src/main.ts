@@ -73,12 +73,19 @@ let id = picked.id;
 /** 메모 앨범 저장소를 여는 동안 띄워 두는 빈 화면 */
 const idleDemo: WidgetDemo = { title: '', hint: '', update: () => undefined, dispose: () => undefined };
 let demo: WidgetDemo = idleDemo;
+let lastHint = '';
+const syncHint = () => {
+  if (demo.hint !== lastHint) {
+    lastHint = demo.hint;
+    hintEl.textContent = lastHint;
+  }
+};
 // 첫 화면은 저장소를 연 뒤에 띄운다(그동안 뒤로·앞으로로 다른 화면이 떴으면 그대로 둔다)
 const ready = openAlbum().then(() => {
   startSummaries(settings.geminiKey);
   if (demo !== idleDemo) return;
   demo = picked.factory(stage);
-  hintEl.textContent = demo.hint;
+  syncHint();
 });
 
 // 위젯 사이를 오가는 탭
@@ -120,7 +127,7 @@ function switchDemo(nextId: string, mount: () => WidgetDemo, step: HistoryStep =
   else history.pushState(step.push, '', url);
   demo = mount();
   id = nextId;
-  hintEl.textContent = demo.hint;
+  syncHint();
   for (const a of tabsEl.querySelectorAll('a')) a.className = a.textContent === id.toUpperCase() ? 'active' : '';
 }
 
@@ -195,11 +202,13 @@ stage.renderer.setAnimationLoop((now: number) => {
   time += dt;
   if (!perf) {
     demo.update(dt, time);
+    syncHint();
     stage.render();
     return;
   }
   const t0 = performance.now();
   demo.update(dt, time);
+  syncHint();
   const t1 = performance.now();
   stage.render();
   const t2 = performance.now();
@@ -224,6 +233,7 @@ if (import.meta.env.DEV) {
         time += 1 / hz;
         demo.update(1 / hz, time);
       }
+      syncHint();
       stage.render();
       return time;
     },
