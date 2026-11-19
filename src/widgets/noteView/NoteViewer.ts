@@ -99,6 +99,24 @@ export class NoteViewer {
     this.applyPhotoZoom(false);
   };
 
+  /** 사진 상자 밖에서 끝난 포인터(캡처 없는 마우스 등)가 photoPointers 에 남지 않게 정리한다 */
+  private readonly onWindowPhotoEnd = (e: PointerEvent) => {
+    if (this.photoPointers.has(e.pointerId)) this.onPhotoEnd(e, true);
+  };
+
+  private readonly onWindowBlur = () => {
+    if (this.photoPointers.size === 0) return;
+    this.photoPointers.clear();
+    this.photoPinch = null;
+    this.photoPan = null;
+    this.photoTap = null;
+    this.lastPhotoTap = null;
+    this.photoWasMulti = false;
+    this.photoBox?.classList.remove('panning');
+    this.photoZoom.settle(this.photoBounds());
+    this.applyPhotoZoom(false);
+  };
+
   constructor(private readonly options: NoteViewerOptions) {
     this.root = el('div', 'note-viewer');
     this.root.hidden = true;
@@ -124,6 +142,9 @@ export class NoteViewer {
     this.root.append(head, this.body);
     document.body.appendChild(this.root);
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('pointerup', this.onWindowPhotoEnd);
+    window.addEventListener('pointercancel', this.onWindowPhotoEnd);
+    window.addEventListener('blur', this.onWindowBlur);
   }
 
   get open(): boolean {
@@ -213,6 +234,9 @@ export class NoteViewer {
 
   dispose(): void {
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('pointerup', this.onWindowPhotoEnd);
+    window.removeEventListener('pointercancel', this.onWindowPhotoEnd);
+    window.removeEventListener('blur', this.onWindowBlur);
     this.root.removeEventListener('pointerdown', this.onRootDown);
     this.hide();
     this.root.remove();
@@ -484,6 +508,7 @@ export class NoteViewer {
     if (this.photoPointers.size === 0) {
       this.photoWasMulti = false;
       this.photoTap = null;
+      if (cancelled) this.lastPhotoTap = null;
     }
   }
 

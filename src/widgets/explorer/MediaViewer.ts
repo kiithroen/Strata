@@ -97,6 +97,30 @@ export class MediaViewer {
     this.applyImageZoom(false);
   };
 
+  /** stage 밖에서 끝난 포인터(동영상·합성 이벤트 등)가 남지 않게 정리한다 */
+  private readonly onWindowPointerEnd = (e: PointerEvent) => {
+    if (this.pointers.has(e.pointerId) || (this.tapCandidate && this.tapCandidate.id === e.pointerId)) {
+      this.onStageEnd(e, true);
+    }
+  };
+
+  private readonly onWindowBlur = () => {
+    if (this.pointers.size === 0 && !this.tapCandidate) return;
+    this.pointers.clear();
+    this.pinch = null;
+    this.panState = null;
+    this.tapCandidate = null;
+    this.lastImageTap = null;
+    this.wasMultiTouch = false;
+    this.clearSingleTapTimer();
+    this.cancelSwipe();
+    this.currentImage?.classList.remove('panning');
+    if (this.currentImage) {
+      this.zoom.settle(this.imageBounds());
+      this.applyImageZoom(false);
+    }
+  };
+
   constructor(private readonly options: MediaViewerOptions = {}) {
     this.root = document.createElement('div');
     this.root.className = 'viewer';
@@ -129,6 +153,9 @@ export class MediaViewer {
     document.body.appendChild(this.root);
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('pointerup', this.onWindowPointerEnd);
+    window.addEventListener('pointercancel', this.onWindowPointerEnd);
+    window.addEventListener('blur', this.onWindowBlur);
   }
 
   private navButton(className: string, text: string, dir: number): HTMLButtonElement {
@@ -178,6 +205,9 @@ export class MediaViewer {
   dispose(): void {
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('pointerup', this.onWindowPointerEnd);
+    window.removeEventListener('pointercancel', this.onWindowPointerEnd);
+    window.removeEventListener('blur', this.onWindowBlur);
     this.clear();
     this.root.remove();
     document.body.classList.remove('viewer-open');
@@ -537,6 +567,10 @@ export class MediaViewer {
     if (this.pointers.size === 0) {
       this.wasMultiTouch = false;
       this.tapCandidate = null;
+      if (cancelled) {
+        this.lastImageTap = null;
+        this.clearSingleTapTimer();
+      }
     }
   }
 
@@ -565,7 +599,9 @@ export class MediaViewer {
     this.singleTapTimer = window.setTimeout(() => {
       this.singleTapTimer = null;
       this.lastImageTap = null;
-      if (gen === this.generation && this.open && this.current?.kind === 'image') this.toggleUi();
+      if (gen === this.generation && this.open && this.current?.kind === 'image' && this.pointers.size === 0) {
+        this.toggleUi();
+      }
     }, tuning.zoom.doubleTapSeconds * 1000);
   }
 
