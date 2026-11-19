@@ -437,7 +437,14 @@ export class ExplorerView {
       // 첫 줄이면 위 여백까지 보이게 맨 위로 간다
       if (next !== top) this.body.scrollTop = next === 0 ? 0 : next + this.spacer.offsetTop - headH;
     }
-    this.renderRange(true);
+    this.renderRange();
+    this.syncCursor();
+  }
+
+  /** DOM 을 교체하지 않고 지금 그려진 칸의 커서 표시만 맞춘다 */
+  private syncCursor(): void {
+    const active = this.shown[this.cursor]?.path;
+    for (const [path, tile] of this.rendered) tile.classList.toggle('cursor', path === active);
   }
 
   /** 목록 보기의 머리 줄처럼 스크롤해도 위에 남아 칸을 가리는 높이 */

@@ -880,10 +880,11 @@ button.note-viewer-tag:hover {
 }
 
 .explorer-body {
-  /* 가상 스크롤이 칸 위치를 이 상자 기준으로 잰다(offsetTop) */
+  /* 가상 스크롤이 칸 위치를 이 상자 기준으로 잰다(offsetTop). 브라우저 스크롤 고정이 칸 교체 시 튀지 않게 끈다 */
   position: relative;
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: none;
   overscroll-behavior: contain;
   touch-action: pan-y;
   padding: 4px 16px 16px;
