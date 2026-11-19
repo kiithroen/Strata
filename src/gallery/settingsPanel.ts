@@ -75,12 +75,25 @@ export class SettingsPanel {
     e.stopImmediatePropagation();
     this.close();
   };
+  /** 바깥을 눌러 닫았을 때 뒤따르는 click 을 아래 단추·링크에 넘기지 않는다. 다음 누름이나 키 입력에서 풀린다 */
+  private swallowClick = false;
   private readonly onOutsideDown = (e: PointerEvent) => {
+    this.swallowClick = false;
     if (!this.isVisible()) return;
     if (e.target instanceof Node && !this.panel.contains(e.target) && !this.button.contains(e.target)) {
       e.stopPropagation();
+      this.swallowClick = true;
       this.close();
     }
+  };
+  private readonly onOutsideClick = (e: MouseEvent) => {
+    if (!this.swallowClick) return;
+    this.swallowClick = false;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  private readonly onAnyKeyDown = () => {
+    this.swallowClick = false;
   };
 
   constructor(
@@ -107,6 +120,8 @@ export class SettingsPanel {
     document.body.appendChild(this.panel);
     window.addEventListener('keydown', this.onKey, true);
     window.addEventListener('pointerdown', this.onOutsideDown, true);
+    window.addEventListener('click', this.onOutsideClick, true);
+    window.addEventListener('keydown', this.onAnyKeyDown, true);
     summary.listen((status) => {
       if (this.summaryNote) this.summaryNote.textContent = summaryStatusText(status, this.summary.route(this.settings.geminiKey));
     });
@@ -133,6 +148,8 @@ export class SettingsPanel {
     this.summary.listen(null);
     window.removeEventListener('keydown', this.onKey, true);
     window.removeEventListener('pointerdown', this.onOutsideDown, true);
+    window.removeEventListener('click', this.onOutsideClick, true);
+    window.removeEventListener('keydown', this.onAnyKeyDown, true);
     this.button.remove();
     this.panel.remove();
   }
