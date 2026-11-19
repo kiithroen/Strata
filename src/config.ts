@@ -549,6 +549,22 @@ export const tuning = {
     pinchMinDistance: 12,
   },
 
+  /**
+   * 사진 뷰어(노트 보기·탐색기 미디어 뷰어)의 확대·이동.
+   * minScale·maxScale 은 배율 범위, doubleTapScale 은 더블탭 확대 배율(확대 중 더블탭은 minScale 로 복귀),
+   * doubleTapSeconds·doubleTapSlop 은 더블탭으로 묶는 최대 간격(초)과 두 탭 사이 최대 거리(CSS px),
+   * wheelSpeed 는 휠 한 눈금(100px)당 로그 배율 변화량, snapEpsilon 은 조작이 끝났을 때 minScale 로 붙이는 여유다
+   */
+  zoom: {
+    minScale: 1,
+    maxScale: 5,
+    doubleTapScale: 2.5,
+    doubleTapSeconds: 0.3,
+    doubleTapSlop: 28,
+    wheelSpeed: 0.25,
+    snapEpsilon: 0.02,
+  },
+
   gesture: {
     /** 화면 세로 한 폭을 끌었을 때 이동하는 깊이(월드 단위) */
     dragDepthPerScreen: 22,

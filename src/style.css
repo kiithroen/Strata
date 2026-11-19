@@ -1237,6 +1237,23 @@ body.explorer-open .hud-bottom {
   padding: calc(env(safe-area-inset-top) + 12px) 16px 10px;
 }
 
+.viewer[data-kind="image"] .viewer-head,
+.viewer[data-kind="video"] .viewer-head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  background: linear-gradient(color-mix(in srgb, var(--bg) 82%, black), transparent);
+  transition: opacity 180ms ease;
+}
+
+.viewer.ui-hidden .viewer-head,
+.viewer.ui-hidden .viewer-nav {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .viewer-title {
   flex: 1;
   min-width: 0;
@@ -1263,6 +1280,18 @@ body.explorer-open .hud-bottom {
   touch-action: pan-y;
 }
 
+.viewer[data-kind="image"] .viewer-stage {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.viewer[data-kind="video"] .viewer-stage {
+  position: relative;
+  padding: 0;
+}
+
 .viewer[data-kind="text"] .viewer-stage {
   align-items: stretch;
   justify-content: flex-start;
@@ -1274,6 +1303,22 @@ body.explorer-open .hud-bottom {
   max-height: 100%;
   object-fit: contain;
   border-radius: 6px;
+}
+
+.viewer-image {
+  transform-origin: center center;
+}
+
+.viewer-image.zoomed {
+  cursor: grab;
+}
+
+.viewer-image.zoomed.panning {
+  cursor: grabbing;
+}
+
+.viewer-image.animating {
+  transition: transform 180ms ease;
 }
 
 .viewer-video {
@@ -1312,10 +1357,87 @@ body.explorer-open .hud-bottom {
   width: 100%;
 }
 
+.viewer-text-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .viewer-text-note {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 11px;
   color: var(--text-dim);
+}
+
+.viewer-text-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.viewer-wrap.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.viewer-find {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viewer-find-input {
+  width: 150px;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 32%, transparent);
+  background: color-mix(in srgb, var(--bg) 80%, black);
+  color: var(--text);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 12px;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.viewer-find-input:focus {
+  border-color: var(--accent);
+}
+
+.viewer-find-count {
+  min-width: 44px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.viewer-find-count:empty {
+  display: none;
+}
+
+.viewer-find-step {
+  padding: 4px 9px;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+@media (max-width: 560px) {
+  .viewer-find {
+    flex: 1 1 100%;
+  }
+
+  .viewer-find-input {
+    flex: 1;
+    width: auto;
+  }
 }
 
 .viewer-text {
@@ -1335,6 +1457,22 @@ body.explorer-open .hud-bottom {
   user-select: text;
 }
 
+.viewer-text.nowrap {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.viewer-mark {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+.viewer-mark.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
 .viewer-message {
   color: var(--text-dim);
 }
@@ -1342,6 +1480,7 @@ body.explorer-open .hud-bottom {
 .viewer-nav {
   position: absolute;
   top: 50%;
+  z-index: 2;
   transform: translateY(-50%);
   width: 44px;
   height: 64px;
@@ -1351,6 +1490,7 @@ body.explorer-open .hud-bottom {
   color: var(--text);
   font-size: 32px;
   cursor: pointer;
+  transition: opacity 180ms ease;
 }
 
 .viewer-nav:disabled {
@@ -1573,6 +1713,24 @@ body.explorer-open .hud-bottom {
   background: color-mix(in srgb, var(--card-tint) 8%, var(--bg));
 }
 
+.note-viewer-photo {
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.note-viewer-photo.zoomed {
+  touch-action: none;
+  cursor: grab;
+}
+
+.note-viewer-photo.zoomed.panning {
+  cursor: grabbing;
+}
+
 .note-editor-photo[hidden] {
   display: none;
 }
@@ -1588,7 +1746,12 @@ body.explorer-open .hud-bottom {
 
 .note-viewer-canvas {
   opacity: 0;
+  transform-origin: center center;
   transition: opacity 200ms ease;
+}
+
+.note-viewer-canvas.animating {
+  transition: opacity 200ms ease, transform 180ms ease;
 }
 
 .note-viewer-canvas.loaded {
