@@ -215,6 +215,13 @@ export class MediaViewer {
 
   private clear(): void {
     this.generation++;
+    this.resetStage();
+    if (this.url) URL.revokeObjectURL(this.url);
+    this.url = null;
+  }
+
+  /** 무대를 비우고 지금 파일에 묶인 읽기·제스처 상태를 지운다. 세대와 객체 URL은 그대로 둔다 */
+  private resetStage(): void {
     this.textReadGen++;
     this.textFill = null;
     this.findInput = null;
@@ -222,8 +229,6 @@ export class MediaViewer {
     this.currentImage = null;
     for (const m of this.stage.querySelectorAll('video, audio')) (m as HTMLMediaElement).pause();
     this.stage.replaceChildren();
-    if (this.url) URL.revokeObjectURL(this.url);
-    this.url = null;
   }
 
   private resetGestureState(): void {
@@ -283,6 +288,11 @@ export class MediaViewer {
       return;
     }
     this.url = URL.createObjectURL(file);
+    // 넘긴 뒤 떼어 낸 미디어가 늦게 내는 오류는 지금 파일 화면을 덮지 않는다
+    const gen = this.generation;
+    const fail = (text: string) => () => {
+      if (gen === this.generation) this.message(text);
+    };
     if (entry.kind === 'image') {
       const img = document.createElement('img');
       img.className = 'viewer-image';
@@ -295,7 +305,7 @@ export class MediaViewer {
           this.applyImageZoom(false);
         }
       });
-      img.addEventListener('error', () => this.message('이 사진 형식은 열 수 없다'));
+      img.addEventListener('error', fail('이 사진 형식은 열 수 없다'));
       this.currentImage = img;
       this.stage.append(img);
     } else if (entry.kind === 'video') {
@@ -305,7 +315,7 @@ export class MediaViewer {
       video.autoplay = true;
       video.playsInline = true;
       video.src = this.url;
-      video.addEventListener('error', () => this.message('이 동영상 형식은 브라우저에서 열 수 없다'));
+      video.addEventListener('error', fail('이 동영상 형식은 브라우저에서 열 수 없다'));
       this.stage.append(video);
     } else if (entry.kind === 'audio') {
       const box = document.createElement('div');
@@ -321,7 +331,7 @@ export class MediaViewer {
       audio.autoplay = true;
       audio.src = this.url;
       audio.addEventListener('ended', () => this.playNextAudio());
-      audio.addEventListener('error', () => this.message('이 음악 형식은 열 수 없다'));
+      audio.addEventListener('error', fail('이 음악 형식은 열 수 없다'));
       box.append(name, meta, audio);
       this.stage.append(box);
     }
@@ -904,13 +914,10 @@ export class MediaViewer {
     }
   }
 
+  /** 무대를 안내 글 하나로 바꾼다. 볼 것이 없으니 숨긴 머리 줄도 다시 보인다 */
   private message(text: string): void {
-    this.textReadGen++;
-    this.textFill = null;
-    this.findInput = null;
-    this.currentImage = null;
-    this.zoom.reset();
-    this.stage.replaceChildren();
+    this.resetStage();
+    this.setUiHidden(false);
     const p = document.createElement('p');
     p.className = 'viewer-message';
     p.textContent = text;
