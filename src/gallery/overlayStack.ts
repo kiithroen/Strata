@@ -1,6 +1,15 @@
 /** 겹쳐 여는 2D 화면 하나(노트 보기·입력). hide 는 방문 기록을 건드리지 않고 닫는다 */
 export interface OverlayLayer {
   hide(): void;
+  /**
+   * 뒤로로 닫히기 직전에 묻는다. 지금 닫혀도 되면 true, 아니면 스스로 확인을 걸고 false 를 돌려준다.
+   * false 면 기록을 다시 쌓아 화면을 그대로 둔다
+   */
+  confirmLeave?(): boolean;
+}
+
+function stateObject(state: unknown): object {
+  return typeof state === 'object' && state !== null ? state : {};
 }
 
 /** 기록 상태에 적는 열린 화면 수 */
@@ -22,7 +31,12 @@ export class OverlayStack {
     const waiters = this.waiters;
     this.waiters = [];
     const depth = depthOf(e.state);
-    while (this.layers.length > depth) this.layers.pop()?.hide();
+    const top = this.top;
+    if (depth < this.layers.length && top?.confirmLeave && !top.confirmLeave()) {
+      history.pushState({ ...stateObject(e.state), noteLayer: this.layers.length }, '');
+    } else {
+      while (this.layers.length > depth) this.layers.pop()?.hide();
+    }
     for (const w of waiters) w();
   };
 
@@ -44,9 +58,8 @@ export class OverlayStack {
 
   /** 화면을 하나 열었다고 기록을 쌓는다 */
   push(layer: OverlayLayer): void {
-    const state = typeof history.state === 'object' && history.state !== null ? history.state : {};
     this.layers.push(layer);
-    history.pushState({ ...state, noteLayer: this.layers.length }, '');
+    history.pushState({ ...stateObject(history.state), noteLayer: this.layers.length }, '');
   }
 
   /** 맨 위 화면을 닫고 그 기록을 되돌린다 */

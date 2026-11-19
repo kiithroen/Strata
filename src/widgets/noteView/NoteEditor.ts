@@ -252,10 +252,14 @@ export class NoteEditor {
   /** 취소 요청: 고친 내용이 있으면 한 번 더 확인하고, 없거나 이미 확인 중이면 닫는다 */
   requestCancel(): void {
     if (!this.open) return;
+    if (this.confirmLeave()) this.options.onCancel();
+  }
+
+  /** 닫아도 되면(고친 내용이 없거나 이미 확인 중이면) true. 아니면 확인을 걸고 false 를 돌려준다. 브라우저 뒤로도 이것을 거친다 */
+  confirmLeave(): boolean {
     if (!this.isDirty() || this.cancelArmed) {
       this.disarmCancel();
-      this.options.onCancel();
-      return;
+      return true;
     }
     this.cancelArmed = true;
     this.cancelButton.textContent = '변경 버리기';
@@ -263,6 +267,7 @@ export class NoteEditor {
     this.status.textContent = DIRTY_PROMPT;
     if (this.cancelTimer !== null) window.clearTimeout(this.cancelTimer);
     this.cancelTimer = window.setTimeout(() => this.disarmCancel(), tuning.album.confirmResetSec * 1000);
+    return false;
   }
 
   private disarmCancel(): void {
