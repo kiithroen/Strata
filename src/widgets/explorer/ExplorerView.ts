@@ -2,7 +2,19 @@ import { tuning } from '../../config';
 import { formatStamp } from '../../core/format';
 import { TaskQueue } from '../../core/taskQueue';
 import { gridLayout, moveCursor, scrollToShow, visibleRows, type GridKey, type GridLayout } from './explorerGrid';
-import { breadcrumbs, extensionOf, formatSize, isViewable, parentPath, sortEntries, visibleEntries, type SortKey } from './explorerModel';
+import {
+  breadcrumbs,
+  defaultSortDir,
+  extensionOf,
+  filterEntries,
+  formatSize,
+  isViewable,
+  parentPath,
+  sortEntries,
+  visibleEntries,
+  type SortDir,
+  type SortKey,
+} from './explorerModel';
 import type { FileEntry, FileSource } from './fileSource';
 import { MediaViewer } from './MediaViewer';
 import { imageThumb, thumbCache, thumbKey, thumbWidth, videoThumb, type Thumb } from './thumbnails';
@@ -36,6 +48,7 @@ export type ViewMode = 'grid' | 'list';
 interface Prefs {
   mode: ViewMode;
   sort: SortKey;
+  dir: SortDir;
 }
 
 const PREFS_KEY = 'strata.explorer';
@@ -46,12 +59,14 @@ const GRID_KEYS = new Set<string>(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowD
 function loadPrefs(): Prefs {
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>;
+    const sort = raw.sort && raw.sort in SORT_LABEL ? raw.sort : 'name';
     return {
       mode: raw.mode === 'list' ? 'list' : 'grid',
-      sort: raw.sort && raw.sort in SORT_LABEL ? raw.sort : 'name',
+      sort,
+      dir: raw.dir === 'asc' || raw.dir === 'desc' ? raw.dir : defaultSortDir(sort),
     };
   } catch {
-    return { mode: 'grid', sort: 'name' };
+    return { mode: 'grid', sort: 'name', dir: defaultSortDir('name') };
   }
 }
 
@@ -81,7 +96,9 @@ export class ExplorerView {
   private readonly path: HTMLElement;
   private readonly upButton: HTMLButtonElement;
   private readonly cosmosButton: HTMLButtonElement;
+  private readonly filterInput: HTMLInputElement;
   private readonly sortSelect: HTMLSelectElement;
+  private readonly dirButton: HTMLButtonElement;
   private readonly modeButton: HTMLButtonElement;
   private readonly listHead: HTMLDivElement;
   private readonly body: HTMLDivElement;
@@ -99,14 +116,16 @@ export class ExplorerView {
   private source: FileSource | null = null;
   private dir = '';
   private entries: FileEntry[] = [];
-  /** 격자에 보이는 항목(정렬한 것) */
+  /** 격자에 보이는 항목(필터·정렬한 것) */
   private shown: FileEntry[] = [];
   private layout: GridLayout | null = null;
   private range = { first: -1, last: -1 };
   /** 키보드 커서가 있는 항목 번호(shown 기준). 없으면 -1 */
   private cursor = -1;
   private sortKey: SortKey;
+  private sortDir: SortDir;
   private mode: ViewMode;
+  private filterQuery = '';
   private generation = 0;
   private viewerPushed = false;
 
@@ -124,6 +143,12 @@ export class ExplorerView {
     if (this.viewer.open || !this.source) return;
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+    if (e.key === '/' && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      this.filterInput.focus();
+      this.filterInput.select();
+      return;
+    }
     if (e.key === 'Backspace' || (e.altKey && e.key === 'ArrowUp')) {
       e.preventDefault();
       this.up();
@@ -157,6 +182,23 @@ export class ExplorerView {
     this.path.className = 'explorer-path';
     const actions = document.createElement('div');
     actions.className = 'explorer-actions';
+    this.filterInput = document.createElement('input');
+    this.filterInput.type = 'search';
+    this.filterInput.className = 'explorer-filter';
+    this.filterInput.placeholder = '이름 필터 (/)';
+    this.filterInput.setAttribute('aria-label', '현재 폴더 이름 필터');
+    this.filterInput.addEventListener('input', () => this.setFilter(this.filterInput.value));
+    this.filterInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        if (this.filterQuery) this.setFilter('');
+        else this.filterInput.blur();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        this.filterInput.blur();
+        if (this.shown.length > 0) this.setCursor(0, true);
+      }
+    });
     this.sortSelect = document.createElement('select');
     this.sortSelect.className = 'explorer-sort';
     for (const key of Object.keys(SORT_LABEL) as SortKey[]) {
@@ -167,14 +209,21 @@ export class ExplorerView {
     }
     const prefs = loadPrefs();
     this.sortKey = prefs.sort;
+    this.sortDir = prefs.dir;
     this.mode = prefs.mode;
     this.sortSelect.value = this.sortKey;
-    this.sortSelect.addEventListener('change', () => this.setSort(this.sortSelect.value as SortKey));
+    this.sortSelect.addEventListener('change', () => {
+      const k = this.sortSelect.value as SortKey;
+      this.setSort(k, defaultSortDir(k));
+    });
+    this.dirButton = this.button('', () => this.setSort(this.sortKey, this.sortDir === 'asc' ? 'desc' : 'asc'));
+    this.dirButton.classList.add('explorer-dir');
+    this.dirButton.setAttribute('aria-label', '정렬 방향 바꾸기');
     this.modeButton = this.button('', () => this.setMode(this.mode === 'grid' ? 'list' : 'grid'));
     this.cosmosButton = this.button('은하로 보기', () => void this.openCosmos());
     this.cosmosButton.hidden = !options.showInCosmos;
     const openButton = this.button('폴더 열기', () => void this.pick());
-    actions.append(this.sortSelect, this.modeButton, this.cosmosButton, openButton);
+    actions.append(this.filterInput, this.sortSelect, this.dirButton, this.modeButton, this.cosmosButton, openButton);
     head.append(this.upButton, this.path, actions);
 
     this.body = document.createElement('div');
@@ -192,7 +241,9 @@ export class ExplorerView {
       b.type = 'button';
       b.dataset.key = c.key;
       b.textContent = c.label;
-      b.addEventListener('click', () => this.setSort(c.key));
+      b.addEventListener('click', () =>
+        this.setSort(c.key, this.sortKey === c.key ? (this.sortDir === 'asc' ? 'desc' : 'asc') : defaultSortDir(c.key)),
+      );
       this.listHead.append(b);
     }
     this.listHead.prepend(document.createElement('span'));
@@ -230,12 +281,15 @@ export class ExplorerView {
   }
 
   /** 지금 원본·폴더·보이는 항목 수(확인 스크립트용) */
-  state(): { source: string | null; dir: string; entries: number; mode: ViewMode; tiles: number; thumbsPending: number; viewer: FileEntry | null } {
+  state(): { source: string | null; dir: string; entries: number; mode: ViewMode; sort: SortKey; sortDir: SortDir; filter: string; tiles: number; thumbsPending: number; viewer: FileEntry | null } {
     return {
       source: this.source?.name ?? null,
       dir: this.dir,
       entries: this.entries.length,
       mode: this.mode,
+      sort: this.sortKey,
+      sortDir: this.sortDir,
+      filter: this.filterQuery,
       tiles: this.rendered.size,
       thumbsPending: this.inflight.size,
       viewer: this.viewer.current,
@@ -265,6 +319,8 @@ export class ExplorerView {
     if (gen !== this.generation) return;
     this.dir = path;
     this.entries = list;
+    this.filterQuery = '';
+    this.filterInput.value = '';
     if (push) history.pushState({ explorer: true, path } satisfies HistoryState, '');
     this.renderPath();
     this.body.scrollTop = 0;
@@ -278,11 +334,11 @@ export class ExplorerView {
     if (parent !== null) void this.navigate(parent, true, this.dir);
   }
 
-  /** 지금 폴더의 path 파일을 뷰어로 연다. 같은 폴더의 뷰어로 여는 파일을 지금 정렬 순서로 넘긴다 */
+  /** 지금 폴더의 path 파일을 뷰어로 연다. 같은 폴더의 뷰어로 여는 파일을 지금 필터·정렬 순서로 넘긴다 */
   openFile(path: string): void {
     const source = this.source;
     if (!source) return;
-    const items = sortEntries(this.entries, this.sortKey).filter((e) => isViewable(e.kind));
+    const items = this.shown.filter((e) => isViewable(e.kind));
     const index = items.findIndex((e) => e.path === path);
     if (index < 0) return;
     if (!this.viewer.open) {
@@ -292,13 +348,24 @@ export class ExplorerView {
     this.viewer.show(source, items, index);
   }
 
-  /** 정렬을 바꾸고 다시 그린다 */
-  setSort(key: SortKey): void {
+  /** 정렬 기준·방향을 바꾸고 다시 그린다 */
+  setSort(key: SortKey, dir = defaultSortDir(key)): void {
     this.sortKey = key;
+    this.sortDir = dir;
     this.sortSelect.value = key;
     this.savePrefs();
     this.applyMode();
     this.rerender();
+  }
+
+  /** 현재 폴더 이름 필터를 바꾼다 */
+  setFilter(query: string): void {
+    this.filterQuery = query;
+    this.filterInput.value = query;
+    if (!this.source) return;
+    this.body.scrollTop = 0;
+    this.cursor = -1;
+    this.renderEntries();
   }
 
   /** 격자·목록 보기를 바꾸고 다시 그린다 */
@@ -358,17 +425,19 @@ export class ExplorerView {
   }
 
   private savePrefs(): void {
-    savePrefs({ mode: this.mode, sort: this.sortKey });
+    savePrefs({ mode: this.mode, sort: this.sortKey, dir: this.sortDir });
   }
 
-  /** 보기 방식 단추 글과 목록 머리 줄의 정렬 표시를 지금 상태에 맞춘다 */
+  /** 보기 방식 단추 글과 정렬 방향 표시, 목록 머리 줄의 정렬 표시를 지금 상태에 맞춘다 */
   private applyMode(): void {
+    const arrow = this.sortDir === 'asc' ? '↑' : '↓';
+    this.dirButton.textContent = arrow;
     this.modeButton.textContent = this.mode === 'grid' ? '목록 보기' : '격자 보기';
     this.grid.classList.toggle('list', this.mode === 'list');
     for (const b of this.listHead.querySelectorAll<HTMLButtonElement>('button')) {
       const active = b.dataset.key === this.sortKey;
       b.classList.toggle('active', active);
-      b.dataset.dir = active ? (this.sortKey === 'name' ? '↑' : '↓') : '';
+      b.dataset.dir = active ? arrow : '';
     }
   }
 
@@ -453,12 +522,14 @@ export class ExplorerView {
   private renderEntries(): void {
     this.reset();
     // 폴더와 열 수 있는 파일만 보인다
-    const { shown, hidden } = visibleEntries(this.entries);
-    this.shown = sortEntries(shown, this.sortKey);
+    const { shown: visible, hidden } = visibleEntries(this.entries);
+    const filtered = filterEntries(visible, this.filterQuery);
+    this.shown = sortEntries(filtered, this.sortKey, this.sortDir);
+    const q = this.filterQuery.trim();
     if (this.shown.length === 0) {
       const p = document.createElement('p');
       p.className = 'explorer-empty-note';
-      p.textContent = hidden > 0 ? `열 수 있는 파일이 없다 (숨긴 파일 ${hidden}개)` : '빈 폴더다';
+      p.textContent = q ? `'${q}'에 맞는 항목이 없다` : hidden > 0 ? `열 수 있는 파일이 없다 (숨긴 파일 ${hidden}개)` : '빈 폴더다';
       this.body.replaceChildren(p);
     } else {
       if (this.mode === 'list') this.body.replaceChildren(this.listHead, this.spacer);
@@ -467,9 +538,10 @@ export class ExplorerView {
     }
     const folders = this.shown.filter((e) => e.kind === 'folder').length;
     // 하위 폴더나 열 수 있는 파일이 있으면 은하로 볼 수 있다
-    this.cosmosButton.disabled = this.shown.length === 0;
+    this.cosmosButton.disabled = visible.length === 0;
     const size = this.shown.reduce((s, e) => s + e.size, 0);
-    this.setStatus(`폴더 ${folders} · 파일 ${this.shown.length - folders} · ${formatSize(size)}${hidden > 0 ? ` · 숨긴 파일 ${hidden}` : ''}`);
+    const prefix = q ? `필터 ${this.shown.length}/${visible.length} · ` : '';
+    this.setStatus(`${prefix}폴더 ${folders} · 파일 ${this.shown.length - folders} · ${formatSize(size)}${hidden > 0 ? ` · 숨긴 파일 ${hidden}` : ''}`);
   }
 
   /** 격자 폭이나 항목이 바뀌면 열 수·칸 높이를 다시 재고 보이는 줄을 다시 그린다 */

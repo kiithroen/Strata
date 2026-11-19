@@ -3,7 +3,9 @@ import { ListSource } from '../src/widgets/explorer/browserSources';
 import {
   breadcrumbs,
   decodeText,
+  defaultSortDir,
   extensionOf,
+  filterEntries,
   formatSize,
   isViewable,
   joinPath,
@@ -65,6 +67,32 @@ describe('sortEntries', () => {
     expect(sortEntries(list, 'modified').map((e) => e.name)).toEqual(['b', 'c', 'a']);
     expect(sortEntries(list, 'size').map((e) => e.name)).toEqual(['a', 'b', 'c']);
     expect(list.map((e) => e.name)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('정렬 방향(asc/desc)을 바꾸어도 폴더 우선과 동률 시 이름 오름차순을 유지한다', () => {
+    const list = [
+      entry('z_folder', 'folder'),
+      entry('a_folder', 'folder'),
+      entry('c.txt', 'text', 5, 300),
+      entry('a.txt', 'text', 9, 100),
+      entry('b.txt', 'text', 9, 300),
+    ];
+    expect(defaultSortDir('name')).toBe('asc');
+    expect(defaultSortDir('modified')).toBe('desc');
+    expect(sortEntries(list, 'name', 'desc').map((e) => e.name)).toEqual(['z_folder', 'a_folder', 'c.txt', 'b.txt', 'a.txt']);
+    expect(sortEntries(list, 'size', 'asc').map((e) => e.name)).toEqual(['a_folder', 'z_folder', 'c.txt', 'a.txt', 'b.txt']);
+    expect(sortEntries(list, 'modified', 'asc').map((e) => e.name)).toEqual(['a_folder', 'z_folder', 'a.txt', 'b.txt', 'c.txt']);
+  });
+});
+
+describe('filterEntries', () => {
+  const list = [entry('2026 여행', 'folder'), entry('IMG_01_Sea.jpg', 'image'), entry('sea_sunset.mp4', 'video')];
+
+  it('빈 검색어는 전체를 돌려주고 공백으로 나눈 낱말을 모두 포함한 항목만 대소문자 없이 남긴다', () => {
+    expect(filterEntries(list, '   ').map((e) => e.name)).toEqual(list.map((e) => e.name));
+    expect(filterEntries(list, 'SEA').map((e) => e.name)).toEqual(['IMG_01_Sea.jpg', 'sea_sunset.mp4']);
+    expect(filterEntries(list, 'sea 01').map((e) => e.name)).toEqual(['IMG_01_Sea.jpg']);
+    expect(filterEntries(list, '2026').map((e) => e.name)).toEqual(['2026 여행']);
   });
 });
 

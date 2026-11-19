@@ -64,20 +64,37 @@ export function breadcrumbs(rootName: string, path: string): { name: string; pat
 }
 
 export type SortKey = 'name' | 'modified' | 'size';
+export type SortDir = 'asc' | 'desc';
+
+export function defaultSortDir(key: SortKey): SortDir {
+  return key === 'name' ? 'asc' : 'desc';
+}
 
 const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
 
 /**
- * 폴더를 먼저, 그다음 파일을 key 순으로 늘어놓는다. 이름은 숫자를 값으로 비교한다(IMG_2 < IMG_10).
- * 수정 시각·크기는 큰 것(최근·큰 파일)부터이고, 같으면 이름 순이다. 원본 배열은 바꾸지 않는다
+ * 폴더를 먼저, 그다음 파일을 key·dir 순으로 늘어놓는다. 이름은 숫자를 값으로 비교한다(IMG_2 < IMG_10).
+ * 수정 시각·크기 순에서 값이 같으면 이름 오름차순이다. 원본 배열은 바꾸지 않는다
  */
-export function sortEntries(entries: readonly FileEntry[], key: SortKey = 'name'): FileEntry[] {
+export function sortEntries(entries: readonly FileEntry[], key: SortKey = 'name', dir: SortDir = defaultSortDir(key)): FileEntry[] {
+  const sign = dir === 'asc' ? 1 : -1;
   return [...entries].sort((a, b) => {
     const folder = Number(b.kind === 'folder') - Number(a.kind === 'folder');
     if (folder !== 0) return folder;
-    if (key === 'modified' && a.modified !== b.modified) return b.modified - a.modified;
-    if (key === 'size' && a.size !== b.size) return b.size - a.size;
+    if (key === 'modified' && a.modified !== b.modified) return (a.modified - b.modified) * sign;
+    if (key === 'size' && a.size !== b.size) return (a.size - b.size) * sign;
+    if (key === 'name') return collator.compare(a.name, b.name) * sign;
     return collator.compare(a.name, b.name);
+  });
+}
+
+/** 이름에 query 의 띄어쓰기 낱말이 모두 들어 있는 항목만 남긴다(대소문자 무시). 비었으면 원본 복사본을 낸다 */
+export function filterEntries(entries: readonly FileEntry[], query: string): FileEntry[] {
+  const tokens = query.normalize('NFC').toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [...entries];
+  return entries.filter((e) => {
+    const name = e.name.normalize('NFC').toLowerCase();
+    return tokens.every((t) => name.includes(t));
   });
 }
 

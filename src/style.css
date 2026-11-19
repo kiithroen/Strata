@@ -767,8 +767,33 @@ button.note-viewer-tag:hover {
 
 .explorer-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.explorer-filter {
+  width: 150px;
+  min-width: 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 32%, transparent);
+  background: color-mix(in srgb, var(--bg) 80%, black);
+  color: var(--text);
+  font-family: system-ui, "Malgun Gothic", sans-serif;
+  font-size: 12px;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.explorer-filter:focus {
+  border-color: var(--accent);
+}
+
+.explorer-dir {
+  padding: 6px 10px;
 }
 
 /* 좁은 화면에서는 경로 막대를 단추 아래 한 줄로 내린다 */
@@ -779,7 +804,13 @@ button.note-viewer-tag:hover {
   }
 
   .explorer-actions {
-    margin-left: auto;
+    flex: 1 1 100%;
+    margin-left: 0;
+  }
+
+  .explorer-filter {
+    flex: 1 1 120px;
+    width: auto;
   }
 }
 
