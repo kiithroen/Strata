@@ -350,11 +350,20 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     const members = group?.map((g) => noteIndex.get(g)).filter((m): m is number => m !== undefined);
     screens.openNote(i, members);
   };
+  const openTagSearch = (tag: string) => {
+    if (searchList.open) {
+      if (screens.open) void screens.closeForTag(tag, (q) => searchList.setQuery(q));
+      else searchList.setQuery(`#${tag}`);
+      return;
+    }
+    if (screens.open) void screens.closeForTag(tag, (q) => void openSearch(q, false));
+    else openSearch(`#${tag}`, false);
+  };
   const cardList = new CardListMode(
     '← 지층으로',
     () => focus.set(null),
     () => focus.set(null),
-    { onOpen: openNoteById },
+    { onOpen: openNoteById, onTagClick: openTagSearch },
   );
   // 검색: 제목·본문·태그로 찾은 노트를 묶음(행성)별 2D 목록으로 펼친다
   const runSearch = (query: string): number => {
@@ -373,7 +382,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
     return found.length;
   };
   const searchList = new CardListMode('← 은하로', undefined, undefined, {
+    historyKey: 'searchList',
     onOpen: openNoteById,
+    onTagClick: openTagSearch,
     search: {
       placeholder: '제목·본문·#태그',
       empty: (q) => (q.trim() ? `'${q.trim()}'에 맞는 노트가 없다` : '제목·본문·태그로 찾는다. #태그는 태그만 찾는다'),
@@ -383,7 +394,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   /** focusInput 이 거짓이면 검색 칸에 입력 초점을 두지 않는다(폰에서 가상 키보드가 뜨지 않게, 되살릴 때) */
   const openSearch = (query?: string, focusInput = true): number => {
     focus.set(null);
-    searchList.setCloseLabel(strata.active ? '← 지층으로' : '← 은하로');
+    searchList.setCloseLabel(cardList.open ? '← 카드로' : strata.active ? '← 지층으로' : '← 은하로');
     const n = runSearch(query ?? searchList.query);
     if (query !== undefined) searchList.setQuery(query);
     if (focusInput) searchList.focusSearch();
@@ -478,6 +489,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
   }, (index) => {
     const pi = planetOfNote[index];
     return pi >= 0 ? newestFirst(planets[pi].cluster.members, (m) => notes[m].time) : [index];
+  }, {
+    onTagClick: openTagSearch,
+    suggestedTags: () => topTags(notes.map((n) => n.tags), tuning.album.suggestedTags).map((w) => w.text),
   });
   // Esc 는 맨 위 화면부터 닫는다. 지층 보기의 Esc 처리보다 먼저 받는다(창의 캡처 단계)
   const onEscapeKey = (e: KeyboardEvent) => {
@@ -505,12 +519,12 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
         focus.set(null);
         return true;
       }
-      if (cardList.open) {
-        cardList.close();
-        return true;
-      }
       if (searchList.open) {
         searchList.close();
+        return true;
+      }
+      if (cardList.open) {
+        cardList.close();
         return true;
       }
       return false;
@@ -520,6 +534,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       pinnedTime = strata.focusTime;
     },
     onLeave: () => {
+      searchList.dismiss();
       cardList.dismiss();
       focus.set(null);
       syncScrubberRange();

@@ -1,20 +1,17 @@
 import { CardListView, type CardLayerInfo, type CardListOptions, type CardViewMode } from '../widgets/cardList/CardListView';
 import type { CardListSection } from '../widgets/cardList/cardListModel';
 
-function isCardListHistoryState(state: unknown): boolean {
-  return typeof state === 'object' && state !== null && (state as { cardList?: unknown }).cardList === true;
-}
-
 /**
  * 카드 보기(2D 목록. onModeChange 를 주면 3D 공간과 토글한다)를 여닫고 방문 기록을 맞춘다.
- * 열 때 지금 기록 상태에 cardList 표시를 더해 하나 쌓으므로 브라우저·안드로이드 뒤로는 카드 보기만 닫고
- * 그 아래 화면(지층 보기)은 그대로 둔다. 닫기 단추와 close() 는 그 기록을 되돌린다. 모드를 바꿔도 기록은 쌓지 않는다.
+ * 열 때 지금 기록 상태에 historyKey 표시를 더해 하나 쌓으므로 브라우저·안드로이드 뒤로는 맨 위 화면만 닫고
+ * 그 아래 화면(지층 보기·카드 보기)은 그대로 둔다. 닫기 단추와 close() 는 그 기록을 되돌린다. 모드를 바꿔도 기록은 쌓지 않는다.
  */
 export class CardListMode {
   private readonly view: CardListView;
+  private readonly historyKey: string;
   private pushed = false;
   private readonly onPop = (e: PopStateEvent) => {
-    if (!this.view.open || isCardListHistoryState(e.state)) return;
+    if (!this.view.open || this.hasState(e.state)) return;
     this.pushed = false;
     this.view.hide();
     this.onClose?.();
@@ -24,10 +21,16 @@ export class CardListMode {
     closeLabel: string,
     onModeChange?: (mode: CardViewMode) => void,
     private readonly onClose?: () => void,
-    extra: Pick<CardListOptions, 'onOpen' | 'search'> = {},
+    extra: Pick<CardListOptions, 'onOpen' | 'onTagClick' | 'search'> & { historyKey?: string } = {},
   ) {
-    this.view = new CardListView({ closeLabel, onClose: () => this.close(), onModeChange, ...extra });
+    const { historyKey = 'cardList', ...viewOptions } = extra;
+    this.historyKey = historyKey;
+    this.view = new CardListView({ closeLabel, onClose: () => this.close(), onModeChange, ...viewOptions });
     window.addEventListener('popstate', this.onPop);
+  }
+
+  private hasState(state: unknown): boolean {
+    return typeof state === 'object' && state !== null && (state as Record<string, unknown>)[this.historyKey] === true;
   }
 
   get open(): boolean {
@@ -78,7 +81,7 @@ export class CardListMode {
     this.view.show(sections, focusKey);
     if (!this.pushed) {
       const state = typeof history.state === 'object' && history.state !== null ? history.state : {};
-      if (!isCardListHistoryState(state)) history.pushState({ ...state, cardList: true }, '');
+      if (!this.hasState(state)) history.pushState({ ...state, [this.historyKey]: true }, '');
       this.pushed = true;
     }
   }

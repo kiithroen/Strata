@@ -79,6 +79,7 @@ export class NoteScreens {
     private readonly dismissBelow: () => number,
     /** 연 쪽이 넘길 차례를 주지 않았을 때 노트가 속한 묶음의 노트 번호들(최근 것부터) */
     private readonly groupOf: (index: number) => readonly number[] = (index) => [index],
+    extras?: { onTagClick?: (tag: string) => void; suggestedTags?: () => readonly string[] },
   ) {
     const editable = album !== undefined;
     this.viewer = new NoteViewer({
@@ -87,6 +88,7 @@ export class NoteScreens {
       onDelete: editable ? (id) => void this.remove(id).catch((err) => console.error(err)) : undefined,
       onStep: (dir) => this.step(dir),
       onCheck: editable ? (id, index, done) => void this.check(id, index, done) : undefined,
+      onTagClick: extras?.onTagClick,
     });
     window.addEventListener('keydown', this.onKey);
     this.editor = album
@@ -94,6 +96,7 @@ export class NoteScreens {
           onCancel: () => this.stack.back(),
           onSave: (result) => this.save(result),
           readTakenAt: album.readTakenAt,
+          suggestedTags: extras?.suggestedTags,
         })
       : null;
   }
@@ -106,12 +109,30 @@ export class NoteScreens {
   /** 맨 위 화면을 닫는다(Esc). 열린 화면이 없으면 false */
   back(): boolean {
     if (this.stack.depth === 0) return false;
+    if (this.editor && this.stack.top === this.editor) {
+      this.editor.requestCancel();
+      return true;
+    }
     // 체크를 바꾼 보기 화면은 그 기록까지 한꺼번에 되돌리고 앨범을 다시 띄운다
     if (this.stack.top === this.viewerLayer && this.checked) {
       this.checked = false;
       void this.refresh().catch((err) => console.error(err));
     } else this.stack.back();
     return true;
+  }
+
+  /** 태그 검색을 위해 열린 보기·입력 화면을 닫고 기록을 되돌린 뒤 openSearch 를 부른다 */
+  async closeForTag(tag: string, openSearch: (query: string) => void): Promise<void> {
+    if (this.checked) {
+      this.checked = false;
+      const view = { ...this.snapshot(), search: `#${tag}` };
+      await this.leave();
+      this.album?.reload({ view });
+      return;
+    }
+    const count = this.stack.hideAll();
+    await this.stack.rewind(count);
+    openSearch(`#${tag}`);
   }
 
   /**

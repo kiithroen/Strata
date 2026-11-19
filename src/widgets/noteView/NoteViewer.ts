@@ -32,6 +32,8 @@ export interface NoteViewerOptions {
   onCheck?: (id: string, index: number, done: boolean) => void;
   /** 이전(-1)·다음(1) 노트로 넘길 때(단추·가로 끌기). 방향키는 여는 쪽이 맡는다 */
   onStep?: (dir: 1 | -1) => void;
+  /** `#태그`를 눌렀을 때 부른다 */
+  onTagClick?: (tag: string) => void;
 }
 
 /** 넘길 차례 안의 지금 자리(0부터)와 노트 수 */
@@ -63,12 +65,17 @@ export class NoteViewer {
   private drag: { id: number; x: number; y: number } | null = null;
   private note: ViewedNote | null = null;
   private armed = false;
+  private disarmTimer: number | null = null;
   /** 보여 줄 때마다 늘린다. 다른 노트로 바뀐 뒤 도착한 사진을 가려낸다 */
   private generation = 0;
+  private readonly onRootDown = (e: PointerEvent) => {
+    if (this.armed && e.target instanceof Node && !this.deleteButton.contains(e.target)) this.disarm();
+  };
 
   constructor(private readonly options: NoteViewerOptions) {
     this.root = el('div', 'note-viewer');
     this.root.hidden = true;
+    this.root.addEventListener('pointerdown', this.onRootDown);
     const head = el('header', 'note-viewer-head');
     const close = button('note-button', '닫기', () => this.options.onClose());
     this.kindLabel = el('span', 'note-viewer-kind');
@@ -147,9 +154,11 @@ export class NoteViewer {
     const time = el('time', 'note-viewer-time');
     time.textContent = formatStamp(new Date(note.time));
     foot.append(time);
+    const onTagClick = this.options.onTagClick;
     for (const tag of note.tags) {
-      const t = el('span', note.autoTags?.includes(tag) ? 'note-viewer-tag auto' : 'note-viewer-tag');
-      t.textContent = `#${tag}`;
+      const cls = note.autoTags?.includes(tag) ? 'note-viewer-tag auto' : 'note-viewer-tag';
+      const t = onTagClick ? button(cls, `#${tag}`, () => onTagClick(tag)) : el('span', cls);
+      if (!onTagClick) t.textContent = `#${tag}`;
       foot.append(t);
     }
     page.append(foot);
@@ -162,6 +171,7 @@ export class NoteViewer {
 
   hide(): void {
     if (!this.open) return;
+    this.disarm();
     this.generation++;
     this.root.hidden = true;
     this.body.replaceChildren();
@@ -172,6 +182,7 @@ export class NoteViewer {
   }
 
   dispose(): void {
+    this.root.removeEventListener('pointerdown', this.onRootDown);
     this.hide();
     this.root.remove();
   }
@@ -252,8 +263,10 @@ export class NoteViewer {
     if (!this.note) return;
     if (!this.armed) {
       this.armed = true;
-      this.deleteButton.textContent = '한 번 더 누르면 지운다';
+      this.deleteButton.textContent = '삭제 확인';
       this.deleteButton.classList.add('armed');
+      if (this.disarmTimer !== null) window.clearTimeout(this.disarmTimer);
+      this.disarmTimer = window.setTimeout(() => this.disarm(), tuning.album.confirmResetSec * 1000);
       return;
     }
     this.disarm();
@@ -261,6 +274,10 @@ export class NoteViewer {
   }
 
   private disarm(): void {
+    if (this.disarmTimer !== null) {
+      window.clearTimeout(this.disarmTimer);
+      this.disarmTimer = null;
+    }
     this.armed = false;
     this.deleteButton.textContent = '삭제';
     this.deleteButton.classList.remove('armed');

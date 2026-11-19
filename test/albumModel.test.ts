@@ -9,7 +9,9 @@ import {
   parseQuery,
   parseTags,
   recordFromDraft,
+  sameDraft,
   searchNotes,
+  toggleTagInText,
   type NoteDraft,
 } from '../src/album/albumModel';
 import { checklistText } from '../src/core/checklist';
@@ -138,5 +140,35 @@ describe('searchNotes', () => {
     expect(searchNotes(notes, '   ')).toEqual([]);
     expect(searchNotes(notes, '#')).toEqual([]);
     expect(parseQuery(' a  #B ')).toEqual({ words: ['a'], tags: ['b'] });
+  });
+});
+
+describe('toggleTagInText', () => {
+  it('태그가 없으면 끝에 추가하고 이미 있으면 제거하며 #·쉼표를 정리한다', () => {
+    expect(toggleTagInText('', '여행')).toBe('여행');
+    expect(toggleTagInText('#여행, 바다', '일상')).toBe('여행 바다 일상');
+    expect(toggleTagInText('여행 바다 일상', '#바다')).toBe('여행 일상');
+  });
+});
+
+describe('sameDraft', () => {
+  const sample: NoteDraft = { ...base, title: '제목', body: '본문', tags: ['일상'], tint: 1 };
+
+  it('초 단위 시각 차이와 앞뒤 공백은 같다고 본다', () => {
+    expect(sameDraft(sample, { ...sample, time: sample.time + 15000, title: ' 제목 ', body: ' 본문\n' })).toBe(true);
+  });
+
+  it('분 단위 시각이나 제목·본문·체크리스트·태그·색·사진이 달라지면 다르다고 본다', () => {
+    expect(sameDraft(sample, { ...sample, time: sample.time + 60000 })).toBe(false);
+    expect(sameDraft(sample, { ...sample, title: '다른 제목' })).toBe(false);
+    expect(sameDraft(sample, { ...sample, body: '다른 본문' })).toBe(false);
+    expect(sameDraft(sample, { ...sample, tags: ['일상', '여행'] })).toBe(false);
+    expect(sameDraft(sample, { ...sample, tint: 2 })).toBe(false);
+    expect(sameDraft(sample, { ...sample, photo: { width: 10, height: 10 } })).toBe(false);
+    expect(sameDraft(sample, { ...sample, checklist: [] })).toBe(false);
+
+    const cl: NoteDraft = { ...base, checklist: [{ text: '우유', done: false }] };
+    expect(sameDraft(cl, { ...base, checklist: [{ text: ' 우유 ', done: false }, { text: ' ', done: false }] })).toBe(true);
+    expect(sameDraft(cl, { ...base, checklist: [{ text: '우유', done: true }] })).toBe(false);
   });
 });

@@ -688,6 +688,22 @@ body.card-view-open .strata-actions {
   color: var(--card-tint);
 }
 
+button.card-item-tag,
+button.note-viewer-tag {
+  border: 0;
+  background: transparent;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.card-item-tag:hover,
+button.note-viewer-tag:hover {
+  background: color-mix(in srgb, var(--card-tint) 16%, transparent);
+}
+
 /* 로컬 탐색기: HUD 아래를 채우는 2D 화면과 전체 화면 뷰어 */
 .explorer {
   position: fixed;
@@ -1240,6 +1256,10 @@ body.explorer-open .hud-bottom {
 }
 
 /* 검색 화면: 카드 목록 머리의 검색 칸과 찾은 것이 없을 때의 안내 */
+.card-list.searching {
+  z-index: 41;
+}
+
 .card-list-search {
   flex: 1;
   min-width: 0;
@@ -1349,7 +1369,8 @@ body.explorer-open .hud-bottom {
   font-weight: 700;
 }
 
-.note-delete.armed {
+.note-delete.armed,
+.note-button.armed {
   border-color: #ff6b8a;
   color: #ff9cb0;
 }
@@ -1661,6 +1682,34 @@ body.explorer-open .hud-bottom {
 
 .note-editor-chips:empty {
   display: none;
+}
+
+.note-editor-suggests {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-editor-suggests[hidden] {
+  display: none;
+}
+
+.note-editor-suggest {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--text) 24%, transparent);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.note-editor-suggest.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .note-editor-swatch {

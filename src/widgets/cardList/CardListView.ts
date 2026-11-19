@@ -23,6 +23,8 @@ export interface CardListOptions {
   onModeChange?: (mode: CardViewMode) => void;
   /** 있으면 카드를 누를 때 그 노트 번호와 카드가 속한 묶음의 노트 번호들(목록 순서)로 부른다 */
   onOpen?: (id: string, group: readonly string[]) => void;
+  /** 있으면 카드의 `#태그`를 눌렀을 때 부른다 */
+  onTagClick?: (tag: string) => void;
   /** 있으면 머리에 검색 칸을 띄우고, 글을 고칠 때마다 검색어로 부른다. empty 는 보여 줄 카드가 없을 때의 안내 글이다 */
   search?: { placeholder: string; empty: (query: string) => string; onQuery: (query: string) => void };
 }
@@ -226,15 +228,15 @@ export class CardListView {
   hide(): void {
     if (!this.open) return;
     this.root.hidden = true;
-    document.body.classList.remove('card-view-open');
+    if (!document.querySelector('.card-list:not([hidden])')) document.body.classList.remove('card-view-open');
     this.reset();
   }
 
   dispose(): void {
-    document.body.classList.remove('card-view-open');
     this.reset();
     this.observer.disconnect();
     this.root.remove();
+    if (!document.querySelector('.card-list:not([hidden])')) document.body.classList.remove('card-view-open');
   }
 
   private reset(): void {
@@ -283,10 +285,22 @@ export class CardListView {
     const time = el('time', 'card-item-time');
     time.textContent = formatStamp(new Date(item.time));
     foot.append(time);
+    const onTagClick = this.options.onTagClick;
     for (const tag of item.tags) {
-      const t = el('span', 'card-item-tag');
-      t.textContent = `#${tag}`;
-      foot.append(t);
+      if (onTagClick) {
+        const t = el('button', 'card-item-tag');
+        t.type = 'button';
+        t.textContent = `#${tag}`;
+        t.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onTagClick(tag);
+        });
+        foot.append(t);
+      } else {
+        const t = el('span', 'card-item-tag');
+        t.textContent = `#${tag}`;
+        foot.append(t);
+      }
     }
     card.append(foot);
     return card;

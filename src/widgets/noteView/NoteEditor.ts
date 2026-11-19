@@ -1,5 +1,5 @@
 import { tuning } from '../../config';
-import { draftHasContent, noteKindOf, parseTags, type NoteDraft } from '../../album/albumModel';
+import { draftHasContent, noteKindOf, parseTags, sameDraft, toggleTagInText, type NoteDraft } from '../../album/albumModel';
 import { checklistToLines, linesToChecklist, type ChecklistItem } from '../../core/checklist';
 import type { NoteKind } from '../noteCard/cardLayout';
 import { releasePhoto, type PhotoSource } from '../noteCard/cardTexture';
@@ -18,7 +18,11 @@ export interface NoteEditorOptions {
   onSave: (result: EditorResult) => Promise<void>;
   /** 고른 사진 파일의 촬영 시각(ms). 새 노트는 이 시각에 놓는다 */
   readTakenAt?: (file: File) => Promise<number | undefined>;
+  /** 입력 화면에 추천으로 띄울 기존 태그 목록 */
+  suggestedTags?: () => readonly string[];
 }
+
+const DIRTY_PROMPT = '저장하지 않은 내용이 있다. 한 번 더 누르면 버린다';
 
 const KIND_NOTE: Record<NoteKind, string> = {
   photo: '사진 노트로 저장한다',
@@ -42,6 +46,7 @@ function toLocalInput(time: number): string {
  */
 export class NoteEditor {
   private readonly root: HTMLDivElement;
+  private readonly cancelButton: HTMLButtonElement;
   private readonly heading: HTMLSpanElement;
   private readonly saveButton: HTMLButtonElement;
   private readonly photoBox: HTMLDivElement;
@@ -58,6 +63,7 @@ export class NoteEditor {
   private checklistMode = false;
   private readonly tagsInput: HTMLInputElement;
   private readonly tagChips: HTMLDivElement;
+  private readonly suggestBox: HTMLDivElement;
   private readonly tintRow: HTMLDivElement;
   private readonly swatches: HTMLButtonElement[] = [];
   private readonly timeInput: HTMLInputElement;
@@ -72,6 +78,9 @@ export class NoteEditor {
   private timeTouched = false;
   private saving = false;
   private generation = 0;
+  private initialDraft: NoteDraft | null = null;
+  private cancelArmed = false;
+  private cancelTimer: number | null = null;
 
   private readonly onKey = (e: KeyboardEvent) => {
     if (!this.open) return;
@@ -85,10 +94,10 @@ export class NoteEditor {
     this.root = el('div', 'note-editor');
     this.root.hidden = true;
     const head = el('header', 'note-editor-head');
-    const cancel = button('note-button', '취소', () => this.options.onCancel());
+    this.cancelButton = button('note-button', '취소', () => this.requestCancel());
     this.heading = el('span', 'note-editor-heading');
     this.saveButton = button('note-button note-save', '저장', () => void this.save());
-    head.append(cancel, this.heading, this.saveButton);
+    head.append(this.cancelButton, this.heading, this.saveButton);
 
     const form = el('div', 'note-editor-body');
 
@@ -127,6 +136,8 @@ export class NoteEditor {
     this.tagsInput.placeholder = '태그 (쉼표나 띄어쓰기로 나눈다)';
     this.tagsInput.autocapitalize = 'off';
     this.tagChips = el('div', 'note-editor-chips');
+    this.suggestBox = el('div', 'note-editor-suggests');
+    this.suggestBox.hidden = true;
 
     this.tintRow = el('div', 'note-editor-row note-editor-tints');
     const tintLabel = el('span', 'note-editor-label');
@@ -137,7 +148,10 @@ export class NoteEditor {
       s.type = 'button';
       s.style.setProperty('--swatch', color);
       s.setAttribute('aria-label', `메모 색 ${i + 1}`);
-      s.addEventListener('click', () => this.setTint(i));
+      s.addEventListener('click', () => {
+        this.setTint(i);
+        this.refresh();
+      });
       this.swatches.push(s);
       this.tintRow.append(s);
     });
@@ -147,14 +161,30 @@ export class NoteEditor {
     timeLabel.textContent = '시각';
     this.timeInput = el('input', 'note-editor-input note-editor-time');
     this.timeInput.type = 'datetime-local';
-    this.timeInput.addEventListener('input', () => (this.timeTouched = true));
+    this.timeInput.addEventListener('input', () => {
+      this.timeTouched = true;
+      this.refresh();
+    });
     timeRow.append(timeLabel, this.timeInput);
 
     this.kindNote = el('p', 'note-editor-note');
     this.status = el('p', 'note-editor-status');
 
     for (const input of [this.titleInput, this.bodyInput, this.tagsInput]) input.addEventListener('input', () => this.refresh());
-    form.append(this.photoBox, photoRow, this.titleInput, this.bodyInput, this.checklistBox, this.tagsInput, this.tagChips, this.tintRow, timeRow, this.kindNote, this.status);
+    form.append(
+      this.photoBox,
+      photoRow,
+      this.titleInput,
+      this.bodyInput,
+      this.checklistBox,
+      this.tagsInput,
+      this.tagChips,
+      this.suggestBox,
+      this.tintRow,
+      timeRow,
+      this.kindNote,
+      this.status,
+    );
     this.root.append(head, form);
     document.body.appendChild(this.root);
     window.addEventListener('keydown', this.onKey);
@@ -169,6 +199,7 @@ export class NoteEditor {
    * 새 노트에 사진을 고르면 시각을 직접 바꾸지 않은 한 사진의 촬영 시각으로 옮긴다
    */
   show(now: number, initial?: { draft: NoteDraft; photo?: PhotoSource }): void {
+    this.disarmCancel();
     this.generation++;
     this.isNew = !initial;
     this.timeTouched = false;
@@ -179,6 +210,7 @@ export class NoteEditor {
     this.bodyInput.value = d?.body ?? '';
     this.checklistRows.replaceChildren();
     for (const item of d?.checklist ?? []) this.addRow(item, null);
+    this.buildSuggestions();
     this.setChecklistMode(d?.checklist !== undefined, false);
     this.tagsInput.value = (d?.tags ?? []).join(' ');
     this.timeInput.value = toLocalInput(d?.time ?? now);
@@ -191,12 +223,14 @@ export class NoteEditor {
     this.root.hidden = false;
     document.body.classList.add('note-editor-open');
     this.refresh();
+    this.initialDraft = this.draft();
     // 새 메모는 바로 쓸 수 있게 제목에 입력 초점을 둔다
     if (this.isNew) this.titleInput.focus({ preventScroll: true });
   }
 
   hide(): void {
     if (!this.open) return;
+    this.disarmCancel();
     this.generation++;
     this.root.hidden = true;
     (document.activeElement as HTMLElement | null)?.blur?.();
@@ -204,9 +238,64 @@ export class NoteEditor {
   }
 
   dispose(): void {
+    this.disarmCancel();
     window.removeEventListener('keydown', this.onKey);
     this.hide();
     this.root.remove();
+  }
+
+  /** 고친 내용이 있는지 */
+  isDirty(): boolean {
+    return this.photoFile !== undefined || (this.initialDraft !== null && !sameDraft(this.initialDraft, this.draft()));
+  }
+
+  /** 취소 요청: 고친 내용이 있으면 한 번 더 확인하고, 없거나 이미 확인 중이면 닫는다 */
+  requestCancel(): void {
+    if (!this.open) return;
+    if (!this.isDirty() || this.cancelArmed) {
+      this.disarmCancel();
+      this.options.onCancel();
+      return;
+    }
+    this.cancelArmed = true;
+    this.cancelButton.textContent = '변경 버리기';
+    this.cancelButton.classList.add('armed');
+    this.status.textContent = DIRTY_PROMPT;
+    if (this.cancelTimer !== null) window.clearTimeout(this.cancelTimer);
+    this.cancelTimer = window.setTimeout(() => this.disarmCancel(), tuning.album.confirmResetSec * 1000);
+  }
+
+  private disarmCancel(): void {
+    if (this.cancelTimer !== null) {
+      window.clearTimeout(this.cancelTimer);
+      this.cancelTimer = null;
+    }
+    this.cancelArmed = false;
+    this.cancelButton.textContent = '취소';
+    this.cancelButton.classList.remove('armed');
+    if (this.status.textContent === DIRTY_PROMPT) this.status.textContent = '';
+  }
+
+  private buildSuggestions(): void {
+    const tags = this.options.suggestedTags?.() ?? [];
+    this.suggestBox.hidden = tags.length === 0;
+    if (tags.length === 0) {
+      this.suggestBox.replaceChildren();
+      return;
+    }
+    const label = el('span', 'note-editor-label');
+    label.textContent = '기존 태그';
+    this.suggestBox.replaceChildren(
+      label,
+      ...tags.map((tag) => {
+        const chip = button('note-editor-suggest', `#${tag}`, () => {
+          this.tagsInput.value = toggleTagInText(this.tagsInput.value, tag);
+          this.refresh();
+        });
+        chip.dataset.tag = tag;
+        return chip;
+      }),
+    );
   }
 
   /** 지금 입력 내용(확인 스크립트·저장용) */
@@ -392,8 +481,9 @@ export class NoteEditor {
     this.photoBox.hidden = false;
   }
 
-  /** 태그 미리보기, 종류 안내, 색 줄, 저장 단추를 지금 입력에 맞춘다 */
+  /** 태그 미리보기, 추천 칩, 종류 안내, 색 줄, 저장 단추를 지금 입력에 맞춘다 */
   private refresh(): void {
+    this.disarmCancel();
     const draft = this.draft();
     this.tagChips.replaceChildren(
       ...draft.tags.map((t) => {
@@ -402,6 +492,11 @@ export class NoteEditor {
         return chip;
       }),
     );
+    for (const chip of this.suggestBox.querySelectorAll<HTMLButtonElement>('.note-editor-suggest')) {
+      const active = chip.dataset.tag !== undefined && draft.tags.includes(chip.dataset.tag);
+      chip.classList.toggle('active', active);
+      chip.setAttribute('aria-pressed', String(active));
+    }
     const kind = noteKindOf(draft);
     this.kindNote.textContent = KIND_NOTE[kind];
     this.tintRow.hidden = kind !== 'memo';

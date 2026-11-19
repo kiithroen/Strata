@@ -489,7 +489,8 @@ export const tuning = {
   /**
    * 메모 앨범의 노트 입력·보기. docMinChars 는 사진 없는 노트가 긴 문서가 되는 본문 글자 수(킵 노트 읽기도 같다),
    * photoMaxPx 는 저장하는 사진 사본의 긴 변(px), photoQuality 는 그 JPEG 품질(0~1),
-   * viewerPhotoMaxPx 는 보기 화면이 사진을 그리는 최대 폭(기기 px), editorPhotoPx 는 입력 화면의 사진 미리보기 폭(CSS px)이다
+   * viewerPhotoMaxPx 는 보기 화면이 사진을 그리는 최대 폭(기기 px), editorPhotoPx 는 입력 화면의 사진 미리보기 폭(CSS px),
+   * suggestedTags 는 입력 화면에 띄우는 기존 태그 수, confirmResetSec 은 삭제·변경 버리기 확인 상태가 풀리는 시간(초)이다
    */
   album: {
     docMinChars: 160,
@@ -497,6 +498,8 @@ export const tuning = {
     photoQuality: 0.88,
     viewerPhotoMaxPx: 2400,
     editorPhotoPx: 640,
+    suggestedTags: 12,
+    confirmResetSec: 3,
     /** 노트 보기의 가로 끌기: 이 거리(CSS px) 이상, 가로가 세로의 swipeRatio 배 이상 움직이면 이전·다음 노트로 넘긴다 */
     swipePx: 60,
     swipeRatio: 1.5,

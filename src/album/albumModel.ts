@@ -28,6 +28,35 @@ export function parseTags(text: string): string[] {
   return out;
 }
 
+/** 태그 입력 글에서 tag 가 이미 있으면 빼고, 없으면 끝에 넣어 공백으로 이은 글을 돌려준다 */
+export function toggleTagInText(text: string, tag: string): string {
+  const clean = tag.replace(/^#+/, '').trim();
+  const list = parseTags(text);
+  if (!clean) return list.join(' ');
+  const i = list.indexOf(clean);
+  if (i >= 0) list.splice(i, 1);
+  else list.push(clean);
+  return list.join(' ');
+}
+
+/** 두 입력 내용이 실질적으로 같은지 비교한다(시각은 분 단위, 제목·본문·체크리스트·태그는 다듬은 값 기준) */
+export function sameDraft(a: NoteDraft, b: NoteDraft): boolean {
+  if (Math.floor(a.time / 60000) !== Math.floor(b.time / 60000)) return false;
+  if (a.title.trim() !== b.title.trim()) return false;
+  if ((a.checklist !== undefined) !== (b.checklist !== undefined)) return false;
+  if (a.checklist && b.checklist) {
+    const ca = cleanChecklist(a.checklist);
+    const cb = cleanChecklist(b.checklist);
+    if (ca.length !== cb.length || ca.some((item, i) => item.text !== cb[i].text || item.done !== cb[i].done)) return false;
+  } else if (a.body.trim() !== b.body.trim()) {
+    return false;
+  }
+  if (a.tags.length !== b.tags.length || a.tags.some((t, i) => t !== b.tags[i])) return false;
+  if (a.photo?.width !== b.photo?.width || a.photo?.height !== b.photo?.height) return false;
+  if (!a.photo && a.tint !== b.tint) return false;
+  return true;
+}
+
 /** 카드에 쓰일 글: 체크리스트 노트면 남는 항목을 줄마다 적은 글, 아니면 본문 */
 function draftText(draft: Pick<NoteDraft, 'body' | 'checklist'>): string {
   return draft.checklist ? checklistText(cleanChecklist(draft.checklist)) : draft.body.trim();
