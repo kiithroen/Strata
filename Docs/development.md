@@ -48,9 +48,11 @@ npm run dev
 ## 메모 앨범 저장
 
 - 우주 보기(`cosmos`)는 메모 앨범이다. 저장된 노트가 하나라도 있으면 그 노트만 띄우고, 없으면 가짜 노트를 미리보기로 띄운다. 실데이터 임시 주입과 탐색기 은하는 앨범이 아니라 `+ 노트`가 없다.
-- 브라우저에서는 IndexedDB `strata` 데이터베이스에 둔다. `notes`에 노트 기록(드라이브와 같은 `NoteRecord` 형식, 지움 표시 포함), `photos`에 노트 번호를 열쇠로 사진 사본(JPEG Blob)을 둔다(`src/album/noteStore.ts`). 열 때 브라우저에 저장소 영구화를 요청한다.
-- IndexedDB를 못 쓰면(사생활 보호 창 등) 메모리 저장소로 대신해 이번 실행에만 남고, 콘솔에 경고를 남긴다.
-- 앨범을 비우려면 브라우저 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다.
+- 저장소는 `NoteStore` 인터페이스 뒤에 있고 실행 환경에 따라 `openNoteStore`가 고른다(`src/album/noteStore.ts`).
+- 안드로이드 앱은 SQLite와 앱 전용 파일 폴더에 둔다(`src/album/sqliteNoteStore.ts`, 플러그인 연결은 `nativeNoteStore.ts`). SQLite `strata` 데이터베이스의 `notes` 표에 노트마다 한 줄(`id`, `time`, `modified`, `deleted` 열과 기록 전체 JSON `record`, 지금 사진 파일 이름 `photo`)을 두고, 사진 사본은 앱 파일 폴더의 `photos/`에 둔다. 사진을 바꿀 때는 새 이름의 파일을 다 쓴 뒤 행을 바꾸고 옛 파일을 지운다. JSON이 깨진 행은 건너뛰고 나머지를 읽는다.
+- 브라우저에서는 IndexedDB `strata` 데이터베이스에 둔다. `notes`에 노트 기록(드라이브와 같은 `NoteRecord` 형식, 지움 표시 포함), `photos`에 노트 번호를 열쇠로 사진 사본(JPEG Blob)을 둔다. 열 때 브라우저에 저장소 영구화를 요청한다.
+- 저장소를 못 열면(사생활 보호 창 등) 메모리 저장소로 대신해 이번 실행에만 남는다. 브라우저는 콘솔에 경고를 남기고, 앱은 경고 창을 띄운다.
+- 브라우저에서 앨범을 비우려면 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다. 앱의 앨범은 앱을 지우거나 안드로이드 설정에서 앱 데이터를 지우면 사라진다.
 - 앱 시작은 저장소를 연 뒤 첫 화면을 띄운다(`main.ts`의 `ready`).
 
 ## AI 요약
@@ -63,6 +65,39 @@ npm run dev
 - 키를 두는 곳: 설정에 키가 있으면 브라우저에서 Gemini API를 바로 부른다. 없으면 개발 서버의 `/api/gemini/<모델>:generateContent` 프록시로 보내고, 개발 서버가 `GEMINI_API_KEY` 환경 변수의 키를 붙인다(`vite.config.ts`). 키는 번들에 들어가지 않고 배포본에는 프록시가 없다. `npm run dev:lan`이면 같은 네트워크의 기기도 프록시를 쓴다.
 - 거절·빈 답·형식이 틀린 답은 그 노트만 이번 실행 동안 건너뛰고, 키 오류·권한·요청 한도·서버 오류·연결 실패는 그 차례를 멈추고 다음 차례에 다시 해 본다.
 - 설정의 키는 그 기기 브라우저의 `localStorage`에 평문으로 남는다. 개인 기기에서만 넣는다. 앱으로 감쌀 때 기기 보안 저장소로 옮긴다.
+
+## 안드로이드 앱
+
+웹 빌드(`dist`)를 Capacitor로 감싼 디버그 APK를 직접 설치해 쓴다. 안드로이드 프로젝트는 `android/`, 설정은 `capacitor.config.ts`다. 쓰는 플러그인은 SQLite(`@capacitor-community/sqlite`), 파일(`@capacitor/filesystem`), 앱(`@capacitor/app`, 뒤로 키)이다.
+
+### 준비
+
+- `JAVA_HOME`이 Android Studio에 들어 있는 JDK(`jbr`)를 가리키게 한다. Gradle은 이 JDK에서 돈다. Gradle 판(`android/gradle/wrapper/gradle-wrapper.properties`)은 이 JDK를 지원해야 해서 Capacitor 템플릿 기본값보다 올려 두었다. Android Studio를 올려 JDK가 바뀌면 `Unsupported class file major version`이 나는지 보고 Gradle을 맞춘다.
+- Capacitor는 Java 21로 컴파일하고, Filesystem 플러그인은 JDK 21 툴체인을 요구한다. 없으면 `android/settings.gradle`의 foojay 플러그인이 받아 `~/.gradle/jdks`에 둔다. 시스템에 JDK 21을 설치할 필요는 없다.
+- Android SDK(컴파일 SDK는 `android/variables.gradle`의 `compileSdkVersion`)와 `ANDROID_HOME`. 처음 빌드할 때 Gradle이 배포판과 의존 패키지를 받는다.
+
+### 빌드
+
+```bash
+npm run apk
+```
+
+웹을 빌드하고(`npm run build`), `dist`와 플러그인을 안드로이드 프로젝트에 복사한 뒤(`cap sync android`), 디버그 APK를 만든다(`gradlew.bat assembleDebug`, 윈도우 전용 스크립트다). `BUILD SUCCESSFUL` 줄을 확인한다. 결과는 `android/app/build/outputs/apk/debug/app-debug.apk`다. 웹 코드만 고쳤어도 `cap sync`를 거쳐야 앱에 들어간다. 플러그인을 더하거나 빼면 `npx cap sync android`가 Gradle 설정도 고친다.
+
+### 설치
+
+- **USB**: 폰에서 USB 디버깅을 켜고 연결한 뒤 `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`. `-r`은 데이터를 둔 채 바꿔 설치한다.
+- **파일로**: APK를 폰에 옮겨 파일 앱에서 열고, 처음 한 번 그 앱의 '출처를 알 수 없는 앱 설치'를 허용한다.
+- 디버그 APK는 이 PC의 디버그 서명 키(`%USERPROFILE%\.android\debug.keystore`)로 서명된다. 다른 키로 서명한 APK는 바꿔 설치할 수 없어 앱을 지워야 하고, 그러면 앱에 저장한 노트도 지워진다. 이 키를 잃지 않게 따로 보관하고, 다른 PC에서 빌드할 때는 같은 키를 옮겨 쓴다.
+- `appId`(`capacitor.config.ts`)를 바꾸면 다른 앱으로 설치되어 저장한 노트가 따라오지 않는다.
+
+### 앱에서 다른 점
+
+- PC 크롬의 `chrome://inspect`로 디버그 앱의 웹뷰 콘솔을 본다. 스크립트로 확인할 때는 `adb forward tcp:<포트> localabstract:webview_devtools_remote_<앱 pid>`로 웹뷰의 개발자 도구 프로토콜에 붙는다. 디버그 앱은 `adb shell run-as <appId>`로 데이터베이스(`databases/strataSQLite.db`)와 사진 폴더(`files/photos`)를 볼 수 있다.
+- 안드로이드 뒤로 키는 방문 기록이 있으면 웹 뒤로(맨 위 화면을 닫는다), 없으면 앱을 뒤로 보낸다(`main.ts`). 키보드가 떠 있으면 첫 뒤로는 키보드만 닫는다(검색은 열 때 입력 칸에 포커스가 간다).
+- 설정(`strata.settings`, Gemini 키 포함)은 웹뷰 `localStorage`에 남는다. 웹뷰 출처는 `https://localhost`이고, `capacitor.config.ts`의 `server.androidScheme`·`hostname`을 바꾸면 설정이 사라진다.
+- 앱에는 개발 서버 프록시가 없어 AI 요약은 설정의 키로만 돈다. 디버그 훅(`window.__strata`)도 없다.
+- 로컬 탐색기는 아직 앱용 `FileSource`가 없다.
 
 ## 배포
 
@@ -81,9 +116,10 @@ npm run dev
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
 | `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 블룸 후처리(`bloom.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
-| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`), AI 요약 차례(`summaries.ts`)와 Gemini API 요청(`geminiSummarizer.ts`) |
+| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 앱의 SQLite·파일 구현(`sqliteNoteStore.ts`, `nativeNoteStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`), AI 요약 차례(`summaries.ts`)와 Gemini API 요청(`geminiSummarizer.ts`) |
 | `src/dev/` | 개발용 가짜 데이터(`noteData.ts`)와 실데이터 임시 불러오기(`localNotes.ts`, `imageHeader.ts`, `keepNote.ts`) |
-| `test/` | vitest 단위 테스트(노드 환경) |
+| `test/` | vitest 단위 테스트(노드 환경). 앱 SQLite 저장소는 `node:sqlite`로 같은 SQL을 돌린다 |
+| `android/` | Capacitor 안드로이드 프로젝트. `app/src/main/assets/public`은 `cap sync`가 채우는 사본이라 저장소에 넣지 않는다 |
 
 게임 시간은 `main.ts`의 루프가 프레임 간격을 누적해 만든다. 긴 멈춤은 `loop.maxStep`으로 자른다.
 

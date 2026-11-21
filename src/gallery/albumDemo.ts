@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { Album } from '../album/album';
 import { draftFromRecord } from '../album/albumModel';
 import { MemoryNoteStore, openNoteStore } from '../album/noteStore';
@@ -16,15 +17,23 @@ let album = new Album(new MemoryNoteStore());
 /** 메모 앨범 저장소를 열고 노트를 읽는다. 앱이 첫 화면을 띄우기 전에 부른다. 저장소를 못 쓰면 이번 실행에만 남는 메모리 저장소다 */
 export async function openAlbum(): Promise<void> {
   const { store, persistent } = await openNoteStore();
-  if (!persistent) console.warn('IndexedDB 를 쓸 수 없어 노트가 이번 실행에만 남는다');
+  if (!persistent) warnNotSaved();
   const opened = new Album(store);
   try {
     await opened.load();
     album = opened;
   } catch (err) {
     console.error(err);
+    warnNotSaved();
     album = new Album(new MemoryNoteStore());
   }
+}
+
+/** 저장소를 못 열어 메모리 저장소로 대신할 때 알린다. 앱에서는 콘솔을 볼 수 없어 창으로 알린다 */
+function warnNotSaved(): void {
+  const message = '노트 저장소를 열 수 없습니다. 지금 쓰는 노트는 앱을 닫으면 사라집니다.';
+  if (Capacitor.isNativePlatform()) window.alert(message);
+  else console.warn(message);
 }
 
 /** 지금 띄운 메모 앨범 우주 보기. 새 요약이 오면 그 카드를 바꾼다 */
