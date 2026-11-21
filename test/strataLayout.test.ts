@@ -41,21 +41,29 @@ describe('layoutStrata', () => {
     }
   });
 
-  it('층 안의 창은 서로 겹치지 않고 원판 안에 들어가며, 원판은 가장 바깥 창에 여유만큼 붙는다', () => {
-    for (const layer of layoutStrata(layers, 0)) {
-      const t = layer.tiles;
-      const outer = Math.max(...t.map((x) => Math.hypot(x.x, x.z) + x.radius));
+  it('칸은 노트 수와 maxTiles 중 작은 수이고, 가장 큰 창이 어느 칸에 앉아도 겹치지 않고 원판 안에 든다', () => {
+    const many: StrataLayerInput = { key: 'many', label: 'many', anchorTime: 0, tiles: tiles(s.maxTiles * 3 + 1, 9) };
+    for (const layer of layoutStrata([...layers, many], 0)) {
+      const count = layer.tiles.length;
+      expect(layer.slots.length).toBe(Math.min(count, s.maxTiles));
+      const r = Math.max(...layer.tiles.map((t) => t.radius));
+      const p = layer.slots;
+      const outer = Math.max(...p.map((x) => Math.hypot(x.x, x.z) + r));
       expect(layer.radius).toBeCloseTo(outer + s.margin, 9);
-      for (let i = 0; i < t.length; i++) {
-        expect(Math.hypot(t[i].x, t[i].z) + t[i].radius).toBeLessThanOrEqual(layer.radius - s.margin + 1e-9);
-        for (let j = i + 1; j < t.length; j++) {
-          expect(Math.hypot(t[i].x - t[j].x, t[i].z - t[j].z)).toBeGreaterThanOrEqual(t[i].radius + t[j].radius - 1e-9);
-        }
+      for (let i = 0; i < p.length; i++) {
+        for (let j = i + 1; j < p.length; j++) expect(Math.hypot(p[i].x - p[j].x, p[i].z - p[j].z)).toBeGreaterThanOrEqual(2 * r - 1e-9);
       }
     }
   });
 
-  it('모든 노트가 한 번씩 깔리고, 관련도가 높을수록 크고 가운데에 가깝다', () => {
+  it('노트가 칸보다 많아도 원판은 칸 수만큼만 커진다', () => {
+    // 창 크기가 같아야 원판 크기를 칸 수로만 비교할 수 있다
+    const same = (n: number) => tiles(n, 9).map((t) => ({ ...t, width: tuning.card.width, height: tuning.card.width, affinity: 0.5 }));
+    const big = (n: number) => layoutStrata([{ key: 'k', label: 'k', anchorTime: 0, tiles: same(n) }], 0)[0];
+    expect(big(s.maxTiles * 10).radius).toBeCloseTo(big(s.maxTiles).radius, 9);
+  });
+
+  it('층의 모든 노트를 관련도 높은 순서로 들고, 관련도가 높을수록 창이 크다', () => {
     const out = layoutStrata(layers, 1);
     out.forEach((layer, li) => {
       const inputs = layers[li].tiles;
@@ -65,9 +73,9 @@ describe('layoutStrata', () => {
         const a = byIndex.get(tile.index)!.affinity;
         expect(tile.scale).toBeCloseTo(s.cardScale[0] + (s.cardScale[1] - s.cardScale[0]) * a, 12);
       }
-      const top = layer.tiles[0];
-      const maxA = Math.max(...inputs.map((t) => t.affinity));
-      expect(byIndex.get(top.index)!.affinity).toBe(maxA);
+      for (let i = 1; i < layer.tiles.length; i++) {
+        expect(byIndex.get(layer.tiles[i - 1].index)!.affinity).toBeGreaterThanOrEqual(byIndex.get(layer.tiles[i].index)!.affinity);
+      }
     });
   });
 
@@ -85,21 +93,22 @@ describe('layoutStrata', () => {
       0,
     );
     // 돌리기만 했으니 중심 거리와 창끼리 거리는 같다
-    a.tiles.forEach((t, i) => expect(Math.hypot(t.x, t.z)).toBeCloseTo(Math.hypot(b.tiles[i].x, b.tiles[i].z), 9));
-    expect(Math.hypot(a.tiles[1].x - a.tiles[5].x, a.tiles[1].z - a.tiles[5].z)).toBeCloseTo(
-      Math.hypot(b.tiles[1].x - b.tiles[5].x, b.tiles[1].z - b.tiles[5].z),
+    a.slots.forEach((t, i) => expect(Math.hypot(t.x, t.z)).toBeCloseTo(Math.hypot(b.slots[i].x, b.slots[i].z), 9));
+    expect(Math.hypot(a.slots[1].x - a.slots[5].x, a.slots[1].z - a.slots[5].z)).toBeCloseTo(
+      Math.hypot(b.slots[1].x - b.slots[5].x, b.slots[1].z - b.slots[5].z),
       9,
     );
-    // 가운데 창을 뺀 창들은 다른 층의 같은 번째 창과 자리가 다르다
-    const moved = a.tiles.slice(1).filter((t, i) => Math.hypot(t.x - b.tiles[i + 1].x, t.z - b.tiles[i + 1].z) > t.radius * 0.5);
-    expect(moved.length).toBe(a.tiles.length - 1);
+    // 가운데 칸을 뺀 칸들은 다른 층의 같은 번째 칸과 자리가 다르다
+    const r = a.tiles[0].radius;
+    const moved = a.slots.slice(1).filter((t, i) => Math.hypot(t.x - b.slots[i + 1].x, t.z - b.slots[i + 1].z) > r * 0.5);
+    expect(moved.length).toBe(a.slots.length - 1);
   });
 
   it('1장은 정중앙에, 2~4장은 같은 반지름 원 위에 대칭으로 놓인다', () => {
-    const one = layoutStrata([{ key: '1', label: '1', anchorTime: 0, tiles: tiles(1, 1) }], 0)[0].tiles;
+    const one = layoutStrata([{ key: '1', label: '1', anchorTime: 0, tiles: tiles(1, 1) }], 0)[0].slots;
     expect(Math.hypot(one[0].x, one[0].z)).toBe(0);
     for (const n of [2, 3, 4]) {
-      const group = layoutStrata([{ key: String(n), label: String(n), anchorTime: 0, tiles: tiles(n, n) }], 0)[0].tiles;
+      const group = layoutStrata([{ key: String(n), label: String(n), anchorTime: 0, tiles: tiles(n, n) }], 0)[0].slots;
       const radii = group.map((t) => Math.hypot(t.x, t.z));
       for (const r of radii) expect(r).toBeCloseTo(radii[0], 9);
     }
@@ -150,11 +159,11 @@ describe('strataPose 원판 회전', () => {
   it('창은 원판에 놓인 채 층 중심 둘레로 함께 돌고, 한 바퀴 돌면 제자리다', () => {
     const layer = layoutStrata(layers, 0)[2];
     const frame = { origin: new Vector3(1, 2, 3), yaw: 0.4 };
-    const tile = layer.tiles[layer.tiles.length - 1];
-    const rest = strataPose(frame, layer, tile, createPose());
+    const slot = layer.slots[layer.slots.length - 1];
+    const rest = strataPose(frame, layer, slot, 1, createPose());
     const center = new Vector3(frame.origin.x, frame.origin.y + layer.y, frame.origin.z);
     for (const spin of [0.3, 1.7, -2.2]) {
-      const p = strataPose(frame, layer, tile, createPose(), spin);
+      const p = strataPose(frame, layer, slot, 1, createPose(), spin);
       expect(p.position.distanceTo(center)).toBeCloseTo(rest.position.distanceTo(center), 9);
       expect(p.position.y).toBeCloseTo(rest.position.y, 9);
       expect(p.quaternion.angleTo(rest.quaternion)).toBeCloseTo(Math.abs(spin), 6);
@@ -163,7 +172,7 @@ describe('strataPose 원판 회전', () => {
       const delta = Math.atan2(-after.z, after.x) - Math.atan2(-before.z, before.x);
       expect(Math.atan2(Math.sin(delta), Math.cos(delta))).toBeCloseTo(spin, 6);
     }
-    const full = strataPose(frame, layer, tile, createPose(), Math.PI * 2);
+    const full = strataPose(frame, layer, slot, 1, createPose(), Math.PI * 2);
     expect(full.position.distanceTo(rest.position)).toBeLessThan(1e-9);
   });
 });
@@ -174,8 +183,9 @@ describe('strataPose', () => {
     const layer = out[2];
     for (const yaw of [0, 0.7, -2.1]) {
       const frame = { origin: new Vector3(1, 2, 3), yaw };
-      for (const tile of layer.tiles) {
-        const pose = strataPose(frame, layer, tile, createPose());
+      for (const [k, slot] of layer.slots.entries()) {
+        const tile = layer.tiles[k];
+        const pose = strataPose(frame, layer, slot, tile.scale, createPose());
         const normal = new Vector3(0, 0, 1).applyQuaternion(pose.quaternion);
         const up = new Vector3(0, 1, 0).applyQuaternion(pose.quaternion);
         const toViewer = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));

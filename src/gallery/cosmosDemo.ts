@@ -1170,7 +1170,9 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
           opened = Math.max(opened, card.motion.focus);
 
           // 살: 노드에서 그 노트로 뻗는다. 카드로 도는 노트는 카드 중심을 향하되 화면에서 카드 테두리에서 멈추고,
-          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 카드는 실을 풀고 점으로 돌아간다
+          // 아니면 노드 둘레 원판의 점에 닿는다. 펼치는 카드는 실을 풀고 점으로 돌아간다.
+          // 관련도 순으로 graph.maxSpokes 개까지만 긋는다. 나머지 양은 노드 크기와 노트 수 글자로 보인다
+          if (rank >= Math.max(capacity, g.maxSpokes)) return;
           burstOffset(rank, spin, offset, affinity).applyQuaternion(burstQuat);
           target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);

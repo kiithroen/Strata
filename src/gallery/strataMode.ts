@@ -15,11 +15,11 @@ import {
   type StrataFrame,
   type StrataLayer,
   type StrataLayerInput,
-  type StrataTile,
   strataDistance,
   strataFocusHeight,
 } from '../widgets/strata/strataLayout';
 import { StrataView } from '../widgets/strata/StrataView';
+import { TileRotation } from '../widgets/strata/tileRotation';
 import type { Stage } from './stage';
 
 interface Saved {
@@ -67,7 +67,10 @@ export class StrataMode {
   private spinPace = 1;
   /** 원판이 돌아도 되는지. 데모가 펼친 카드·손가락·카드 보기를 보고 정한다 */
   spinning = true;
-  private readonly placed = new Map<number, { layer: StrataLayer; layerIndex: number; tile: StrataTile }>();
+  /** 노트 번호 → 속한 층과 그 층의 멤버 번호(관련도 순서) */
+  private readonly placed = new Map<number, { layer: StrataLayer; layerIndex: number; member: number }>();
+  /** 층마다 창 칸을 돌려 쓰는 상태 */
+  private rotations: TileRotation[] = [];
   /** 층마다 카드가 멀어 사라진 정도(0~1). measure 가 매 프레임 구한다 */
   private readonly hidden = new Map<StrataLayer, number>();
   private readonly center = new Vector3();
@@ -168,8 +171,9 @@ export class StrataMode {
     this.layers = layoutStrata(layers, focusIndex);
     this.placed.clear();
     this.layers.forEach((layer, layerIndex) => {
-      for (const tile of layer.tiles) this.placed.set(tile.index, { layer, layerIndex, tile });
+      layer.tiles.forEach((tile, member) => this.placed.set(tile.index, { layer, layerIndex, member }));
     });
+    this.rotations = this.layers.map((layer, i) => new TileRotation(layer.tiles.length, this.slotsFor(i, focusIndex)));
     this.focus = focusIndex;
     this.syncStepButtons();
     this.view.build(this.layers, this.frame);
@@ -224,8 +228,16 @@ export class StrataMode {
     this.leave();
   }
 
+  private slotsFor(layerIndex: number, focus: number): number {
+    return Math.min(this.layers[layerIndex]?.slots.length ?? 0, layerIndex === focus ? tuning.strata.maxTiles : tuning.strata.sideTiles);
+  }
+
+  /** 지금 층 칸에 앉아 보이는 노트인지(탭을 받는 창) */
   hasCard(index: number): boolean {
-    return this.placed.has(index);
+    const p = this.placed.get(index);
+    if (!p) return false;
+    const seat = this.rotations[p.layerIndex]?.find(p.member);
+    return seat !== null && seat !== undefined && seat.bubble > 0.5;
   }
 
   /** 층마다 열쇠, 날짜 글자, 깔린 노트 번호(최근 층부터) */
@@ -276,6 +288,7 @@ export class StrataMode {
     const layer = this.layers[index];
     if (!layer) return;
     this.focus = index;
+    this.rotations.forEach((rot, i) => rot.setSlots(this.slotsFor(i, index)));
     this.syncStepButtons();
     this.rig.focusPoint(strataPoint(this.frame, 0, strataFocusHeight(this.layers, index), 0, this.hit));
     this.rig.setGoalDistance(this.fitDistance());
@@ -309,19 +322,21 @@ export class StrataMode {
   }
 
   /**
-   * 노트 창 하나의 기본 자세와 불투명도를 지층 쪽으로 섞는다. 지층에 깔리는 노트는 지층 자세로 옮겨 가며 또렷해지고,
-   * 아닌 노트는 옅어진다. home 은 은하 자세가 담긴 채로 들어와 섞인 자세로 바뀐다.
+   * 노트 창 하나의 기본 자세와 불투명도를 지층 쪽으로 섞는다. 층 칸에 앉은 노트는 지층 자세로 옮겨 가며 또렷해지고,
+   * 아닌 노트는 옅어진다. 칸을 돌려 쓰는 동안에는 부푼 정도만큼 커지고 또렷해진다. home 은 은하 자세가 담긴 채로 들어와 섞인 자세로 바뀐다.
    */
   blendCard(index: number, home: Pose, fade: number): number {
     if (this.mix <= 0) return fade;
     const p = this.placed.get(index);
-    if (!p) return fade * Math.max(0, 1 - this.mix * tuning.strata.leaveFade);
-    strataPose(this.frame, p.layer, p.tile, this.pose, this.spin);
+    const seat = p ? this.rotations[p.layerIndex]?.find(p.member) : null;
+    if (!p || !seat) return fade * Math.max(0, 1 - this.mix * tuning.strata.leaveFade);
+    const tile = p.layer.tiles[p.member];
+    strataPose(this.frame, p.layer, p.layer.slots[seat.slot], tile.scale * seat.bubble, this.pose, this.spin);
     const w = this.mix;
     home.position.lerp(this.pose.position, w);
     home.quaternion.slerp(this.pose.quaternion, w);
     home.scale += (this.pose.scale - home.scale) * w;
-    const shown = 1 - (this.hidden.get(p.layer) ?? 0);
+    const shown = (1 - (this.hidden.get(p.layer) ?? 0)) * seat.bubble;
     return fade * (1 - w) + shown * w;
   }
 
@@ -354,13 +369,18 @@ export class StrataMode {
       if (this.layers.length > 0) {
         this.layers = [];
         this.placed.clear();
+        this.rotations = [];
         this.hidden.clear();
         this.view.clear();
       }
     }
     const sp = s.spin;
     this.spinPace = damp(this.spinPace, this.spinning ? 1 : 0, sp.rate, dt);
-    if (this.active) this.spin += sp.speed * this.spinPace * dt;
+    if (this.active) {
+      this.spin += sp.speed * this.spinPace * dt;
+      // 손가락이 닿았거나 카드를 펼친 동안에는 칸 돌리기도 멈춰, 누르려던 창이 꺼지지 않는다
+      for (const rot of this.rotations) rot.update(dt * this.spinPace);
+    }
     this.view.update(dt, this.mix * this.veil, this.focus, this.spin);
   }
 

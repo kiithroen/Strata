@@ -348,6 +348,8 @@ export const tuning = {
       tapRadius: 34,
       /** 카드 탭 판정 반경(CSS px). 화면에 보이는 카드 반지름이 이보다 크면 그쪽을 쓴다 */
       cardTapRadius: 38,
+      /** 노드마다 긋는 살과 점의 최대 수(관련도 높은 노트부터). 카드로 도는 노트는 늘 긋는다 */
+      maxSpokes: 24,
       burst: { inner: 0.06, spacing: 0.055, pullSpread: 0.85, pullCurve: 1.5, depthJitter: 0.05, spin: 0.06 },
       hourColors: ['#2a5cff', '#2f9dff', '#38d4ff', '#7fe9ff', '#5a7dff', '#8fb4ff'],
     },
@@ -400,6 +402,14 @@ export const tuning = {
     cardScale: [0.42, 0.62],
     /** 창 사이·고리 사이 여백(가장 큰 창 대각선 대비) */
     cellGap: 0.16,
+    /** 바라보는 층과 나머지 층에 까는 창 칸 수. 노트가 더 많으면 칸을 돌려 쓴다 */
+    maxTiles: 12,
+    sideTiles: 3,
+    /**
+     * 칸 돌려 쓰기. hold 는 노트가 칸에 머무는 시간 범위(게임 시간, 초), rate 는 거품처럼 부풀고 꺼지는 빠르기(1/초),
+     * stagger 는 칸이 늘어날 때 칸마다 부풀기 시작하는 시차(초)다
+     */
+    rotate: { hold: [4.5, 8], rate: 7, stagger: 0.12 },
     /** 지층에 깔리지 않는 카드가 들어가는 동안 사라지는 빠르기(들어간 정도 대비 배율) */
     leaveFade: 2.5,
     /** 층 원판이 가장 바깥 창보다 넓게 두르는 여백(월드)과 날짜 글자 높이(월드) */

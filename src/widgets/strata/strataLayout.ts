@@ -22,11 +22,15 @@ export interface StrataLayerInput {
   words?: readonly PlacedWord[];
 }
 
-/** 층 판 위 자리. x 는 판의 오른쪽, z 는 판의 앞쪽(보는 쪽)이다. radius 는 창이 차지하는 원(대각선)의 반지름 */
-export interface StrataTile {
-  index: number;
+/** 층 판 위 칸 자리. x 는 판의 오른쪽, z 는 판의 앞쪽(보는 쪽)이다 */
+export interface StrataSlot {
   x: number;
   z: number;
+}
+
+/** 층에 속한 노트 하나의 창 배율과 창이 차지하는 원(대각선)의 반지름 */
+export interface StrataTile {
+  index: number;
   scale: number;
   radius: number;
 }
@@ -38,8 +42,11 @@ export interface StrataLayer {
   /** 고른 층을 0으로 한 높이. 최근 층이 위다 */
   y: number;
   words: readonly PlacedWord[];
-  /** 층 원판의 반지름. 모든 창을 감싸고 strata.margin 만큼 여유가 있다 */
+  /** 층 원판의 반지름. 모든 칸을 감싸고 strata.margin 만큼 여유가 있다 */
   radius: number;
+  /** 창 칸. 가운데 칸부터이고 strata.maxTiles 개를 넘지 않는다 */
+  slots: StrataSlot[];
+  /** 층의 모든 노트. 관련도 높은 순서다(같으면 입력 순서) */
   tiles: StrataTile[];
 }
 
@@ -80,10 +87,11 @@ function ringPositions(n: number, step: number): Array<{ x: number; z: number }>
 }
 
 /**
- * 층들을 쌓고 층마다 노트 창을 동심원 고리 위에 깐다. layers 는 최근 것부터, focusIndex 는 고른 층이다.
- * 고리 간격·창 간격이 그 층에서 가장 큰 창의 대각선에 여백을 더한 것이라 창끼리 겹치지 않는다.
- * 관련도가 높은 창일수록 크고 판 가운데에 놓인다. 층마다 고리 배치를 층 키로 정한 각도만큼 돌려,
- * 위에서 볼 때 여러 층의 창이 같은 자리에 겹쳐 기둥처럼 줄 서지 않게 한다(같은 층은 늘 같은 각도다).
+ * 층들을 쌓고 층마다 창 칸을 동심원 고리 위에 잡는다. layers 는 최근 것부터, focusIndex 는 고른 층이다.
+ * 칸 수는 노트 수와 strata.maxTiles 중 작은 쪽이고, 넘친 노트는 칸을 돌려 쓴다(TileRotation).
+ * 어느 노트든 어느 칸에 앉을 수 있도록 고리 간격·칸 간격은 그 층에서 가장 큰 창의 대각선에 여백을 더한 것이라 창끼리 겹치지 않는다.
+ * 창 크기는 노트의 관련도로 정하고, 칸 차례는 가운데부터라 관련도 높은 노트가 먼저 가운데에 앉는다.
+ * 층마다 고리 배치를 층 키로 정한 각도만큼 돌려, 위에서 볼 때 여러 층의 창이 같은 자리에 겹쳐 기둥처럼 줄 서지 않게 한다(같은 층은 늘 같은 각도다).
  */
 export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: number): StrataLayer[] {
   const s = tuning.strata;
@@ -94,29 +102,22 @@ export function layoutStrata(layers: readonly StrataLayerInput[], focusIndex: nu
     });
     const maxDiag = sized.reduce((m, v) => Math.max(m, v.diag), 0);
     const step = maxDiag * (1 + s.cellGap);
-    const slots = ringPositions(sized.length, step);
+    const ring = ringPositions(Math.min(sized.length, s.maxTiles), step);
     const order = sized.map((_, i) => i).sort((a, b) => sized[b].t.affinity - sized[a].t.affinity || a - b);
     const turn = hash01(hashString(layer.key)) * Math.PI * 2;
     const cos = Math.cos(turn);
     const sin = Math.sin(turn);
 
-    const tiles: StrataTile[] = order.map((si, k) => {
-      const { t, scale, diag } = sized[si];
-      return {
-        index: t.index,
-        x: slots[k].x * cos - slots[k].z * sin,
-        z: slots[k].x * sin + slots[k].z * cos,
-        scale,
-        radius: diag / 2,
-      };
-    });
+    const slots: StrataSlot[] = ring.map((p) => ({ x: p.x * cos - p.z * sin, z: p.x * sin + p.z * cos }));
+    const tiles: StrataTile[] = order.map((si) => ({ index: sized[si].t.index, scale: sized[si].scale, radius: sized[si].diag / 2 }));
     return {
       key: layer.key,
       label: layer.label,
       anchorTime: layer.anchorTime,
       y: (focusIndex - li) * s.layerGap,
       words: layer.words ?? [],
-      radius: tiles.reduce((m, t) => Math.max(m, Math.hypot(t.x, t.z) + t.radius), 0) + s.margin,
+      radius: slots.reduce((m, p) => Math.max(m, Math.hypot(p.x, p.z)), 0) + maxDiag / 2 + s.margin,
+      slots,
       tiles,
     };
   });
@@ -187,13 +188,13 @@ export function strataPoint(frame: StrataFrame, x: number, y: number, z: number,
 }
 
 /**
- * 층에 눕힌 창의 자세. 앞면이 위를 보고, 창의 위쪽이 판 안쪽(보는 쪽 반대)을 향해 앞에서 내려다보면 글이 바로 읽힌다.
+ * 층의 칸에 눕힌 창의 자세. 앞면이 위를 보고, 창의 위쪽이 판 안쪽(보는 쪽 반대)을 향해 앞에서 내려다보면 글이 바로 읽힌다.
  * spin 은 원판(테이블)이 층 중심 둘레로 돈 각도다. 창은 원판에 놓인 채 함께 돈다
  */
-export function strataPose(frame: StrataFrame, layer: StrataLayer, tile: StrataTile, out: Pose, spin = 0): Pose {
-  out.position.set(tile.x, layer.y, tile.z).applyAxisAngle(AXIS_Y, frame.yaw + spin).add(frame.origin);
+export function strataPose(frame: StrataFrame, layer: StrataLayer, slot: StrataSlot, scale: number, out: Pose, spin = 0): Pose {
+  out.position.set(slot.x, layer.y, slot.z).applyAxisAngle(AXIS_Y, frame.yaw + spin).add(frame.origin);
   turn.setFromAxisAngle(AXIS_Y, frame.yaw + spin);
   out.quaternion.copy(turn).multiply(lay);
-  out.scale = tile.scale;
+  out.scale = scale;
   return out;
 }
