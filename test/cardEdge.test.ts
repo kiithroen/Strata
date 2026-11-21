@@ -55,4 +55,12 @@ describe('cardEdgePoint', () => {
     cardEdgePoint(new Vector3(0, 0, 5), eye, center, edgeOn, 1, 0.5, out);
     expect(out.distanceTo(center)).toBeLessThan(1e-9);
   });
+
+  it('반폭이나 반높이가 0 이어도 NaN 없이 카드 중심을 낸다', () => {
+    cardEdgePoint(new Vector3(0, 0, -5), eye, center, facing, 0, 0, out);
+    expect(Number.isFinite(out.x) && Number.isFinite(out.y) && Number.isFinite(out.z)).toBe(true);
+    expect(out.distanceTo(center)).toBeLessThan(1e-9);
+    cardEdgePoint(new Vector3(5, 0, 0), eye, center, facing, 0, 0.5, out);
+    expect(out.distanceTo(center)).toBeLessThan(1e-9);
+  });
 });

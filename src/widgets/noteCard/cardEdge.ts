@@ -21,6 +21,7 @@ export function cardEdgePoint(
   halfH: number,
   out: Vector3,
 ): Vector3 {
+  if (halfW <= 0 || halfH <= 0) return out.copy(position);
   normal.set(0, 0, 1).applyQuaternion(quaternion);
   ray.copy(from).sub(eye);
   const denom = normal.dot(ray);

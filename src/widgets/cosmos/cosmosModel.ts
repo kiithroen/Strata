@@ -120,7 +120,7 @@ const spreadP = new Vector3();
 /**
  * 나선 위 깊이들을 순서는 그대로 두고, 노드끼리 나선 위에서 minGap(월드) 이상 떨어지도록 바깥쪽으로 민다.
  * 원점에 가까운 것부터 차례로, 먼저 놓인 노드 중 반지름으로 보아 닿을 수 있는 노드와 모두 minGap 이상 떨어질 때까지 진행도(spiralArc)를 늘린다.
- * jitters 를 넘기면 노드마다의 편차까지 넣어 잰다. 과거(양수)와 미래(음수)는 따로 민다.
+ * jitters 를 넘기면 노드마다의 편차까지 넣어 잰다. 과거(양수)와 미래(음수)는 부호별 순서를 따로 지키면서 서로 닿지 않게 민다.
  * 공전 시계는 모든 노드를 같이 돌리므로 거리에 영향이 없다.
  */
 export function spreadDepths(depths: readonly number[], minGap: number, jitters?: readonly PlanetJitter[]): number[] {
@@ -128,70 +128,86 @@ export function spreadDepths(depths: readonly number[], minGap: number, jitters?
   if (minGap <= 0) return out;
   const c = tuning.cosmos;
   const jitterOf = (i: number) => jitters?.[i] ?? NO_JITTER;
-  for (const sign of [1, -1]) {
-    const side = depths
-      .map((_, i) => i)
-      .filter((i) => (sign > 0 ? depths[i] >= 0 : depths[i] < 0))
-      .sort((a, b) => Math.abs(depths[a]) - Math.abs(depths[b]) || a - b);
-    const placed: { arc: number; radius: number; point: Vector3 }[] = [];
-    let first = 0;
-    for (const i of side) {
-      const jitter = jitterOf(i);
-      let arc = Math.abs(spiralArc(depths[i]));
-      const floor = placed.length > 0 ? placed[placed.length - 1].arc : 0;
-      // 반지름 차이는 두 점 거리를 넘지 않으므로, 이 노드가 가질 수 있는 가장 작은 반지름보다 minGap 이상 안쪽 노드와는 닿지 않는다.
-      // 진행도는 늘기만 하니 한 번 빠진 노드는 다시 볼 필요가 없다
-      const reach = c.radialScale * Math.max(arc, floor) * (1 - c.radiusJitter) - minGap;
-      while (first < placed.length && placed[first].radius < reach) first++;
-      const near = placed.slice(first);
-      const far = (a: number) => {
-        spiralPoint(depthOfArc(sign * a), 0, jitter, spreadP);
-        return near.every((q) => q.point.distanceTo(spreadP) >= minGap);
-      };
-      let moved = false;
-      if (floor > arc) {
-        arc = floor;
-        moved = true;
-      }
-      if (near.length > 0) {
-        if (!far(arc)) {
-          moved = true;
-          // 반지름 차이는 두 점 거리를 넘지 않으므로, 앞 노드들의 가장 큰 반지름보다 minGap 만큼 바깥이면 반드시 떨어진다
-          const outer = Math.max(...near.map((q) => q.radius));
-          let lo = arc;
-          let hi = Math.max(arc, (outer + minGap) / (c.radialScale * jitter.radiusScale));
-          // 고도각을 자르면 반지름이 그대로라 위 한계가 맞다. 그래도 못 닿으면 넉넉히 늘린다
-          while (!far(hi)) hi += minGap / c.radialScale;
-          for (let k = 0; k < 40; k++) {
-            const mid = (lo + hi) / 2;
-            if (far(mid)) hi = mid;
-            else lo = mid;
-          }
-          arc = hi;
-        }
-      }
-      if (moved) out[i] = depthOfArc(sign * arc);
-      const point = spiralPoint(out[i], 0, jitter, new Vector3());
-      placed.push({ arc, radius: point.length(), point });
+  const order = depths.map((_, i) => i).sort((a, b) => Math.abs(depths[a]) - Math.abs(depths[b]) || a - b);
+  const placed: { radius: number; point: Vector3 }[] = [];
+  let floorPos = 0;
+  let floorNeg = 0;
+  for (const i of order) {
+    const sign = depths[i] >= 0 ? 1 : -1;
+    const jitter = jitterOf(i);
+    let arc = Math.abs(spiralArc(depths[i]));
+    const floor = sign > 0 ? floorPos : floorNeg;
+    // 반지름 차이는 두 점 거리를 넘지 않으므로, 이 노드의 최소 반지름보다 minGap 이상 안쪽 노드와는 닿지 않는다
+    const minR = c.radialScale * Math.max(arc, floor) * jitter.radiusScale;
+    const near = placed.filter((q) => q.radius >= minR - minGap);
+    const far = (a: number) => {
+      spiralPoint(depthOfArc(sign * a), 0, jitter, spreadP);
+      return near.every((q) => q.point.distanceTo(spreadP) >= minGap);
+    };
+    let moved = false;
+    if (floor > arc) {
+      arc = floor;
+      moved = true;
     }
+    if (near.length > 0 && !far(arc)) {
+      moved = true;
+      // 3D 호 길이 약 minGap * 0.25 씩 바깥으로 걸어 최초 유효 구간을 찾아, 나선 회전 겹침에서 앞쪽 자리를 건너뛰지 않는다
+      const maxSpeed = (a: number) =>
+        c.radialScale * Math.max(1e-6, jitter.radiusScale) * Math.hypot(1, c.twist * a, c.elevationAmp * c.elevationFreq * a);
+      let lo = arc;
+      let hi = arc;
+      while (!far(hi)) {
+        lo = hi;
+        hi += (minGap * 0.25) / maxSpeed(hi);
+      }
+      for (let k = 0; k < 32; k++) {
+        const mid = (lo + hi) / 2;
+        if (far(mid)) hi = mid;
+        else lo = mid;
+      }
+      arc = hi;
+    }
+    if (sign > 0) floorPos = arc;
+    else floorNeg = arc;
+    if (moved) out[i] = depthOfArc(sign * arc);
+    const point = spiralPoint(out[i], 0, jitter, new Vector3());
+    placed.push({ radius: point.length(), point });
   }
   return out;
 }
 
 /**
  * spreadDepths 로 민 만큼을 시각 축 전체에 이어 붙인다. times·base·spread 는 노드마다의 시각, 원래 깊이, 민 깊이다.
- * 돌려주는 함수는 시각과 그 시각의 원래 깊이를 받아, 시간 순서로 이웃한 두 노드가 민 양을 시각으로 선형 보간해 더한다.
- * 가장 최근·가장 오래된 노드 바깥은 그 노드가 민 양을 그대로 쓴다. 그래서 시간 띠로 고른 시각이 민 노드 자리와 맞는다.
+ * 진행도(spiralArc) 공간에서 보간해 지수 왜곡을 피하고, 같은 시각의 노드들은 평균 진행도로 합쳐 역행을 막는다.
+ * 가장 최근·가장 오래된 노드 바깥은 그 노드가 민 진행도 차를 그대로 쓴다. 그래서 시간 띠로 고른 시각이 민 노드 자리와 맞는다.
  */
 export function depthWarp(times: readonly number[], base: readonly number[], spread: readonly number[]): (time: number, depth: number) => number {
   const order = times.map((_, i) => i).sort((a, b) => times[a] - times[b]);
-  const t = order.map((i) => times[i]);
-  const delta = order.map((i) => spread[i] - base[i]);
+  const t: number[] = [];
+  const baseA: number[] = [];
+  const spreadA: number[] = [];
+  for (let k = 0; k < order.length; ) {
+    const time = times[order[k]];
+    let sumB = 0;
+    let sumS = 0;
+    let count = 0;
+    while (k < order.length && times[order[k]] === time) {
+      const i = order[k++];
+      sumB += spiralArc(base[i]);
+      sumS += spiralArc(spread[i]);
+      count++;
+    }
+    t.push(time);
+    baseA.push(sumB / count);
+    spreadA.push(sumS / count);
+  }
+  const deltaA = spreadA.map((s, i) => s - baseA[i]);
   return (time, depth) => {
     const n = t.length;
     if (n === 0) return depth;
-    if (time <= t[0]) return depth + delta[0];
-    if (time >= t[n - 1]) return depth + delta[n - 1];
+    const curArc = spiralArc(depth);
+    if (time <= t[0]) return depthOfArc(curArc + deltaA[0]);
+    if (time >= t[n - 1]) return depthOfArc(curArc + deltaA[n - 1]);
     let lo = 0;
     let hi = n - 1;
     while (hi - lo > 1) {
@@ -199,9 +215,9 @@ export function depthWarp(times: readonly number[], base: readonly number[], spr
       if (t[mid] <= time) lo = mid;
       else hi = mid;
     }
-    const span = t[hi] - t[lo];
-    const w = span > 0 ? (time - t[lo]) / span : 0;
-    return depth + delta[lo] + (delta[hi] - delta[lo]) * w;
+    const baseSpan = baseA[hi] - baseA[lo];
+    const w = Math.abs(baseSpan) > 1e-12 ? (curArc - baseA[lo]) / baseSpan : (time - t[lo]) / (t[hi] - t[lo]);
+    return depthOfArc(spreadA[lo] + (spreadA[hi] - spreadA[lo]) * w);
   };
 }
 
@@ -240,16 +256,16 @@ export function buildHubs(clusters: readonly Cluster[], parent: TimeUnit | null)
   return hubs;
 }
 
-/** 허브 자리: 자식 행성들의 평균 시간 거리에서, 평균 반지름의 graph.hubRadius 비율인 안쪽 구면 껍질 위 */
+/** 허브 자리: 자식 행성들의 평균 진행도(spiralArc) 자리에서, 평균 반지름의 graph.hubRadius 비율인 안쪽 구면 껍질 위 */
 export function hubPoint(childOffsets: readonly number[], time: number, out: Vector3): Vector3 {
-  let sumS = 0;
+  let sumArc = 0;
   let sumR = 0;
   for (const s of childOffsets) {
-    sumS += s;
+    sumArc += spiralArc(s);
     sumR += spiralRadius(s);
   }
   const count = Math.max(1, childOffsets.length);
-  const sAvg = sumS / count;
+  const sAvg = depthOfArc(sumArc / count);
   const r = (sumR / count) * tuning.cosmos.graph.hubRadius;
   const alpha = spiralAngle(sAvg, time);
   const maxE = tuning.cosmos.maxElevation;

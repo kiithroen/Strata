@@ -1188,20 +1188,22 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
           target.copy(pos).add(offset);
           const dotP = dotBlends[m].step(dt, cluster.key, target);
           const tied = orbitFade[m] * (1 - card.motion.focus);
-          const cardScale = card.mesh.scale.x;
-          cardEdgePoint(
-            pos,
-            cameraPosition,
-            card.mesh.position,
-            card.mesh.quaternion,
-            (card.layout.worldWidth * cardScale) / 2,
-            (card.layout.worldHeight * cardScale) / 2,
-            pinWorld,
-          );
-          spokeEnd.copy(dotP).lerp(pinWorld, tied);
-          // 지층 보기 동안에는 창이 은하 노드에서 멀리 옮겨 가므로 실을 걷는다
-          const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition)) * (1 - strata.mix);
-          graph.spoke(pos, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
+          if (strata.mix < 1) {
+            const cardScale = card.mesh.scale.x;
+            cardEdgePoint(
+              pos,
+              cameraPosition,
+              card.mesh.position,
+              card.mesh.quaternion,
+              (card.layout.worldWidth * cardScale) / 2,
+              (card.layout.worldHeight * cardScale) / 2,
+              pinWorld,
+            );
+            spokeEnd.copy(dotP).lerp(pinWorld, tied);
+            // 지층 보기 동안에는 창이 은하 노드에서 멀리 옮겨 가므로 실을 걷는다
+            const endAlpha = alpha * cosmosFade(spokeEnd.distanceTo(cameraPosition)) * (1 - strata.mix);
+            graph.spoke(pos, spokeEnd, noteColors[m], g.spokeAlpha * endAlpha);
+          }
           graph.dot(dotP, noteColors[m], g.dotSize, alpha * cosmosFade(dotP.distanceTo(cameraPosition)) * (1 - tied));
         });
       }

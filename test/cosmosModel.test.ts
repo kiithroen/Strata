@@ -224,14 +224,19 @@ describe('선 그래프', () => {
     }
   });
 
-  it('허브는 자식들의 평균 시간 거리에서 안쪽 구면 껍질 위에 놓인다', () => {
+  it('허브는 자식들의 평균 진행도 자리에서 안쪽 구면 껍질 위에 놓인다', () => {
     const out = new Vector3();
     hubPoint([4, 8, 12], 2, out);
     const expectedR = ((spiralRadius(4) + spiralRadius(8) + spiralRadius(12)) / 3) * g.hubRadius;
     expect(out.length()).toBeCloseTo(expectedR, 12);
-    const sAvg = 8;
-    const expectedAlpha = spiralAngle(sAvg, 2);
+    const avgArc = (spiralArc(4) + spiralArc(8) + spiralArc(12)) / 3;
+    const expectedAlpha = c.twist * avgArc + c.spin * 2;
     expect(Math.atan2(out.x, -out.z)).toBeCloseTo(Math.atan2(Math.sin(expectedAlpha), Math.cos(expectedAlpha)), 9);
+
+    // 지수적으로 멀리 밀린 자식이 있어도 평균 진행도 자리에 놓인다
+    hubPoint([0, 10, 1000], 0, out);
+    const skewAlpha = (c.twist * (spiralArc(0) + spiralArc(10) + spiralArc(1000))) / 3;
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(Math.atan2(Math.sin(skewAlpha), Math.cos(skewAlpha)), 9);
   });
 
   it('노트 점은 관련도가 높을수록 가깝고, 같은 관련도에서는 순서가 뒤일수록 바깥이며 겹치지 않는다', () => {

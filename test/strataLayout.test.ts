@@ -113,6 +113,14 @@ describe('layoutStrata', () => {
       for (const r of radii) expect(r).toBeCloseTo(radii[0], 9);
     }
   });
+
+  it('5장 이상인 층은 1·2번 칸이 중심을 사이에 두고 맞은편에 놓여 일부 칸만 써도 한쪽에 쏠리지 않는다', () => {
+    for (const n of [5, 7, 12]) {
+      const slots = layoutStrata([{ key: `k${n}`, label: `k${n}`, anchorTime: 0, tiles: tiles(n, n) }], 0)[0].slots;
+      expect(Math.hypot(slots[0].x, slots[0].z)).toBe(0);
+      expect(slots[1].x * slots[2].x + slots[1].z * slots[2].z).toBeLessThan(0);
+    }
+  });
 });
 
 describe('nearestLayer', () => {

@@ -100,6 +100,7 @@ describe('TileRotation', () => {
     run(a, r.hold[0] * 2.5, 1 / 30);
     run(b, r.hold[0] * 2.5, 1 / 144);
     const settled = (x: TileRotation) => x.occupants().filter((m) => x.find(m)!.bubble === 1);
+    expect(settled(a).length).toBeGreaterThanOrEqual(4);
     const common = settled(a).filter((m) => settled(b).includes(m));
     expect(common.length).toBeGreaterThanOrEqual(settled(a).length - 2);
   });
@@ -140,5 +141,32 @@ describe('TileRotation', () => {
     rot.setSlots(6);
     run(rot, 2, 1 / 60);
     expect(rot.find(leaving)?.bubble).toBe(1);
+  });
+
+  it('꺼지는 중에 칸이 늘어 대기열이 비면 그 칸이 0까지 꺼졌다 튀지 않고 바로 다시 부푼다', () => {
+    const rot = new TileRotation(10, 3);
+    const prev = new Map(rot.occupants().map((m) => [m, rot.find(m)!.bubble]));
+    let shrinking: { member: number; bubble: number } | null = null;
+    for (let step = 0; step < 600 && !shrinking; step++) {
+      rot.update(1 / 60);
+      for (const m of rot.occupants()) {
+        const b = rot.find(m)!.bubble;
+        const p = prev.get(m);
+        if (p !== undefined && b < p) {
+          shrinking = { member: m, bubble: b };
+          break;
+        }
+        prev.set(m, b);
+      }
+    }
+    expect(shrinking).not.toBeNull();
+    rot.setSlots(10);
+    for (let step = 0; step < 120; step++) {
+      rot.update(1 / 60);
+      const seat = rot.find(shrinking!.member);
+      expect(seat).not.toBeNull();
+      expect(seat!.bubble).toBeGreaterThanOrEqual(shrinking!.bubble);
+    }
+    expect(rot.find(shrinking!.member)?.bubble).toBe(1);
   });
 });

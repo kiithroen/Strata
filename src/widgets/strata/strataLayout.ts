@@ -56,6 +56,27 @@ export interface StrataFrame {
   yaw: number;
 }
 
+/** 고리 안 칸 차례를 맞은편으로 벌려 놓아 일부 칸만 써도 원판 한쪽에 몰리지 않게 한다 */
+function ringOrder(take: number): number[] {
+  if (take <= 0) return [];
+  const used = [0];
+  while (used.length < take) {
+    let best = -1;
+    let bestDist = -1;
+    for (let j = 0; j < take; j++) {
+      if (used.includes(j)) continue;
+      let d = Infinity;
+      for (const u of used) d = Math.min(d, Math.min(Math.abs(j - u), take - Math.abs(j - u)));
+      if (d > bestDist) {
+        bestDist = d;
+        best = j;
+      }
+    }
+    used.push(best);
+  }
+  return used;
+}
+
 /** n 개 창을 원판 중심 기준 동심원 고리 위에 겹치지 않게 배치한다 */
 function ringPositions(n: number, step: number): Array<{ x: number; z: number }> {
   if (n <= 0) return [];
@@ -76,7 +97,7 @@ function ringPositions(n: number, step: number): Array<{ x: number; z: number }>
     const cap = Math.max(1, Math.floor(Math.PI / Math.asin(Math.min(1, step / (2 * r)))));
     const take = Math.min(remaining, cap);
     const start = ring % 2 === 1 ? -Math.PI / 2 : -Math.PI / 2 + Math.PI / take;
-    for (let k = 0; k < take; k++) {
+    for (const k of ringOrder(take)) {
       const a = start + (k * 2 * Math.PI) / take;
       out.push({ x: r * Math.cos(a), z: r * Math.sin(a) });
     }

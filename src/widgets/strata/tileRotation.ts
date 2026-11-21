@@ -79,6 +79,11 @@ export class TileRotation {
       this.slots.push({ member, bubble: 0, state: 'wait', timer: added * tuning.strata.rotate.stagger, holdFor: this.holdTime(k, 0), turns: 0 });
       added++;
     }
+    if (this.queue.length === 0) {
+      for (const slot of this.slots) {
+        if (slot.state === 'shrink') slot.state = 'grow';
+      }
+    }
   }
 
   /** dt 만큼 진행한다. 부르는 쪽이 멈출 때(손가락, 펼친 카드)는 dt 를 0으로 넘긴다 */

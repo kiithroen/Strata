@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { depthWarp, planetJitter, spiralPoint, spreadDepths, type PlanetJitter } from '../src/widgets/cosmos/cosmosModel';
+import { depthWarp, planetJitter, spiralArc, spiralPoint, spreadDepths, type PlanetJitter } from '../src/widgets/cosmos/cosmosModel';
 
 const NONE: PlanetJitter = { radiusScale: 1, angleOffset: 0, elevationOffset: 0 };
 const GAP = 2.5;
@@ -45,14 +45,13 @@ describe('spreadDepths', () => {
     expect(spreadDepths(sparse, GAP)).toEqual(sparse);
   });
 
-  it('미래(음수) 쪽도 원점에서 바깥으로 따로 민다', () => {
+  it('미래(음수) 쪽도 원점에서 바깥으로 순서를 지키며 밀고 과거 쪽과도 겹치지 않는다', () => {
     const both = [0.01, -0.01, 0.02, -0.02];
     const out = spreadDepths(both, GAP);
     expect(Math.sign(out[1])).toBe(-1);
     expect(Math.sign(out[3])).toBe(-1);
     expect(out[3]).toBeLessThan(out[1]);
-    expect(points([out[0], out[2]])[0].distanceTo(points([out[2]])[0])).toBeGreaterThanOrEqual(GAP - 1e-6);
-    expect(points([out[1]])[0].distanceTo(points([out[3]])[0])).toBeGreaterThanOrEqual(GAP - 1e-6);
+    expect(minDistance(points(out))).toBeGreaterThanOrEqual(GAP - 1e-6);
   });
 
   it('minGap 이 0이면 그대로다', () => {
@@ -70,11 +69,31 @@ describe('depthWarp', () => {
     times.forEach((t, i) => expect(warp(t, base[i])).toBeCloseTo(spread[i], 12));
   });
 
-  it('노드 사이는 민 양을 시각으로 선형 보간하고, 바깥은 끝 노드가 민 양을 쓴다', () => {
-    // 700 은 800(민 양 2)과 600(민 양 5)의 가운데다
-    expect(warp(700, 1.5)).toBeCloseTo(1.5 + 3.5, 12);
+  it('노드 사이는 진행도(spiralArc) 공간에서 선형 보간하고, 바깥은 끝 노드가 민 진행도 차를 쓴다', () => {
+    const w = (spiralArc(1.5) - spiralArc(2)) / (spiralArc(1) - spiralArc(2));
+    const expectedMidArc = spiralArc(7) + (spiralArc(3) - spiralArc(7)) * w;
+    expect(spiralArc(warp(700, 1.5))).toBeCloseTo(expectedMidArc, 12);
     expect(warp(2000, -5)).toBeCloseTo(-5, 12);
-    expect(warp(100, 4.5)).toBeCloseTo(4.5 + 5, 12);
+    expect(spiralArc(warp(100, 4.5))).toBeCloseTo(spiralArc(4.5) + spiralArc(7) - spiralArc(2), 12);
+  });
+
+  it('같은 시각의 노드가 여럿 있어도 과거로 갈수록 깊이가 역행하지 않는다', () => {
+    const sameTimes = [1000, 1000, 1000, 500];
+    const sameBase = [0, 0, 0, 1];
+    const sameSpread = [0, 5, 12, 18];
+    const w = depthWarp(sameTimes, sameBase, sameSpread);
+    let prev = -Infinity;
+    for (let t = 1000; t >= 500; t -= 25) {
+      const d = w(t, (1000 - t) / 500);
+      expect(d).toBeGreaterThanOrEqual(prev - 1e-12);
+      prev = d;
+    }
+  });
+
+  it('노드가 크게 밀려 지수 차이가 커도 사이는 진행도 공간에서 고르게 변한다', () => {
+    const w = depthWarp([1000, 0], [0, 10], [0, 10000]);
+    const ratio = spiralArc(w(900, 1)) / spiralArc(10000);
+    expect(ratio).toBeCloseTo(spiralArc(1) / spiralArc(10), 10);
   });
 
   it('노드가 없으면 그대로다', () => {
