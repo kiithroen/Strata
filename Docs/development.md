@@ -50,9 +50,13 @@ npm run dev
 - 우주 보기(`cosmos`)는 메모 앨범이다. 저장된 노트가 하나라도 있으면 그 노트만 띄우고, 없으면 가짜 노트를 미리보기로 띄운다. 실데이터 임시 주입과 탐색기 은하는 앨범이 아니라 `+ 노트`가 없다.
 - 저장소는 `NoteStore` 인터페이스 뒤에 있고 실행 환경에 따라 `openNoteStore`가 고른다(`src/album/noteStore.ts`).
 - 안드로이드 앱은 SQLite와 앱 전용 파일 폴더에 둔다(`src/album/sqliteNoteStore.ts`, 플러그인 연결은 `nativeNoteStore.ts`). SQLite `strata` 데이터베이스의 `notes` 표에 노트마다 한 줄(`id`, `time`, `modified`, `deleted` 열과 기록 전체 JSON `record`, 지금 사진 파일 이름 `photo`)을 두고, 사진 사본은 앱 파일 폴더의 `photos/`에 둔다. 사진을 바꿀 때는 새 이름의 파일을 다 쓴 뒤 행을 바꾸고 옛 파일을 지운다. JSON이 깨진 행은 건너뛰고 나머지를 읽는다.
+- 안드로이드 앱은 노트 사본을 내장 저장소 공용 폴더 `Documents/Strata`에도 쓴다(`src/album/backupStore.ts`의 `BackupNoteStore`). 드라이브와 같은 모양으로 노트마다 `note-<번호>.json`과 `photo-<번호>.<확장자>`를 두고([sync.md](sync.md) "노트 기록"), 갤러리 앱이 사진을 올리지 않게 `.nomedia`를 둔다. 앱을 지워도 이 폴더는 남는다.
+  - 앱을 열 때 폴더와 앱 저장소를 `mergeRecords`로 맞춘다(수정 시각이 늦은 쪽이 이긴다). 앱 저장소가 비어 있으면(새로 설치) 맞춘 뒤에 첫 화면을 띄워 폴더의 노트로 되살리고, 아니면 첫 화면 뒤에 맞춘다(폴더 쪽이 새 노트는 다음에 열 때 보인다).
+  - 맞추기가 한 번 성공한 뒤부터 저장할 때마다 폴더에도 쓴다. 폴더 쓰기는 저장을 기다리게 하지 않고, 실패하면 설정 화면에 오류가 보이며 다음에 열 때 다시 맞춘다.
+  - 다시 설치한 앱이 옛 파일을 읽고 고치려면 '모든 파일 접근'(`MANAGE_EXTERNAL_STORAGE`) 권한이 있어야 한다. 앱 안의 플러그인(`android/.../AllFilesAccessPlugin.java`)이 확인하고 설정 화면을 연다. 권한이 없으면 첫 화면 뒤에 한 번 묻고, 설정 화면의 `노트 백업`에서 다시 켤 수 있다. 권한을 받아 맞춘 뒤 폴더에서 노트를 되살렸으면 앱을 다시 불러온다. 안드로이드 10 이하는 지원하지 않는다.
 - 브라우저에서는 IndexedDB `strata` 데이터베이스에 둔다. `notes`에 노트 기록(드라이브와 같은 `NoteRecord` 형식, 지움 표시 포함), `photos`에 노트 번호를 열쇠로 사진 사본(JPEG Blob)을 둔다. 열 때 브라우저에 저장소 영구화를 요청한다.
 - 저장소를 못 열면(사생활 보호 창 등) 메모리 저장소로 대신해 이번 실행에만 남는다. 브라우저는 콘솔에 경고를 남기고, 앱은 경고 창을 띄운다.
-- 브라우저에서 앨범을 비우려면 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다. 앱의 앨범은 앱을 지우거나 안드로이드 설정에서 앱 데이터를 지우면 사라진다.
+- 브라우저에서 앨범을 비우려면 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다. 앱의 앨범은 앱을 지우거나 앱 데이터를 지우면 앱 안에서는 사라지고, 다시 열 때 `Documents/Strata`에서 되살린다. 앨범을 정말 비우려면 그 폴더도 지운다.
 - 앱 시작은 저장소를 연 뒤 첫 화면을 띄운다(`main.ts`의 `ready`).
 
 ## AI 요약
@@ -88,8 +92,8 @@ npm run apk
 
 - **USB**: 폰에서 USB 디버깅을 켜고 연결한 뒤 `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`. `-r`은 데이터를 둔 채 바꿔 설치한다.
 - **파일로**: APK를 폰에 옮겨 파일 앱에서 열고, 처음 한 번 그 앱의 '출처를 알 수 없는 앱 설치'를 허용한다.
-- 디버그 APK는 이 PC의 디버그 서명 키(`%USERPROFILE%\.android\debug.keystore`)로 서명된다. 다른 키로 서명한 APK는 바꿔 설치할 수 없어 앱을 지워야 하고, 그러면 앱에 저장한 노트도 지워진다. 이 키를 잃지 않게 따로 보관하고, 다른 PC에서 빌드할 때는 같은 키를 옮겨 쓴다.
-- `appId`(`capacitor.config.ts`)를 바꾸면 다른 앱으로 설치되어 저장한 노트가 따라오지 않는다.
+- 디버그 APK는 이 PC의 디버그 서명 키(`%USERPROFILE%\.android\debug.keystore`)로 서명된다. 다른 키로 서명한 APK는 바꿔 설치할 수 없어 앱을 지워야 한다. 노트는 `Documents/Strata`에서 되살아나지만 설정(`localStorage`)은 사라진다. 다른 PC에서 빌드할 때는 같은 키를 옮겨 쓴다.
+- `appId`(`capacitor.config.ts`)를 바꾸면 다른 앱으로 설치된다. 같은 `Documents/Strata`를 읽으면 노트는 따라온다.
 
 ### 앱에서 다른 점
 

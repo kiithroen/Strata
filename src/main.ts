@@ -6,7 +6,7 @@ import { applyQuality, readQuality } from './core/quality';
 import { importLocalNotes, photoQueue } from './dev/localNotes';
 import type { NoteData } from './dev/noteData';
 import { appHooks, type ExplorerResume } from './gallery/appHooks';
-import { albumCount, mountAlbumDemo, onSummaryStatus, openAlbum, runSummariesNow, startSummaries, summaryRoute, summaryStatus } from './gallery/albumDemo';
+import { albumBackup, albumCount, mountAlbumDemo, onSummaryStatus, openAlbum, runSummariesNow, startSummaries, summaryRoute, summaryStatus } from './gallery/albumDemo';
 import { mountCosmosDemo, type CosmosAxis } from './gallery/cosmosDemo';
 import { mountExplorerDemo } from './gallery/explorerDemo';
 import { pickDemo, widgetDemos } from './gallery/registry';
@@ -197,6 +197,7 @@ new SettingsPanel(
   setPhotoStyle,
   importFiles,
   { restart: startSummaries, route: summaryRoute, status: summaryStatus, listen: onSummaryStatus, runNow: runSummariesNow },
+  albumBackup,
 );
 
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다

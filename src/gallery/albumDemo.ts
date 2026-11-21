@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Album } from '../album/album';
 import { draftFromRecord } from '../album/albumModel';
+import type { BackupControls } from '../album/nativeNoteStore';
 import { MemoryNoteStore, openNoteStore } from '../album/noteStore';
 import { bakePhotoCopy, readTakenAt } from '../album/photoCopy';
 import { geminiSummarizer } from '../album/geminiSummarizer';
@@ -13,15 +14,23 @@ import type { Stage } from './stage';
 
 /** 메모 앨범. openAlbum 전에는 빈 메모리 저장소다 */
 let album = new Album(new MemoryNoteStore());
+/** 안드로이드 앱의 노트 백업(앱 밖 폴더). 브라우저와 저장소를 못 열었을 때는 null */
+let backup: BackupControls | null = null;
+
+/** 노트 백업 상태와 권한 요청. 안드로이드 앱에서만 있다 */
+export function albumBackup(): BackupControls | null {
+  return backup;
+}
 
 /** 메모 앨범 저장소를 열고 노트를 읽는다. 앱이 첫 화면을 띄우기 전에 부른다. 저장소를 못 쓰면 이번 실행에만 남는 메모리 저장소다 */
 export async function openAlbum(): Promise<void> {
-  const { store, persistent } = await openNoteStore();
+  const { store, persistent, backup: storeBackup } = await openNoteStore();
   if (!persistent) warnNotSaved();
   const opened = new Album(store);
   try {
     await opened.load();
     album = opened;
+    backup = storeBackup ?? null;
   } catch (err) {
     console.error(err);
     warnNotSaved();
@@ -31,7 +40,7 @@ export async function openAlbum(): Promise<void> {
 
 /** 저장소를 못 열어 메모리 저장소로 대신할 때 알린다. 앱에서는 콘솔을 볼 수 없어 창으로 알린다 */
 function warnNotSaved(): void {
-  const message = '노트 저장소를 열 수 없습니다. 지금 쓰는 노트는 앱을 닫으면 사라집니다.';
+  const message = '노트 저장소를 열 수 없다. 지금 쓰는 노트는 앱을 닫으면 사라진다.';
   if (Capacitor.isNativePlatform()) window.alert(message);
   else console.warn(message);
 }

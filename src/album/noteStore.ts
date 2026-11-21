@@ -1,9 +1,10 @@
 import { Capacitor } from '@capacitor/core';
 import type { NoteRecord } from '../sync/noteRecord';
+import type { BackupControls } from './nativeNoteStore';
 
 /**
  * 메모 앨범의 로컬 저장소. 노트 기록(지움 표시 포함)과 노트마다 사진 사본 하나를 둔다. 화면은 이것만 읽는다.
- * 브라우저는 IndexedDB 구현(IdbNoteStore)을, 안드로이드 앱은 SQLite·앱 파일 저장소 구현(SqliteNoteStore)을 쓴다.
+ * 브라우저는 IndexedDB 구현(IdbNoteStore)을, 안드로이드 앱은 SQLite·앱 파일 저장소 구현(SqliteNoteStore)과 그 사본을 앱 밖 폴더에 쓰는 BackupNoteStore 를 쓴다.
  */
 export interface NoteStore {
   /** 모든 기록(지움 표시 포함) */
@@ -88,14 +89,15 @@ export class IdbNoteStore implements NoteStore {
 }
 
 /**
- * 실행 환경의 저장소를 연다. 안드로이드 앱은 SQLite·앱 파일 저장소, 브라우저는 IndexedDB 다.
+ * 실행 환경의 저장소를 연다. 안드로이드 앱은 SQLite·앱 파일 저장소와 앱 밖 사본 폴더(backup 으로 상태를 알린다), 브라우저는 IndexedDB 다.
  * 못 쓰면 메모리 저장소로 대신하고 persistent 를 false 로 알린다
  */
-export async function openNoteStore(): Promise<{ store: NoteStore; persistent: boolean }> {
+export async function openNoteStore(): Promise<{ store: NoteStore; persistent: boolean; backup?: BackupControls }> {
   if (Capacitor.isNativePlatform()) {
     try {
       const { openNativeNoteStore } = await import('./nativeNoteStore');
-      return { store: await openNativeNoteStore(), persistent: true };
+      const { store, backup } = await openNativeNoteStore();
+      return { store, persistent: true, backup };
     } catch (err) {
       console.error(err);
       return { store: new MemoryNoteStore(), persistent: false };

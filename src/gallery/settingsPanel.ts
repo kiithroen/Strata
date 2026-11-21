@@ -10,6 +10,7 @@ import {
   qualityPresets,
   sameQuality,
 } from '../core/quality';
+import type { BackupControls } from '../album/nativeNoteStore';
 import type { SummaryStatus } from '../album/summaries';
 import type { PhotoStyle } from '../widgets/noteCard/cardMaterial';
 import { type AppSettings, saveSettings } from './settings';
@@ -105,6 +106,8 @@ export class SettingsPanel {
     private readonly onPhotoStyleChange: (style: PhotoStyle) => void,
     private readonly onImport: (files: File[], progress: (text: string) => void) => Promise<string>,
     private readonly summary: SummaryControls,
+    /** 안드로이드 앱의 노트 백업. 없으면(브라우저) 줄을 띄우지 않는다 */
+    private readonly backup: () => BackupControls | null = () => null,
   ) {
     this.draft = { ...current };
     this.button = document.createElement('button');
@@ -181,6 +184,7 @@ export class SettingsPanel {
       ),
     );
 
+    this.renderBackup(p);
     this.renderSummary(p);
 
     const pickFiles = choice('파일', false, () => this.pick(false));
@@ -228,6 +232,24 @@ export class SettingsPanel {
     apply.className = 'settings-apply';
     apply.disabled = !changed;
     p.append(apply);
+  }
+
+  /** 노트 백업(앱 밖 폴더): 상태 글과, 권한이 없으면 권한 설정 단추 */
+  private renderBackup(p: HTMLElement): void {
+    const backup = this.backup();
+    if (!backup) return;
+    if (backup.needsAccess()) {
+      p.append(
+        row('노트 백업', [
+          choice('권한 설정', false, () => {
+            void backup.requestAccess().then(() => {
+              if (!this.panel.hidden) this.render();
+            });
+          }),
+        ]),
+      );
+    } else p.append(row('노트 백업', []));
+    p.append(el('p', 'settings-note', backup.text()));
   }
 
   /** AI 요약: 키가 있으면 지금 요약과 키 지우기, 없으면 입력 칸과 저장(개발 서버 프록시가 있으면 지금 요약도) */
