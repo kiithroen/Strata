@@ -51,9 +51,9 @@ npm run dev
 - 저장소는 `NoteStore` 인터페이스 뒤에 있고 실행 환경에 따라 `openNoteStore`가 고른다(`src/album/noteStore.ts`).
 - 안드로이드 앱은 SQLite와 앱 전용 파일 폴더에 둔다(`src/album/sqliteNoteStore.ts`, 플러그인 연결은 `nativeNoteStore.ts`). SQLite `strata` 데이터베이스의 `notes` 표에 노트마다 한 줄(`id`, `time`, `modified`, `deleted` 열과 기록 전체 JSON `record`, 지금 사진 파일 이름 `photo`)을 두고, 사진 사본은 앱 파일 폴더의 `photos/`에 둔다. 사진을 바꿀 때는 새 이름의 파일을 다 쓴 뒤 행을 바꾸고 옛 파일을 지운다. JSON이 깨진 행은 건너뛰고 나머지를 읽는다.
 - 안드로이드 앱은 노트 사본을 내장 저장소 공용 폴더 `Documents/Strata`에도 쓴다(`src/album/backupStore.ts`의 `BackupNoteStore`). 드라이브와 같은 모양으로 노트마다 `note-<번호>.json`과 `photo-<번호>.<확장자>`를 두고([sync.md](sync.md) "노트 기록"), 갤러리 앱이 사진을 올리지 않게 `.nomedia`를 둔다. 앱을 지워도 이 폴더는 남는다.
-  - 앱을 열 때 폴더와 앱 저장소를 `mergeRecords`로 맞춘다(수정 시각이 늦은 쪽이 이긴다). 앱 저장소가 비어 있으면(새로 설치) 맞춘 뒤에 첫 화면을 띄워 폴더의 노트로 되살리고, 아니면 첫 화면 뒤에 맞춘다(폴더 쪽이 새 노트는 다음에 열 때 보인다).
+  - 앱을 열 때 폴더와 앱 저장소를 `mergeRecords`로 맞춘다(수정 시각이 늦은 쪽이 이긴다). 앱 저장소가 비어 있으면(새로 설치) 맞춘 뒤에 첫 화면을 띄워 폴더의 노트로 되살리고, 아니면 첫 화면 뒤에 맞춘다(`applyExternal`로 메모리 앨범에도 반영한다).
   - 맞추기가 한 번 성공한 뒤부터 저장할 때마다 폴더에도 쓴다. 폴더 쓰기는 저장을 기다리게 하지 않고, 실패하면 설정 화면에 오류가 보이며 다음에 열 때 다시 맞춘다.
-  - 다시 설치한 앱이 옛 파일을 읽고 고치려면 '모든 파일 접근'(`MANAGE_EXTERNAL_STORAGE`) 권한이 있어야 한다. 앱 안의 플러그인(`android/.../AllFilesAccessPlugin.java`)이 확인하고 설정 화면을 연다. 권한이 없으면 첫 화면 뒤에 한 번 묻고, 설정 화면의 `노트 백업`에서 다시 켤 수 있다. 권한을 받아 맞춘 뒤 폴더에서 노트를 되살렸으면 앱을 다시 불러온다. 안드로이드 10 이하는 지원하지 않는다.
+  - 다시 설치한 앱이 옛 파일을 읽고 고치려면 '모든 파일 접근'(`MANAGE_EXTERNAL_STORAGE`) 권한이 있어야 한다. 앱 안의 플러그인(`android/.../AllFilesAccessPlugin.java`)이 확인하고 설정 화면을 연다. 권한이 없으면 첫 실행 뒤 한 번만 묻고, 설정 화면의 `노트 백업`에서 다시 켤 수 있다. 설정 앱에서 돌아오거나 권한을 받아 맞춘 뒤 폴더에서 노트를 되살렸으면 앱을 다시 불러온다. `minSdkVersion`은 30(안드로이드 11 이상)이고, `android:allowBackup="false"`라 재설치 시 옛 SQLite DB가 복원되지 않는다.
 - 브라우저에서는 IndexedDB `strata` 데이터베이스에 둔다. `notes`에 노트 기록(드라이브와 같은 `NoteRecord` 형식, 지움 표시 포함), `photos`에 노트 번호를 열쇠로 사진 사본(JPEG Blob)을 둔다. 열 때 브라우저에 저장소 영구화를 요청한다.
 - 저장소를 못 열면(사생활 보호 창 등) 메모리 저장소로 대신해 이번 실행에만 남는다. 브라우저는 콘솔에 경고를 남기고, 앱은 경고 창을 띄운다.
 - 브라우저에서 앨범을 비우려면 개발자 도구에서 IndexedDB `strata`를 지운다. 같은 주소(개발 서버, 배포본)마다 따로다. 앱의 앨범은 앱을 지우거나 앱 데이터를 지우면 앱 안에서는 사라지고, 다시 열 때 `Documents/Strata`에서 되살린다. 앨범을 정말 비우려면 그 폴더도 지운다.
@@ -98,7 +98,7 @@ npm run apk
 ### 앱에서 다른 점
 
 - PC 크롬의 `chrome://inspect`로 디버그 앱의 웹뷰 콘솔을 본다. 스크립트로 확인할 때는 `adb forward tcp:<포트> localabstract:webview_devtools_remote_<앱 pid>`로 웹뷰의 개발자 도구 프로토콜에 붙는다. 디버그 앱은 `adb shell run-as <appId>`로 데이터베이스(`databases/strataSQLite.db`)와 사진 폴더(`files/photos`)를 볼 수 있다.
-- 안드로이드 뒤로 키는 방문 기록이 있으면 웹 뒤로(맨 위 화면을 닫는다), 없으면 앱을 뒤로 보낸다(`main.ts`). 키보드가 떠 있으면 첫 뒤로는 키보드만 닫는다(검색은 열 때 입력 칸에 포커스가 간다).
+- 안드로이드 뒤로 키는 열린 설정 화면·펼친 카드·방문 기록(노트 보기·입력·검색·카드 보기·지층 보기) 차례로 맨 위 화면을 닫고, 첫 화면이면 앱을 뒤로 보낸다(`main.ts`). 키보드가 떠 있으면 첫 뒤로는 키보드만 닫는다(검색은 열 때 입력 칸에 포커스가 간다).
 - 설정(`strata.settings`, Gemini 키 포함)은 웹뷰 `localStorage`에 남는다. 웹뷰 출처는 `https://localhost`이고, `capacitor.config.ts`의 `server.androidScheme`·`hostname`을 바꾸면 설정이 사라진다.
 - 앱에는 개발 서버 프록시가 없어 AI 요약은 설정의 키로만 돈다. 디버그 훅(`window.__strata`)도 없다.
 - 로컬 탐색기는 아직 앱용 `FileSource`가 없다.
@@ -120,7 +120,7 @@ npm run apk
 | `src/widgets/common/` | 위젯이 함께 쓰는 뷰 부품(글자 텍스처 캐시, 빛 무리 텍스처) |
 | `src/input/` | 손가락 입력 해석 |
 | `src/gallery/` | 위젯 갤러리: 공용 렌더러·장면·카메라(`stage.ts`), 위젯 데모, 은하 ↔ 지층 전환(`strataMode.ts`), 펼치기 공용 상태(`cardFocus.ts`), 시점 표시(`timeReadout.ts`), 시간 띠(`timeScrubber.ts`), 성능 표시(`perfOverlay.ts`), 블룸 후처리(`bloom.ts`), 설정 저장·화면(`settings.ts`, `settingsPanel.ts`), 등록표 |
-| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 앱의 SQLite·파일 구현(`sqliteNoteStore.ts`, `nativeNoteStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`), AI 요약 차례(`summaries.ts`)와 Gemini API 요청(`geminiSummarizer.ts`) |
+| `src/album/` | 메모 앨범: 노트 입력 모델·검색(`albumModel.ts`), 로컬 저장소 인터페이스와 IndexedDB·메모리 구현(`noteStore.ts`), 앱의 SQLite·파일·백업 폴더 구현(`sqliteNoteStore.ts`, `nativeNoteStore.ts`, `backupStore.ts`), 저장소를 읽어 은하 노트를 만드는 `Album`(`album.ts`), 사진 사본 굽기(`photoCopy.ts`), AI 요약 차례(`summaries.ts`)와 Gemini API 요청(`geminiSummarizer.ts`) |
 | `src/dev/` | 개발용 가짜 데이터(`noteData.ts`)와 실데이터 임시 불러오기(`localNotes.ts`, `imageHeader.ts`, `keepNote.ts`) |
 | `test/` | vitest 단위 테스트(노드 환경). 앱 SQLite 저장소는 `node:sqlite`로 같은 SQL을 돌린다 |
 | `android/` | Capacitor 안드로이드 프로젝트. `app/src/main/assets/public`은 `cap sync`가 채우는 사본이라 저장소에 넣지 않는다 |

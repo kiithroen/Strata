@@ -97,12 +97,54 @@ describe('SqliteNoteStore', () => {
     expect(await (await store.photo('a'))?.text()).toBe('first');
   });
 
-  it('깨진 행은 건너뛰고 나머지를 읽는다', async () => {
+  it('깨진 행이나 형식이 틀린 행은 건너뛰고 나머지를 읽는다', async () => {
     const { db, store } = await setup();
     await store.put(record('a', '멀쩡함'));
     db.raw.prepare("INSERT INTO notes (id, time, modified, deleted, record) VALUES ('x', 0, 0, 0, '{깨짐')").run();
+    db.raw.prepare("INSERT INTO notes (id, time, modified, deleted, record) VALUES ('y', 0, 0, 0, '{}')").run();
+    db.raw.prepare("INSERT INTO notes (id, time, modified, deleted, record) VALUES ('z', 0, 0, 0, 'null')").run();
+    db.raw.prepare('INSERT INTO notes (id, time, modified, deleted, record) VALUES (\'w\', 0, 0, 0, \'{"v":1,"id":"w"}\')').run();
     const list = await store.list();
     expect(list.map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('같은 밀리초 안에서 사진을 바꿔도 새 파일 이름을 쓰고, DB 쓰기가 실패해도 옛 사진은 지우지 않는다', async () => {
+    const db = nodeDb();
+    const folder = new MemoryFolder();
+    const store = await SqliteNoteStore.open(db, folder, () => t0);
+    await store.put(record('a', '첫 사진'), jpeg('first'));
+    const [firstName] = [...folder.files.keys()];
+    await store.put(record('a', '둘째 사진'), jpeg('second'));
+    const [secondName] = [...folder.files.keys()];
+    expect(secondName).not.toBe(firstName);
+
+    const run = db.run.bind(db);
+    db.run = async () => {
+      throw new Error('DB 쓰기 실패');
+    };
+    await expect(store.put(record('a', '실패'), jpeg('third'))).rejects.toThrow('DB 쓰기 실패');
+    db.run = run;
+
+    expect(folder.files.size).toBe(1);
+    expect(folder.files.has(secondName)).toBe(true);
+    expect(await (await store.photo('a'))?.text()).toBe('second');
+  });
+
+  it('사진 삭제가 실패해도 저장 성공을 깨지 않고, DB 실패 때는 원래 DB 오류를 낸다', async () => {
+    const db = nodeDb();
+    const folder = new MemoryFolder();
+    const store = await SqliteNoteStore.open(db, folder, () => t0);
+    await store.put(record('a', '처음'), jpeg('first'));
+    folder.remove = async () => {
+      throw new Error('파일 삭제 실패');
+    };
+    await expect(store.put(record('a', '바꿈'), jpeg('second'))).resolves.toBeUndefined();
+    expect(await (await store.photo('a'))?.text()).toBe('second');
+
+    db.run = async () => {
+      throw new Error('DB 오류');
+    };
+    await expect(store.put(record('a', '실패'), jpeg('third'))).rejects.toThrow('DB 오류');
   });
 
   it('Album 이 이 저장소로 저장·사진·다시 읽기를 한다', async () => {

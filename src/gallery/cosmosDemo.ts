@@ -1296,6 +1296,13 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       readout.update();
       scrubber.update();
     },
+    onBack() {
+      if (!screens.open && !searchList.open && focus.focused) {
+        focus.set(null);
+        return true;
+      }
+      return false;
+    },
     dispose() {
       window.removeEventListener('keydown', onHomeKey);
       window.removeEventListener('keydown', onEscapeKey, true);

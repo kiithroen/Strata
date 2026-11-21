@@ -70,6 +70,8 @@ export class SettingsPanel {
   private importing = false;
   /** 요약 상태 글. 상태가 바뀔 때 이 글만 고친다(입력 칸이 다시 그려지지 않게) */
   private summaryNote: HTMLParagraphElement | null = null;
+  /** 노트 백업 줄 갱신 함수. 상태가 바뀔 때 백업 줄만 고친다 */
+  private syncBackupRow: (() => void) | null = null;
   private readonly onKey = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || !this.isVisible()) return;
     e.preventDefault();
@@ -135,20 +137,34 @@ export class SettingsPanel {
     return !this.panel.hidden && !c.contains('card-view-open') && !c.contains('note-viewer-open') && !c.contains('note-editor-open') && !c.contains('viewer-open');
   }
 
+  /** 설정 화면이 맨 위에 열려 있으면 닫고 true 를 돌려준다 */
+  closeIfVisible(): boolean {
+    if (!this.isVisible()) return false;
+    this.close();
+    return true;
+  }
+
   open(): void {
     this.draft = { ...this.current };
     this.panel.hidden = false;
     this.button.classList.add('active');
+    this.backup()?.listen(() => {
+      if (!this.panel.hidden) this.syncBackupRow?.();
+    });
     this.render();
   }
 
   close(): void {
     this.panel.hidden = true;
     this.button.classList.remove('active');
+    this.backup()?.listen(null);
+    this.syncBackupRow = null;
   }
 
   dispose(): void {
     this.summary.listen(null);
+    this.backup()?.listen(null);
+    this.syncBackupRow = null;
     window.removeEventListener('keydown', this.onKey, true);
     window.removeEventListener('pointerdown', this.onOutsideDown, true);
     window.removeEventListener('click', this.onOutsideClick, true);
@@ -159,6 +175,7 @@ export class SettingsPanel {
 
   private render(): void {
     const p = this.panel;
+    this.syncBackupRow = null;
     p.replaceChildren();
 
     const head = el('div', 'settings-head');
@@ -238,18 +255,27 @@ export class SettingsPanel {
   private renderBackup(p: HTMLElement): void {
     const backup = this.backup();
     if (!backup) return;
-    if (backup.needsAccess()) {
-      p.append(
-        row('노트 백업', [
-          choice('권한 설정', false, () => {
-            void backup.requestAccess().then(() => {
-              if (!this.panel.hidden) this.render();
-            });
-          }),
-        ]),
-      );
-    } else p.append(row('노트 백업', []));
-    p.append(el('p', 'settings-note', backup.text()));
+    const rowEl = row('노트 백업', []);
+    const noteEl = el('p', 'settings-note', '');
+    const syncRow = () => {
+      const group = rowEl.querySelector('.settings-choices')!;
+      if (backup.needsAccess()) {
+        let btn = group.querySelector('button');
+        if (!btn) {
+          btn = choice('권한 설정', false, () => {
+            void backup.requestAccess().then(syncRow);
+          });
+          group.replaceChildren(btn);
+        }
+        btn.disabled = backup.busy();
+      } else {
+        group.replaceChildren();
+      }
+      noteEl.textContent = backup.text();
+    };
+    syncRow();
+    this.syncBackupRow = syncRow;
+    p.append(rowEl, noteEl);
   }
 
   /** AI 요약: 키가 있으면 지금 요약과 키 지우기, 없으면 입력 칸과 저장(개발 서버 프록시가 있으면 지금 요약도) */

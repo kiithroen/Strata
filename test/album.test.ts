@@ -102,4 +102,24 @@ describe('Album 체크리스트', () => {
     await album.check(a.id, 5, false);
     expect(album.record(a.id)?.modified).toBe(t0);
   });
+
+  it('applyExternal 은 더 새 기록만 반영하고 같거나 옛 기록은 덮어쓰지 않는다', async () => {
+    const { album, tick } = clockAlbum();
+    const a = await album.save(draft('원본', t0));
+    tick(100);
+    const b = await album.save(draft('최신', t0));
+    const recA = album.record(a.id)!;
+    const recB = album.record(b.id)!;
+
+    album.applyExternal([
+      { ...recA, title: '더 새것', modified: recA.modified + 10 },
+      { ...recB, title: '같은 시각', modified: recB.modified },
+      { ...recB, title: '더 옛것', modified: recB.modified - 10 },
+      { v: 1, id: 'ext-1', time: t0, modified: t0, kind: 'memo', title: '외부 새 노트' },
+    ]);
+
+    expect(album.record(a.id)?.title).toBe('더 새것');
+    expect(album.record(b.id)?.title).toBe('최신');
+    expect(album.record('ext-1')?.title).toBe('외부 새 노트');
+  });
 });

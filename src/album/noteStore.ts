@@ -92,11 +92,13 @@ export class IdbNoteStore implements NoteStore {
  * 실행 환경의 저장소를 연다. 안드로이드 앱은 SQLite·앱 파일 저장소와 앱 밖 사본 폴더(backup 으로 상태를 알린다), 브라우저는 IndexedDB 다.
  * 못 쓰면 메모리 저장소로 대신하고 persistent 를 false 로 알린다
  */
-export async function openNoteStore(): Promise<{ store: NoteStore; persistent: boolean; backup?: BackupControls }> {
+export async function openNoteStore(
+  options?: { onDownload?: (records: NoteRecord[]) => void },
+): Promise<{ store: NoteStore; persistent: boolean; backup?: BackupControls }> {
   if (Capacitor.isNativePlatform()) {
     try {
       const { openNativeNoteStore } = await import('./nativeNoteStore');
-      const { store, backup } = await openNativeNoteStore();
+      const { store, backup } = await openNativeNoteStore(options?.onDownload);
       return { store, persistent: true, backup };
     } catch (err) {
       console.error(err);

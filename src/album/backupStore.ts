@@ -14,7 +14,7 @@ export interface BackupFolder {
 }
 
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const PHOTO_NAME = /^photo-([^.]+)\.[a-z0-9]+$/;
+const PHOTO_NAME = /^photo-(.+)\.[a-z0-9]+$/i;
 /** 갤러리 앱이 폴더의 사진을 사진첩에 올리지 않게 하는 표시 파일 */
 export const NO_MEDIA = '.nomedia';
 
@@ -39,12 +39,15 @@ export class BackupNoteStore implements NoteStore {
   private chain: Promise<void> = Promise.resolve();
   /** sync 가 도는 동안 저장한 노트. 그 노트는 폴더 쪽으로 덮어쓰지 않는다 */
   private touched: Set<string> | null = null;
+  /** 첫 sync 가 끝날 때까지 사이에 저장한 노트. 맞추기가 끝난 뒤 폴더에 쓴다 */
+  private dirtyDuringSync: Map<string, { record: NoteRecord; photo: Blob | null | undefined }> | null = null;
   /** 마지막 폴더 작업의 오류. 성공하면 비운다 */
   lastError: string | null = null;
 
   constructor(
     private readonly inner: NoteStore,
     private readonly folder: BackupFolder,
+    private readonly onDownload?: (records: NoteRecord[]) => void,
   ) {}
 
   /** 폴더에 쓰고 있는지(sync 가 한 번 성공했는지) */
@@ -64,7 +67,12 @@ export class BackupNoteStore implements NoteStore {
     this.touched?.add(record.id);
     await this.inner.put(record, photo);
     // 실패는 lastError 로 남고 다음 sync 가 다시 맞춘다
-    if (this.active) this.queue(() => this.mirror(record, photo)).catch(() => undefined);
+    if (this.active) {
+      this.queue(() => this.mirror(record, photo)).catch(() => undefined);
+    } else if (this.dirtyDuringSync) {
+      const prev = this.dirtyDuringSync.get(record.id);
+      this.dirtyDuringSync.set(record.id, { record, photo: photo === undefined ? prev?.photo : photo });
+    }
   }
 
   /** 기다리던 폴더 작업이 다 끝나면 끝난다 */
@@ -79,10 +87,12 @@ export class BackupNoteStore implements NoteStore {
   sync(): Promise<BackupResult> {
     return this.queue(async () => {
       this.touched = new Set();
+      this.dirtyDuringSync = new Map();
       try {
         return await this.reconcile();
       } finally {
         this.touched = null;
+        this.dirtyDuringSync = null;
       }
     });
   }
@@ -104,7 +114,6 @@ export class BackupNoteStore implements NoteStore {
   private async reconcile(): Promise<BackupResult> {
     const names = await this.folder.list();
     if (!names.includes(NO_MEDIA)) await this.folder.writeText(NO_MEDIA, '');
-    this.active = true;
     this.photoNames.clear();
     const remote: NoteRecord[] = [];
     for (const name of names) {
@@ -121,23 +130,42 @@ export class BackupNoteStore implements NoteStore {
 
     const local = await this.inner.list();
     const { upload, download } = mergeRecords(local, remote);
-    let downloaded = 0;
+    const downloadedRecords: NoteRecord[] = [];
     for (const r of download) {
       if (this.touched?.has(r.id)) continue;
       const blob = r.photo && !r.deleted ? await this.folderPhoto(r.id) : null;
+      if (this.touched?.has(r.id)) continue;
       // 사진 정보가 있는데 폴더에 사진 파일이 없으면 앱에 있던 사진을 그대로 둔다
       await this.inner.put(r, r.photo && !r.deleted ? (blob ?? undefined) : null);
-      downloaded++;
+      downloadedRecords.push(r);
     }
     const uploadIds = new Set(upload.map((r) => r.id));
-    for (const r of upload) await this.mirror(r, r.photo && !r.deleted ? await this.inner.photo(r.id) : null);
+    let uploaded = 0;
+    for (const r of upload) {
+      if (this.touched?.has(r.id)) continue;
+      // 로컬 사진을 읽지 못해 null 이 와도 폴더에 남아 있던 백업 사진을 지우지 않는다
+      const blob = r.photo && !r.deleted ? ((await this.inner.photo(r.id)) ?? undefined) : null;
+      if (this.touched?.has(r.id)) continue;
+      await this.mirror(r, blob);
+      uploaded++;
+    }
     // 기록은 같은데 폴더에 사진 파일이 빠진 노트는 사진만 채운다
     for (const r of local) {
-      if (uploadIds.has(r.id) || r.deleted || !r.photo || this.photoNames.has(r.id)) continue;
+      if (this.touched?.has(r.id) || uploadIds.has(r.id) || r.deleted || !r.photo || this.photoNames.has(r.id)) continue;
       const blob = await this.inner.photo(r.id);
+      if (this.touched?.has(r.id)) continue;
       if (blob) await this.writePhoto(r.id, blob);
     }
-    return { downloaded, uploaded: upload.length };
+    if (!this.active && this.dirtyDuringSync) {
+      while (this.dirtyDuringSync.size > 0) {
+        const batch = [...this.dirtyDuringSync.entries()];
+        this.dirtyDuringSync.clear();
+        for (const [, entry] of batch) await this.mirror(entry.record, entry.photo);
+      }
+    }
+    this.active = true;
+    if (downloadedRecords.length > 0) this.onDownload?.(downloadedRecords);
+    return { downloaded: downloadedRecords.length, uploaded };
   }
 
   /** 기록 하나를 폴더에 쓴다. photo 가 Blob 이면 사진을 바꾸고, null 이면 지우며, 없으면 그대로 둔다. 사진을 먼저 쓴다 */

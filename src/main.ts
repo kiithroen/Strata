@@ -57,14 +57,6 @@ document.querySelector('meta[name="theme-color"]')?.setAttribute('content', tuni
 const settings = loadSettings();
 applyQuality(settings.quality);
 
-// 안드로이드 뒤로 키: 방문 기록이 있으면 웹 뒤로(맨 위 화면을 닫는다), 없으면 앱을 뒤로 보낸다
-if (Capacitor.isNativePlatform()) {
-  void App.addListener('backButton', ({ canGoBack }) => {
-    if (canGoBack) history.back();
-    else void App.minimizeApp();
-  });
-}
-
 const stage = new Stage(container);
 // 위젯 데모가 부르는 앱 동작은 데모를 만들기 전에 채운다(아래 함수들은 함수 선언이라 여기서 쓸 수 있다)
 appHooks.showNotes = (data, resume) => {
@@ -187,7 +179,7 @@ async function importFiles(files: File[], progress?: (text: string) => void): Pr
 
 let perf: PerfOverlay | null = settings.perf ? new PerfOverlay(stage.renderer) : null;
 setPhotoStyle(settings.photoStyle);
-new SettingsPanel(
+const settingsPanel = new SettingsPanel(
   settings,
   readQuality(),
   (on) => {
@@ -199,6 +191,16 @@ new SettingsPanel(
   { restart: startSummaries, route: summaryRoute, status: summaryStatus, listen: onSummaryStatus, runNow: runSummariesNow },
   albumBackup,
 );
+
+// 안드로이드 뒤로 키: 열린 설정 화면·펼친 카드·방문 기록 차례로 닫고, 첫 화면이면 앱을 뒤로 보낸다
+if (Capacitor.isNativePlatform()) {
+  void App.addListener('backButton', ({ canGoBack }) => {
+    if (settingsPanel.closeIfVisible()) return;
+    if (demo.onBack?.()) return;
+    if (canGoBack) history.back();
+    else void App.minimizeApp();
+  });
+}
 
 // 게임 시간: 프레임 간격을 누적하되 긴 멈춤은 loop.maxStep 으로 자른다
 let time = 0;

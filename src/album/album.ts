@@ -28,6 +28,19 @@ export class Album {
     this.photoBlobs.clear();
   }
 
+  /** 외부 동기화로 저장소에 들어온 기록을 메모리 상태에 반영한다. 수정 시각이 더 늦은 기록만 받는다 */
+  applyExternal(records: readonly NoteRecord[]): void {
+    let changed = false;
+    for (const r of records) {
+      const cur = this.records.get(r.id);
+      if (cur && cur.modified >= r.modified) continue;
+      this.records.set(r.id, structuredClone(r));
+      this.photoBlobs.delete(r.id);
+      changed = true;
+    }
+    if (changed) this.cached = null;
+  }
+
   /** 지우지 않은 노트 수 */
   get count(): number {
     let n = 0;

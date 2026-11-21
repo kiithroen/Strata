@@ -188,4 +188,93 @@ describe('BackupNoteStore', () => {
     expect((await inner.list())[0].title).toBe('방금 고침');
     expect(folder.record('a')?.title).toBe('방금 고침');
   });
+
+  it('폴더 사진을 읽는 중에 노트를 고치면 내려받은 옛 기록으로 덮어쓰지 않는다', async () => {
+    const folder = new MemoryFolder();
+    folder.files.set(noteFileName('a'), JSON.stringify({ ...photoNote('a', t0 + 10), title: '폴더 옛것' }));
+    folder.files.set(photoFileName('a', 'jpg'), jpeg('old-pic'));
+    const inner = new MemoryNoteStore();
+    const store = new BackupNoteStore(inner, folder);
+    let editing: Promise<void> | null = null;
+    const readBlob = folder.readBlob.bind(folder);
+    folder.readBlob = async (name) => {
+      const blob = await readBlob(name);
+      editing ??= store.put({ ...photoNote('a', t0 + 20), title: '방금 고침' }, jpeg('new-pic'));
+      return blob;
+    };
+    await store.sync();
+    await editing;
+    await store.flush();
+    expect((await inner.list())[0].title).toBe('방금 고침');
+    expect(await (await inner.photo('a'))?.text()).toBe('new-pic');
+    expect(folder.record('a')?.title).toBe('방금 고침');
+    expect(await (folder.files.get(photoFileName('a', 'jpg')) as Blob).text()).toBe('new-pic');
+  });
+
+  it('업로드할 사진 노트의 앱 쪽 사진을 못 읽어도 폴더에 남아 있던 백업 사진은 지우지 않는다', async () => {
+    const folder = new MemoryFolder();
+    folder.files.set(noteFileName('a'), JSON.stringify(photoNote('a', t0)));
+    folder.files.set(photoFileName('a', 'jpg'), jpeg('backup-pic'));
+    const inner = new MemoryNoteStore();
+    await inner.put(photoNote('a', t0 + 10), null);
+    const store = new BackupNoteStore(inner, folder);
+    expect(await store.sync()).toEqual({ downloaded: 0, uploaded: 1 });
+    expect(folder.record('a')?.modified).toBe(t0 + 10);
+    expect(await (folder.files.get(photoFileName('a', 'jpg')) as Blob).text()).toBe('backup-pic');
+  });
+
+  it('첫 sync 가 중간에 실패하면 enabled 는 꺼진 채 남는다', async () => {
+    const folder = new MemoryFolder();
+    folder.files.set(NO_MEDIA, '');
+    const inner = new MemoryNoteStore();
+    await inner.put(memo('a', '메모'));
+    folder.writeText = async () => {
+      throw new Error('쓰기 실패');
+    };
+    const store = new BackupNoteStore(inner, folder);
+    await expect(store.sync()).rejects.toThrow('쓰기 실패');
+    expect(store.enabled).toBe(false);
+  });
+
+  it('첫 sync 가 도는 동안 새로 저장한 노트도 누락하지 않고 폴더에 쓴다', async () => {
+    const folder = new MemoryFolder();
+    const inner = new MemoryNoteStore();
+    const store = new BackupNoteStore(inner, folder);
+    let saving: Promise<void> | null = null;
+    const list = inner.list.bind(inner);
+    inner.list = async () => {
+      const records = await list();
+      saving ??= store.put(photoNote('n.1'), jpeg('during-sync'));
+      return records;
+    };
+    await store.sync();
+    await saving;
+    await store.flush();
+    expect(folder.record('n.1')?.title).toBe('사진');
+    expect(await (folder.files.get(photoFileName('n.1', 'jpg')) as Blob).text()).toBe('during-sync');
+  });
+
+  it('점이 들어간 번호와 대문자 확장자 사진 파일도 되살린다', async () => {
+    const folder = new MemoryFolder();
+    folder.files.set(noteFileName('a.1'), JSON.stringify({ ...photoNote('a.1'), photo: { file: 'photo-a.1.JPG', width: 4, height: 3 } }));
+    folder.files.set('photo-a.1.JPG', jpeg('upper'));
+    const inner = new MemoryNoteStore();
+    const downloaded: NoteRecord[] = [];
+    const store = new BackupNoteStore(inner, folder, (r) => downloaded.push(...r));
+    expect(await store.sync()).toEqual({ downloaded: 1, uploaded: 0 });
+    expect(downloaded.map((r) => r.id)).toEqual(['a.1']);
+    expect(await (await inner.photo('a.1'))?.text()).toBe('upper');
+  });
+
+  it('onDownload 콜백은 실제로 내려받은 기록만 넘긴다', async () => {
+    const folder = new MemoryFolder();
+    folder.files.set(noteFileName('a'), JSON.stringify(memo('a', '폴더가 새것', t0 + 10)));
+    folder.files.set(noteFileName('b'), JSON.stringify(memo('b', '폴더가 옛것', t0)));
+    const inner = new MemoryNoteStore();
+    await inner.put(memo('a', '앱이 옛것', t0));
+    await inner.put(memo('b', '앱이 새것', t0 + 10));
+    const got: NoteRecord[] = [];
+    await new BackupNoteStore(inner, folder, (r) => got.push(...r)).sync();
+    expect(got.map((r) => r.id)).toEqual(['a']);
+  });
 });

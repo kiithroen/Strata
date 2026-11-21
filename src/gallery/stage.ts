@@ -81,6 +81,8 @@ export interface WidgetDemo {
   readonly title: string;
   readonly hint: string;
   update(dt: number, time: number): void;
+  /** 안드로이드 뒤로 키에서 방문 기록을 되돌리기 전에 닫을 화면이 있으면 닫고 true 를 돌려준다 */
+  onBack?(): boolean;
   dispose(): void;
 }
 

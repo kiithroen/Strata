@@ -7,6 +7,7 @@ import { bakePhotoCopy, readTakenAt } from '../album/photoCopy';
 import { geminiSummarizer } from '../album/geminiSummarizer';
 import { SummaryRunner, type SummaryStatus } from '../album/summaries';
 import { tuning } from '../config';
+import type { NoteRecord } from '../sync/noteRecord';
 import { appHooks } from './appHooks';
 import { mountCosmosDemo, type CosmosDemo } from './cosmosDemo';
 import type { AlbumActions, AlbumReload } from './noteScreens';
@@ -24,17 +25,27 @@ export function albumBackup(): BackupControls | null {
 
 /** 메모 앨범 저장소를 열고 노트를 읽는다. 앱이 첫 화면을 띄우기 전에 부른다. 저장소를 못 쓰면 이번 실행에만 남는 메모리 저장소다 */
 export async function openAlbum(): Promise<void> {
-  const { store, persistent, backup: storeBackup } = await openNoteStore();
+  const pendingExternal: NoteRecord[] = [];
+  let loaded = false;
+  const { store, persistent, backup: storeBackup } = await openNoteStore({
+    onDownload: (records) => {
+      if (loaded) album.applyExternal(records);
+      else pendingExternal.push(...records);
+    },
+  });
   if (!persistent) warnNotSaved();
   const opened = new Album(store);
   try {
     await opened.load();
+    if (pendingExternal.length > 0) opened.applyExternal(pendingExternal);
     album = opened;
+    loaded = true;
     backup = storeBackup ?? null;
   } catch (err) {
     console.error(err);
     warnNotSaved();
     album = new Album(new MemoryNoteStore());
+    backup = null;
   }
 }
 
@@ -69,7 +80,7 @@ export function startSummaries(apiKey: string): void {
   runner = null;
   const route = summaryRoute(apiKey);
   if (route) {
-    runner = new SummaryRunner(
+    const current = new SummaryRunner(
       album,
       geminiSummarizer(route === 'key' ? apiKey : null),
       (id) => {
@@ -78,7 +89,12 @@ export function startSummaries(apiKey: string): void {
       },
       (status) => summaryListener?.(status),
     );
-    void runner.runOnce();
+    runner = current;
+    const firstRun = () => {
+      if (runner === current) void current.runOnce();
+    };
+    if (backup) void backup.whenSynced.then(firstRun);
+    else firstRun();
     summaryTimer = window.setInterval(() => void runner?.runOnce(), tuning.album.summary.intervalSec * 1000);
   }
   summaryListener?.(summaryStatus());

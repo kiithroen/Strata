@@ -1,4 +1,4 @@
-import type { NoteRecord } from '../sync/noteRecord';
+import { parseNoteRecord, type NoteRecord } from '../sync/noteRecord';
 import type { NoteStore } from './noteStore';
 
 /** SQLite 연결에서 저장소가 쓰는 부분. 앱은 Capacitor SQLite 플러그인, 테스트는 node:sqlite 로 채운다 */
@@ -30,18 +30,12 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS notes (
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 /**
- * 사진 파일 이름. 바꿀 때마다 새 이름이라 쓰다가 멈춰도 기록이 가리키는 옛 파일은 온전하다.
- * 드라이브의 파일 이름(photoFileName)과는 따로다
- */
-function photoName(id: string, type: string, now: number): string {
-  return `photo-${id}-${now.toString(36)}.${EXT[type] ?? 'bin'}`;
-}
-
-/**
  * 앱의 메모 앨범 저장소: 노트 기록은 SQLite notes 표(번호·시각·지움 표시는 열로, 기록 전체는 JSON 으로), 사진은 앱 파일 폴더에 둔다.
  * photo 열이 지금 사진 파일 이름이다. 사진을 바꿀 때는 새 파일을 다 쓴 뒤 행을 바꾸고 옛 파일을 지운다
  */
 export class SqliteNoteStore implements NoteStore {
+  private seq = 0;
+
   private constructor(
     private readonly db: SqlDb,
     private readonly folder: PhotoFolder,
@@ -53,12 +47,24 @@ export class SqliteNoteStore implements NoteStore {
     return new SqliteNoteStore(db, folder, now);
   }
 
+  /** 바꿀 때마다 새 이름이라 같은 밀리초 안에서도 옛 파일을 덮어쓰지 않는다. 드라이브 파일 이름(photoFileName)과는 따로다 */
+  private nextPhotoName(id: string, type: string, old: string | null): string {
+    const ext = EXT[type] ?? 'bin';
+    let name: string;
+    do {
+      name = `photo-${id}-${this.now().toString(36)}-${(this.seq++).toString(36)}.${ext}`;
+    } while (name === old);
+    return name;
+  }
+
   async list(): Promise<NoteRecord[]> {
     const rows = await this.db.query('SELECT id, record FROM notes');
     const records: NoteRecord[] = [];
     for (const row of rows) {
       try {
-        records.push(JSON.parse(String(row.record)) as NoteRecord);
+        const parsed = parseNoteRecord(JSON.parse(String(row.record)));
+        if (parsed) records.push(parsed);
+        else console.warn(`노트 ${String(row.id)} 기록 형식이 맞지 않아 건너뛴다`);
       } catch {
         // 깨진 행 하나 때문에 앨범 전체를 못 여는 일이 없게 건너뛴다
         console.warn(`노트 ${String(row.id)} 기록을 읽을 수 없어 건너뛴다`);
@@ -79,7 +85,7 @@ export class SqliteNoteStore implements NoteStore {
       return;
     }
     const old = await this.photoNameOf(record.id);
-    const name = photo ? photoName(record.id, photo.type, this.now()) : null;
+    const name = photo ? this.nextPhotoName(record.id, photo.type, old) : null;
     if (photo && name) await this.folder.write(name, photo);
     try {
       await this.db.run(
@@ -89,10 +95,10 @@ export class SqliteNoteStore implements NoteStore {
         [...values, name, json],
       );
     } catch (err) {
-      if (name) await this.folder.remove(name);
+      if (name && name !== old) await this.folder.remove(name).catch(() => undefined);
       throw err;
     }
-    if (old && old !== name) await this.folder.remove(old);
+    if (old && old !== name) await this.folder.remove(old).catch(() => undefined);
   }
 
   async photo(id: string): Promise<Blob | null> {
