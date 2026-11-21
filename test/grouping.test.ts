@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { tuning } from '../src/config';
 import { floorTo } from '../src/core/calendar';
 import { buildHubs, choosePlanetUnit, clusterAffinities, parentUnit, planetLabel, swarmCapacity } from '../src/widgets/cosmos/cosmosModel';
-import { dateGrouping, folderGrouping } from '../src/widgets/cosmos/grouping';
+import { dateGrouping, folderAffinities, folderGrouping } from '../src/widgets/cosmos/grouping';
 import { clusterNotes, levelLogScale, type NoteRef } from '../src/widgets/timeAxis/axisModel';
 
 const day = (d: number, h = 12) => new Date(2026, 10, d, h).getTime();
@@ -73,5 +73,19 @@ describe('folderGrouping', () => {
     expect(g.planets[0].affinities[1]).toBeCloseTo((1 + f.minAffinity) / 2, 12);
     expect(g.planets[1].affinities).toEqual([1]);
     expect(g.capacity).toBe(f.capacity);
+  });
+
+  it('파일이 카드 수보다 많으면 카드 수까지 직선으로 줄고 그 뒤는 minAffinity 라, 카드들의 관련도가 고루 퍼진다', () => {
+    const f = tuning.cosmos.folderAxis;
+    const many = folderAffinities(f.capacity * 20);
+    expect(many[0]).toBe(1);
+    expect(many[f.capacity - 1]).toBeCloseTo(f.minAffinity, 12);
+    for (let k = 1; k < f.capacity; k++) expect(many[k]).toBeLessThan(many[k - 1]);
+    for (let k = f.capacity; k < many.length; k++) expect(many[k]).toBeCloseTo(f.minAffinity, 12);
+    // 카드 수 이하면 가장 오래된 파일이 minAffinity 인 직선이다
+    const few = folderAffinities(3);
+    expect(few[0]).toBe(1);
+    expect(few[1]).toBeCloseTo((1 + f.minAffinity) / 2, 12);
+    expect(few[2]).toBeCloseTo(f.minAffinity, 12);
   });
 });

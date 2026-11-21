@@ -110,6 +110,101 @@ export function spiralPoint(s: number, time: number, jitter: PlanetJitter, out: 
   return out.set(r * cosPhi * Math.sin(alpha), r * Math.sin(phi), -r * cosPhi * Math.cos(alpha));
 }
 
+function depthOfArc(arc: number): number {
+  return (Math.sign(arc) * Math.expm1(Math.abs(arc))) / tuning.cosmos.spiralKnee;
+}
+
+const NO_JITTER: PlanetJitter = { radiusScale: 1, angleOffset: 0, elevationOffset: 0 };
+const spreadP = new Vector3();
+
+/**
+ * 나선 위 깊이들을 순서는 그대로 두고, 노드끼리 나선 위에서 minGap(월드) 이상 떨어지도록 바깥쪽으로 민다.
+ * 원점에 가까운 것부터 차례로, 먼저 놓인 노드 중 반지름으로 보아 닿을 수 있는 노드와 모두 minGap 이상 떨어질 때까지 진행도(spiralArc)를 늘린다.
+ * jitters 를 넘기면 노드마다의 편차까지 넣어 잰다. 과거(양수)와 미래(음수)는 따로 민다.
+ * 공전 시계는 모든 노드를 같이 돌리므로 거리에 영향이 없다.
+ */
+export function spreadDepths(depths: readonly number[], minGap: number, jitters?: readonly PlanetJitter[]): number[] {
+  const out = depths.slice();
+  if (minGap <= 0) return out;
+  const c = tuning.cosmos;
+  const jitterOf = (i: number) => jitters?.[i] ?? NO_JITTER;
+  for (const sign of [1, -1]) {
+    const side = depths
+      .map((_, i) => i)
+      .filter((i) => (sign > 0 ? depths[i] >= 0 : depths[i] < 0))
+      .sort((a, b) => Math.abs(depths[a]) - Math.abs(depths[b]) || a - b);
+    const placed: { arc: number; radius: number; point: Vector3 }[] = [];
+    let first = 0;
+    for (const i of side) {
+      const jitter = jitterOf(i);
+      let arc = Math.abs(spiralArc(depths[i]));
+      const floor = placed.length > 0 ? placed[placed.length - 1].arc : 0;
+      // 반지름 차이는 두 점 거리를 넘지 않으므로, 이 노드가 가질 수 있는 가장 작은 반지름보다 minGap 이상 안쪽 노드와는 닿지 않는다.
+      // 진행도는 늘기만 하니 한 번 빠진 노드는 다시 볼 필요가 없다
+      const reach = c.radialScale * Math.max(arc, floor) * (1 - c.radiusJitter) - minGap;
+      while (first < placed.length && placed[first].radius < reach) first++;
+      const near = placed.slice(first);
+      const far = (a: number) => {
+        spiralPoint(depthOfArc(sign * a), 0, jitter, spreadP);
+        return near.every((q) => q.point.distanceTo(spreadP) >= minGap);
+      };
+      let moved = false;
+      if (floor > arc) {
+        arc = floor;
+        moved = true;
+      }
+      if (near.length > 0) {
+        if (!far(arc)) {
+          moved = true;
+          // 반지름 차이는 두 점 거리를 넘지 않으므로, 앞 노드들의 가장 큰 반지름보다 minGap 만큼 바깥이면 반드시 떨어진다
+          const outer = Math.max(...near.map((q) => q.radius));
+          let lo = arc;
+          let hi = Math.max(arc, (outer + minGap) / (c.radialScale * jitter.radiusScale));
+          // 고도각을 자르면 반지름이 그대로라 위 한계가 맞다. 그래도 못 닿으면 넉넉히 늘린다
+          while (!far(hi)) hi += minGap / c.radialScale;
+          for (let k = 0; k < 40; k++) {
+            const mid = (lo + hi) / 2;
+            if (far(mid)) hi = mid;
+            else lo = mid;
+          }
+          arc = hi;
+        }
+      }
+      if (moved) out[i] = depthOfArc(sign * arc);
+      const point = spiralPoint(out[i], 0, jitter, new Vector3());
+      placed.push({ arc, radius: point.length(), point });
+    }
+  }
+  return out;
+}
+
+/**
+ * spreadDepths 로 민 만큼을 시각 축 전체에 이어 붙인다. times·base·spread 는 노드마다의 시각, 원래 깊이, 민 깊이다.
+ * 돌려주는 함수는 시각과 그 시각의 원래 깊이를 받아, 시간 순서로 이웃한 두 노드가 민 양을 시각으로 선형 보간해 더한다.
+ * 가장 최근·가장 오래된 노드 바깥은 그 노드가 민 양을 그대로 쓴다. 그래서 시간 띠로 고른 시각이 민 노드 자리와 맞는다.
+ */
+export function depthWarp(times: readonly number[], base: readonly number[], spread: readonly number[]): (time: number, depth: number) => number {
+  const order = times.map((_, i) => i).sort((a, b) => times[a] - times[b]);
+  const t = order.map((i) => times[i]);
+  const delta = order.map((i) => spread[i] - base[i]);
+  return (time, depth) => {
+    const n = t.length;
+    if (n === 0) return depth;
+    if (time <= t[0]) return depth + delta[0];
+    if (time >= t[n - 1]) return depth + delta[n - 1];
+    let lo = 0;
+    let hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (t[mid] <= time) lo = mid;
+      else hi = mid;
+    }
+    const span = t[hi] - t[lo];
+    const w = span > 0 ? (time - t[lo]) / span : 0;
+    return depth + delta[lo] + (delta[hi] - delta[lo]) * w;
+  };
+}
+
 // ── 선 그래프 ─────────────────────────────────────────
 
 /** 행성 단위의 한 단계 위 단위. 행성들은 이 단위의 허브에 가지로 이어진다. 연이면 위가 없다 */

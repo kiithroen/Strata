@@ -286,6 +286,8 @@ export const tuning = {
     twist: 2.2,
     elevationAmp: 0.72,
     elevationFreq: 1.25,
+    /** 나선 위 이웃한 행성 노드 사이의 최소 거리(월드). 더 붙으면 순서를 지키며 바깥으로 민다 */
+    nodeGap: 2.6,
     /** 궤도 카메라 거리 범위·기본 거리·초기 각도(라디안) */
     initialDistance: 11.0,
     minDistance: 1.6,
@@ -349,7 +351,7 @@ export const tuning = {
       /** 카드 탭 판정 반경(CSS px). 화면에 보이는 카드 반지름이 이보다 크면 그쪽을 쓴다 */
       cardTapRadius: 38,
       /** 노드마다 긋는 살과 점의 최대 수(관련도 높은 노트부터). 카드로 도는 노트는 늘 긋는다 */
-      maxSpokes: 24,
+      maxSpokes: 12,
       burst: { inner: 0.06, spacing: 0.055, pullSpread: 0.85, pullCurve: 1.5, depthJitter: 0.05, spin: 0.06 },
       hourColors: ['#2a5cff', '#2f9dff', '#38d4ff', '#7fe9ff', '#5a7dff', '#8fb4ff'],
     },

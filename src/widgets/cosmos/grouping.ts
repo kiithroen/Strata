@@ -79,6 +79,16 @@ function parentFolder(path: string): string {
   return slash < 0 ? '' : path.slice(0, slash);
 }
 
+/**
+ * 폴더 안 관련도(최근 파일부터). 최근 파일이 1이고, 카드로 도는 수(cosmos.folderAxis.capacity)까지 직선으로 줄어
+ * 그 뒤 파일은 모두 cosmos.folderAxis.minAffinity 다. 파일이 많아도 카드들이 궤도 반지름에 고루 퍼진다
+ */
+export function folderAffinities(n: number): number[] {
+  const f = tuning.cosmos.folderAxis;
+  const span = Math.min(n, f.capacity) - 1;
+  return Array.from({ length: n }, (_, k) => (span <= 0 ? (k === 0 ? 1 : f.minAffinity) : 1 - Math.min(1, k / span) * (1 - f.minAffinity)));
+}
+
 const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
 
 /**
@@ -86,8 +96,8 @@ const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' })
  * 잎을 품은 폴더는 자기 이름의 허브가 되고, 그 폴더에 파일이 있으면 그 행성도 자기 허브에 든다(같은 폴더가 허브와 다른 묶음의 행성으로 갈라지지 않게).
  * 그래서 허브의 수는 그 허브의 지층 층에 깔리는 파일 수다.
  * folderOf 는 노트마다 들어 있는 폴더 경로(원본 기준, 원본은 '')이고 rootName 은 원본 폴더 이름이다.
- * 노드 위에는 폴더 이름, 아래에는 가장 최근 파일의 날짜와 파일 수를 적는다. 폴더 안의 관련도는 최근 파일일수록 높고
- * 가장 오래된 파일이 cosmos.folderAxis.minAffinity 다. notes 는 최근 것부터여야 한다.
+ * 노드 위에는 폴더 이름, 아래에는 가장 최근 파일의 날짜와 파일 수를 적는다. 폴더 안의 관련도는 folderAffinities 다.
+ * notes 는 최근 것부터여야 한다.
  */
 export function folderGrouping(notes: readonly NoteRef[], folderOf: readonly string[], rootName: string): Grouping {
   const f = tuning.cosmos.folderAxis;
@@ -113,7 +123,7 @@ export function folderGrouping(notes: readonly NoteRef[], folderOf: readonly str
       label: planetLabel('day', floorTo('day', anchorTime), n),
       heading: name,
       title: name,
-      affinities: list.map((_, k) => (n === 1 ? 1 : 1 - (k / (n - 1)) * (1 - f.minAffinity))),
+      affinities: folderAffinities(n),
     };
   });
 

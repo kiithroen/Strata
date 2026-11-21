@@ -29,6 +29,8 @@ import {
   galaxySpinAngle,
   spiralPoint,
   timeOffsetDepth,
+  spreadDepths,
+  depthWarp,
   type PlanetJitter,
   type TapTarget,
 } from '../widgets/cosmos/cosmosModel';
@@ -282,6 +284,15 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       node: { kind: 'planet', key: cluster.key, anchorTime: cluster.anchorTime, position: new Vector3() } as CosmosNode,
     };
   });
+  // 나선 위에서 너무 붙은 노드(같은 때 몰린 폴더, 로그로 눌린 옛 묶음)는 순서를 지키며 바깥으로 밀고, 시간 띠도 그만큼 따라가게 한다
+  const baseDepths = planets.map((p) => p.offsetS);
+  const spreadDepthList = spreadDepths(baseDepths, c.nodeGap, planets.map((p) => p.jitter));
+  planets.forEach((p, i) => (p.offsetS = spreadDepthList[i]));
+  const warpDepth = depthWarp(
+    planets.map((p) => p.cluster.anchorTime),
+    baseDepths,
+    spreadDepthList,
+  );
   const hubViews = hubs.map((hub) => {
     const color = nodeColor(hub.key);
     return {
@@ -848,7 +859,7 @@ export function mountCosmosDemo(stage: Stage, data?: NoteData, options: CosmosOp
       pinnedTime = t;
       controller.current.focusTime = t;
       controller.target.focusTime = t;
-      spiralPoint(timeOffsetDepth(spiralState, t), orbitClock, zeroJitter, scrubPoint);
+      spiralPoint(warpDepth(t, timeOffsetDepth(spiralState, t)), orbitClock, zeroJitter, scrubPoint);
       cameraRig.focusPoint(scrubPoint);
     },
     onTouchingChange: (t) => {
